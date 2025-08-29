@@ -83,18 +83,23 @@ export default function Players() {
           </div>
           <div className="flex items-center space-x-3">
             {viewMode === "waiver" && (
-              <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-                <SelectTrigger className="w-48" data-testid="select-league">
-                  <SelectValue placeholder="Select a league" />
-                </SelectTrigger>
-                <SelectContent>
-                  {leagues?.map((league: any) => (
-                    <SelectItem key={league.id} value={league.id}>
-                      {league.name} ({league.season})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <>
+                <div className="text-sm text-muted-foreground">League:</div>
+                <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                  <SelectTrigger className="w-48" data-testid="select-league">
+                    <SelectValue placeholder="Select a league" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leagues?.length > 0 ? leagues.map((league: any) => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name} ({league.season})
+                      </SelectItem>
+                    )) : (
+                      <SelectItem value="" disabled>No leagues found - load a league first</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </>
             )}
             
             <Select value={selectedSport} onValueChange={setSelectedSport}>
