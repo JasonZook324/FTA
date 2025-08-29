@@ -453,8 +453,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
         espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
         espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster'])
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster', 'mScoreboard'])
       ]);
+      
+      // Also try getting settings directly from standings data which often has more complete info
+      const settingsFromStandings = standingsData.settings || {};
+      console.log('Settings from standings data:', JSON.stringify(settingsFromStandings, null, 2));
+      
+      // Merge settings data from multiple sources
+      const combinedSettings = {
+        ...leagueDetailsData.settings,
+        ...settingsFromStandings
+      };
+      console.log('Combined settings:', JSON.stringify(combinedSettings, null, 2));
 
       // Get waiver wire players (using existing logic from waiver-wire route)
       const playersResponse = await espnApiService.getPlayers(credentials, league.sport, league.season);
@@ -527,17 +538,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let scoringType = 'Standard';
       
       // Check multiple possible paths for scoring settings
-      if (leagueDetailsData.settings?.scoringSettings?.receptionPoints !== undefined) {
-        receptionPoints = leagueDetailsData.settings.scoringSettings.receptionPoints;
-      } else if (leagueDetailsData.settings?.scoringItems) {
-        // Look for reception scoring in scoringItems (ESPN often puts it here)
-        const receptionScoringItem = leagueDetailsData.settings.scoringItems.find((item: any) => 
-          item.statId === 53 || // Reception stat ID in ESPN
-          item.description?.toLowerCase().includes('reception') ||
-          item.abbr === 'REC'
-        );
-        if (receptionScoringItem) {
-          receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+      // Try combined settings first, then individual sources
+      const settingsSources = [combinedSettings, settingsFromStandings, leagueDetailsData.settings];
+      
+      for (const settings of settingsSources) {
+        if (settings?.scoringSettings?.receptionPoints !== undefined) {
+          receptionPoints = settings.scoringSettings.receptionPoints;
+          console.log('Found reception points in scoringSettings:', receptionPoints);
+          break;
+        } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+          // Look for reception scoring in scoringItems (ESPN often puts it here)
+          const receptionScoringItem = settings.scoringItems.find((item: any) => 
+            item.statId === 53 || // Reception stat ID in ESPN
+            item.description?.toLowerCase().includes('reception') ||
+            item.abbr === 'REC'
+          );
+          if (receptionScoringItem) {
+            receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+            console.log('Found reception points in scoringItems:', receptionPoints);
+            break;
+          }
         }
       }
       
@@ -666,17 +686,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let scoringType = 'Standard';
       
       // Check multiple possible paths for scoring settings
-      if (leagueDetailsData.settings?.scoringSettings?.receptionPoints !== undefined) {
-        receptionPoints = leagueDetailsData.settings.scoringSettings.receptionPoints;
-      } else if (leagueDetailsData.settings?.scoringItems) {
-        // Look for reception scoring in scoringItems (ESPN often puts it here)
-        const receptionScoringItem = leagueDetailsData.settings.scoringItems.find((item: any) => 
-          item.statId === 53 || // Reception stat ID in ESPN
-          item.description?.toLowerCase().includes('reception') ||
-          item.abbr === 'REC'
-        );
-        if (receptionScoringItem) {
-          receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+      // Try combined settings first, then individual sources
+      const settingsSources = [combinedSettings, settingsFromStandings, leagueDetailsData.settings];
+      
+      for (const settings of settingsSources) {
+        if (settings?.scoringSettings?.receptionPoints !== undefined) {
+          receptionPoints = settings.scoringSettings.receptionPoints;
+          console.log('Found reception points in scoringSettings:', receptionPoints);
+          break;
+        } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+          // Look for reception scoring in scoringItems (ESPN often puts it here)
+          const receptionScoringItem = settings.scoringItems.find((item: any) => 
+            item.statId === 53 || // Reception stat ID in ESPN
+            item.description?.toLowerCase().includes('reception') ||
+            item.abbr === 'REC'
+          );
+          if (receptionScoringItem) {
+            receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+            console.log('Found reception points in scoringItems:', receptionPoints);
+            break;
+          }
         }
       }
       
