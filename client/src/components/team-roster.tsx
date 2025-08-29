@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download } from "lucide-react";
 
 interface TeamRosterProps {
   data: any;
@@ -113,21 +115,35 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
         return (
           <Card key={team.id} data-testid={`card-team-${team.id}`}>
             <CardHeader>
-              <div className="flex items-center space-x-3">
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ backgroundColor: `hsl(${(team.id * 137.5) % 360}, 70%, 50%)` }}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div 
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: `hsl(${(team.id * 137.5) % 360}, 70%, 50%)` }}
+                  >
+                    {initials}
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">
+                      {teamName}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {ownerName}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
+                    window.open(url, '_blank');
+                  }}
+                  data-testid={`button-export-team-${team.id}`}
                 >
-                  {initials}
-                </div>
-                <div>
-                  <CardTitle className="text-lg">
-                    {teamName}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {ownerName}
-                  </p>
-                </div>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
               </div>
             </CardHeader>
             <CardContent>

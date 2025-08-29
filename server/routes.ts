@@ -998,6 +998,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export individual team roster
+  app.get('/api/leagues/:id/teams/:teamId/roster-export', async (req, res) => {
+    try {
+      const leagueId = req.params.id;
+      const teamId = parseInt(req.params.teamId);
+      const storage = getStorage();
+      const league = await storage.getLeague(leagueId);
+      
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      const credentials = await storage.getESPNCredentials('default-user');
+      if (!credentials) {
+        return res.status(404).json({ message: 'ESPN credentials not found' });
+      }
+
+      // Get roster data using the same method as full roster export
+      const rostersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/segments/0/leagues/${league.espnLeagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1&nocache=${Date.now()}`;
+      const rostersResponse = await fetch(rostersUrl, {
+        headers: { 'Cookie': `espn_s2=${credentials.espnS2}; SWID=${credentials.swid}` }
+      });
+      
+      if (!rostersResponse.ok) {
+        throw new Error(`Failed to fetch roster data: ${rostersResponse.status}`);
+      }
+      
+      const rostersData = await rostersResponse.json();
+      
+      // Find the specific team
+      const team = rostersData.teams?.find((t: any) => t.id === teamId);
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      // Get players data for mapping
+      const playersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/players?view=players_wl&view=kona_player_info&scoringPeriodId=1`;
+      const playersResponse = await fetch(playersUrl, {
+        headers: { 'Cookie': `espn_s2=${credentials.espnS2}; SWID=${credentials.swid}` }
+      });
+      
+      const playersData = playersResponse.ok ? await playersResponse.json() : { players: [] };
+      
+      // Create a map of player ID to player data for quick lookup
+      const playerMap = new Map();
+      if (playersData.players) {
+        playersData.players.forEach((player: any) => {
+          playerMap.set(player.id, player);
+        });
+      }
+
+      // Helper functions (reuse from full roster export)
+      const getNFLTeamName = (teamId: number): string => {
+        const teamNames: Record<number, string> = {
+          1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET",
+          9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN",
+          17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC",
+          25: "SF", 26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU"
+        };
+        return teamNames[teamId] || "FA";
+      };
+
+      const getPositionName = (positionId: number): string => {
+        const positions: Record<number, string> = {
+          0: "QB", 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 
+          16: "DEF", 17: "K", 23: "FLEX"
+        };
+        return positions[positionId] || `POS_${positionId}`;
+      };
+
+      const getPlayerName = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        return player.fullName || player.name || player.displayName || 
+               (player.firstName && player.lastName ? `${player.firstName} ${player.lastName}` : 'Unknown Player');
+      };
+
+      const getPlayerPositionId = (playerData: any): number => {
+        const player = playerData.player || playerData;
+        return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
+      };
+
+      const getProTeamId = (playerData: any): number => {
+        const player = playerData.player || playerData;
+        return player.proTeamId;
+      };
+
+      const getProjectedPoints = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const projection = player.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
+                          player.projectedStats ||
+                          player.outlook?.projectedStats;
+        
+        if (projection?.appliedTotal !== undefined) {
+          return projection.appliedTotal.toFixed(1);
+        }
+        if (projection?.total !== undefined) {
+          return projection.total.toFixed(1);
+        }
+        return "-";
+      };
+
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+      };
+
+      const getLineupSlotName = (slotId: number): string => {
+        const slots: Record<number, string> = {
+          0: "QB", 2: "RB", 4: "WR", 6: "TE", 17: "K", 16: "DEF",
+          20: "Bench", 21: "IR", 23: "FLEX"
+        };
+        return slots[slotId] || `Slot_${slotId}`;
+      };
+
+      // Get team name
+      const getTeamName = (team: any) => {
+        const location = team.location || team.name || '';
+        const nickname = team.nickname || team.mascot || '';
+        
+        if (location && nickname) {
+          return `${location} ${nickname}`;
+        } else if (location || nickname) {
+          return location || nickname;
+        } else {
+          return `Team ${team.id}`;
+        }
+      };
+
+      const fantasyTeamName = getTeamName(team);
+
+      // Process team roster
+      const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
+      const rosterData: any[] = [];
+      
+      if (roster?.entries) {
+        roster.entries.forEach((entry: any) => {
+          const playerId = entry.playerPoolEntry?.player?.id || 
+                          entry.player?.id || 
+                          entry.playerId ||
+                          entry.id;
+          
+          if (playerId) {
+            // Get player data from the players API or from the entry itself
+            const playerData = playerMap.get(playerId) || entry.playerPoolEntry || entry;
+            
+            rosterData.push({
+              playerData: playerData,
+              lineupSlotId: entry.lineupSlotId
+            });
+          }
+        });
+      }
+
+      // Generate CSV
+      const csvHeader = "Player Name,Position,NFL Team,Lineup Slot,Projected Points,Status\n";
+      const csvRows = rosterData.map((entry: any) => {
+        const name = `"${getPlayerName(entry.playerData)}"`;
+        const position = getPositionName(getPlayerPositionId(entry.playerData));
+        const nflTeam = getProTeamId(entry.playerData) ? getNFLTeamName(getProTeamId(entry.playerData)) : "FA";
+        const lineupSlot = getLineupSlotName(entry.lineupSlotId);
+        const projectedPoints = getProjectedPoints(entry.playerData);
+        const status = getInjuryStatus(entry.playerData);
+        
+        return `${name},${position},"${nflTeam}","${lineupSlot}",${projectedPoints},${status}`;
+      }).join('\n');
+
+      const csvContent = csvHeader + csvRows;
+
+      // Set headers for file download with cache busting
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="roster-${fantasyTeamName.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.csv"`);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.send(csvContent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
