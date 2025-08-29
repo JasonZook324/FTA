@@ -35,21 +35,33 @@ interface TradeAnalysis {
   summary: string;
 }
 
+// Helper function for position mapping
+const getPositionName = (positionId: number): string => {
+  const positions: { [key: number]: string } = {
+    1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'
+  };
+  return positions[positionId] || `POS_${positionId}`;
+};
+
 export default function TradeAnalyzer() {
-  const { selectedLeague } = useSelectedLeague();
+  const [userId] = useState("default-user");
+  const { selectedLeagueId, setSelectedLeagueId, leagues, hasAutoSelected } = useSelectedLeague(userId);
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
+
+  // Find the selected league object
+  const selectedLeague = leagues?.find((l: any) => l.id === selectedLeagueId);
 
   // Fetch roster data to show available players for trade analysis
   const { data: rostersData, isLoading: rostersLoading } = useQuery({
-    queryKey: ["/api/leagues", selectedLeague?.id, "rosters"],
-    enabled: !!selectedLeague?.id,
+    queryKey: ["/api/leagues", selectedLeagueId, "rosters"],
+    enabled: !!selectedLeagueId,
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
   // Trade analysis mutation
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
-      const response = await apiRequest(`/api/leagues/${selectedLeague?.id}/trade-analysis`, {
+      const response = await apiRequest(`/api/leagues/${selectedLeagueId}/trade-analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -60,12 +72,12 @@ export default function TradeAnalyzer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/leagues", selectedLeague?.id, "trade-analysis"] 
+        queryKey: ["/api/leagues", selectedLeagueId, "trade-analysis"] 
       });
     }
   });
 
-  if (!selectedLeague) {
+  if (!selectedLeagueId || !selectedLeague) {
     return (
       <div className="container mx-auto p-6" data-testid="no-league-selected">
         <Card>
@@ -75,7 +87,9 @@ export default function TradeAnalyzer() {
               No League Selected
             </CardTitle>
             <CardDescription>
-              Please select a league first to analyze trade opportunities.
+              {leagues.length === 0 
+                ? "No leagues found. Please set up your ESPN credentials and import leagues first."
+                : "Loading your league data..."}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -110,13 +124,6 @@ export default function TradeAnalyzer() {
     tradeAnalysisMutation.mutate({
       selectedPlayer
     });
-  };
-
-  const getPositionName = (positionId: number): string => {
-    const positions: { [key: number]: string } = {
-      1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'
-    };
-    return positions[positionId] || `POS_${positionId}`;
   };
 
   const getPriorityColor = (priority: string) => {
