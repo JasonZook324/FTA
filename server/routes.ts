@@ -30,13 +30,7 @@ class EspnApiService {
       
       const response = await fetch(testUrl, { 
         method: 'GET',
-        headers: this.getHeaders(credentials),
-        // For local development, bypass SSL verification
-        ...(process.env.NODE_ENV === 'development' && {
-          agent: new (await import('https')).Agent({
-            rejectUnauthorized: false
-          })
-        })
+        headers: this.getHeaders(credentials)
       });
       
       console.log('ESPN API response status:', response.status);
@@ -64,13 +58,7 @@ class EspnApiService {
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: this.getHeaders(credentials),
-      // For local development, bypass SSL verification
-      ...(process.env.NODE_ENV === 'development' && {
-        agent: new (await import('https')).Agent({
-          rejectUnauthorized: false
-        })
-      })
+      headers: this.getHeaders(credentials)
     });
     
     if (!response.ok) {
@@ -111,13 +99,7 @@ class EspnApiService {
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: this.getHeaders(credentials),
-      // For local development, bypass SSL verification
-      ...(process.env.NODE_ENV === 'development' && {
-        agent: new (await import('https')).Agent({
-          rejectUnauthorized: false
-        })
-      })
+      headers: this.getHeaders(credentials)
     });
     
     if (!response.ok) {
