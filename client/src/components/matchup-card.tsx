@@ -32,8 +32,8 @@ export default function MatchupCard({ data, isLoading, leagueId, week }: Matchup
     );
   }
 
-  // ESPN API returns matchup data in the members array, with team info in teams array
-  if (!data?.members || data.members.length === 0 || !data?.teams || data.teams.length === 0) {
+  // ESPN API returns matchup data in the schedule array, with team info in teams array
+  if (!data?.schedule || data.schedule.length === 0 || !data?.teams || data.teams.length === 0) {
     return (
       <Card data-testid="matchups-empty">
         <CardHeader>
@@ -82,8 +82,8 @@ export default function MatchupCard({ data, isLoading, leagueId, week }: Matchup
       
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* ESPN API stores matchup data in the members array, not schedule */}
-          {(data.members || []).map((matchup: any, index: number) => {
+          {/* ESPN API stores matchup data in the schedule array */}
+          {(data.schedule || []).map((matchup: any, index: number) => {
             const homeTeam = data.teams?.find((t: any) => t.id === matchup.home?.teamId);
             const awayTeam = data.teams?.find((t: any) => t.id === matchup.away?.teamId);
             

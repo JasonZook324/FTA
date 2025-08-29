@@ -81,10 +81,13 @@ class EspnApiService {
     leagueId: string,
     week?: number
   ) {
-    const views = ['mMatchup', 'mMatchupScore', 'mTeam'];
+    // Try different view combinations to get schedule data
+    const views = ['mMatchup', 'mMatchupScore', 'mTeam', 'mSchedule'];
     const weekParam = week ? `&scoringPeriodId=${week}` : '';
     const viewParam = views.join(',');
     const url = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${viewParam}${weekParam}`;
+    
+    console.log('Matchups API URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -97,13 +100,35 @@ class EspnApiService {
     
     const data = await response.json();
     console.log('Matchups API response keys:', Object.keys(data));
-    console.log('Schedule data:', data.schedule ? 'exists' : 'does not exist');
+    console.log('Schedule data:', data.schedule ? `exists with ${data.schedule.length} items` : 'does not exist');
     console.log('Members data:', data.members ? `exists with ${data.members.length} items` : 'does not exist');
     console.log('Teams data:', data.teams ? `exists with ${data.teams.length} items` : 'does not exist');
     
-    // Log the structure of members if it exists (may contain matchup data)
-    if (data.members && data.members.length > 0) {
-      console.log('First member structure:', Object.keys(data.members[0]));
+    // Log schedule structure if it exists
+    if (data.schedule && data.schedule.length > 0) {
+      console.log('First schedule item structure:', Object.keys(data.schedule[0]));
+      console.log('First schedule item:', JSON.stringify(data.schedule[0], null, 2));
+    }
+    
+    // If still no schedule, try alternative approach
+    if (!data.schedule) {
+      console.log('No schedule in main response, trying alternative approach...');
+      const altViews = ['mBoxscore', 'mMatchup', 'mTeam'];
+      const altUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${altViews.join(',')}${weekParam}`;
+      
+      const altResponse = await fetch(altUrl, {
+        method: 'GET',
+        headers: this.getHeaders(credentials)
+      });
+      
+      if (altResponse.ok) {
+        const altData = await altResponse.json();
+        console.log('Alternative API response keys:', Object.keys(altData));
+        if (altData.schedule) {
+          console.log('Found schedule in alternative response!');
+          return altData;
+        }
+      }
     }
     
     return data;
