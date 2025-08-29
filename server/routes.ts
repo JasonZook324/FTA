@@ -409,6 +409,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         week && week !== "current" ? parseInt(week as string) : undefined
       );
 
+      console.log('Matchups API response keys:', Object.keys(matchupsData));
+      console.log('Schedule data:', matchupsData.schedule ? 'exists' : 'does not exist');
+      
       res.json(matchupsData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
