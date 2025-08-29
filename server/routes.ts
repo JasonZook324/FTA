@@ -506,34 +506,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.season,
         league.espnLeagueId
       );
-      
-      console.log('Roster API returned:', { 
-        hasData: !!rostersData, 
-        keys: Object.keys(rostersData || {}),
-        hasTeams: !!rostersData?.teams,
-        teamCount: rostersData?.teams?.length
-      });
 
       // Extract taken player IDs from all rosters
       const takenPlayerIds = new Set();
-      
-      if (rostersData && rostersData.teams && rostersData.teams.length > 0) {
-        console.log('First team data sample:', JSON.stringify(rostersData.teams[0], null, 2).substring(0, 1000));
-      } else {
-        console.log('No teams found in roster data or roster data is empty');
-      }
-
-      console.log('Processing roster data structure:', { 
-        hasTeams: !!rostersData?.teams, 
-        teamCount: rostersData?.teams?.length,
-        firstTeam: rostersData?.teams?.[0] ? {
-          id: rostersData.teams[0].id,
-          hasRoster: !!rostersData.teams[0].roster,
-          hasEntries: !!rostersData.teams[0].roster?.entries,
-          entryCount: rostersData.teams[0].roster?.entries?.length,
-          firstEntry: rostersData.teams[0].roster?.entries?.[0]
-        } : null
-      });
 
       // Parse roster data from multiple possible locations
       function extractPlayerIds(roster: any, source: string) {
