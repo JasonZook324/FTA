@@ -70,8 +70,12 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
     const member = data.members.find((m: any) => m.id === ownerId);
     
     if (member) {
-      return member.displayName || 
-             (member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : 'Unknown Owner');
+      // Prefer real name (firstName + lastName) over displayName
+      if (member.firstName && member.lastName) {
+        return `${member.firstName} ${member.lastName}`;
+      }
+      // Fall back to displayName only if no real name available
+      return member.displayName || 'Unknown Owner';
     }
     return 'Unknown Owner';
   };
