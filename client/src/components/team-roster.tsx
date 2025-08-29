@@ -79,10 +79,13 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                 </div>
                 <div>
                   <CardTitle className="text-lg">
-                    {team.location} {team.nickname}
+                    {[team.location, team.nickname].filter(Boolean).join(' ') || `Team ${team.id}`}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {team.owners?.[0]?.displayName || team.owners?.[0]?.firstName + ' ' + team.owners?.[0]?.lastName || 'Unknown Owner'}
+                    {team.owners?.[0]?.displayName || 
+                     (team.owners?.[0]?.firstName && team.owners?.[0]?.lastName ? 
+                      `${team.owners[0].firstName} ${team.owners[0].lastName}` : 
+                      'Unknown Owner')}
                   </p>
                 </div>
               </div>
