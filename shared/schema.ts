@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
 });
 
 export const espnCredentials = pgTable("espn_credentials", {

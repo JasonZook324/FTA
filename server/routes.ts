@@ -312,6 +312,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's selected league
+  app.get("/api/user/:userId/selected-league", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user?.selectedLeagueId) {
+        return res.json({ selectedLeague: null });
+      }
+
+      const selectedLeague = await storage.getLeague(user.selectedLeagueId);
+      res.json({ selectedLeague });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/leagues/:userId/load", async (req, res) => {
     try {
       const { espnLeagueId, sport, season } = req.body;
@@ -391,6 +406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Set this league as the user's selected league for auto-loading
+      await storage.updateUser(userId, { selectedLeagueId: league.id });
 
       res.json({ league, teams: await storage.getTeams(league.id) });
     } catch (error: any) {

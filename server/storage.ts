@@ -8,7 +8,7 @@ import {
   users, espnCredentials, leagues, teams, matchups, players
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -16,6 +16,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
 
   // ESPN Credentials methods
   getEspnCredentials(userId: string): Promise<EspnCredentials | undefined>;
@@ -75,9 +76,18 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = { ...insertUser, id, selectedLeagueId: null };
     this.users.set(id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    
+    const updated: User = { ...existing, ...updates };
+    this.users.set(id, updated);
+    return updated;
   }
 
   // ESPN Credentials methods
@@ -277,6 +287,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
   // ESPN Credentials methods - The core improvement for persistence
   async getEspnCredentials(userId: string): Promise<EspnCredentials | undefined> {
     const [cred] = await db
@@ -377,13 +396,17 @@ export class DatabaseStorage implements IStorage {
 
   // Matchup methods
   async getMatchups(leagueId: string, week?: number): Promise<Matchup[]> {
-    let query = db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
-    
     if (week !== undefined) {
-      query = query.where(eq(matchups.week, week));
+      return await db
+        .select()
+        .from(matchups)
+        .where(and(eq(matchups.leagueId, leagueId), eq(matchups.week, week)));
     }
     
-    return await query;
+    return await db
+      .select()
+      .from(matchups)
+      .where(eq(matchups.leagueId, leagueId));
   }
 
   async createMatchup(matchup: InsertMatchup): Promise<Matchup> {

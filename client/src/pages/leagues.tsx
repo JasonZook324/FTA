@@ -19,8 +19,8 @@ export default function Leagues() {
     queryKey: ["/api/leagues", userId],
   });
 
-  // Query ESPN credentials status
-  const { data: credentials } = useQuery({
+  // Query ESPN credentials status  
+  const { data: credentials } = useQuery<{ isValid?: boolean }>({
     queryKey: ["/api/espn-credentials", userId],
   });
 
