@@ -502,9 +502,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter to get only available waiver wire players
-      const waiverWirePlayers = playersData.filter((playerData: any) => {
+      const waiverWirePlayers = (Array.isArray(playersData) ? playersData : []).filter((playerData: any) => {
         const player = playerData.player || playerData;
-        return !takenPlayerIds.has(player.id);
+        return player?.id && !takenPlayerIds.has(player.id);
       }).slice(0, 50); // Top 50 available
 
       // Find user's team (for now, use the first team as default)
@@ -889,9 +889,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sample player IDs from players list:', playersData.players?.slice(0, 5).map((p: any) => p.id));
 
       // Filter out taken players to get waiver wire
-      const waiverWirePlayers = playersData.players?.filter((player: any) => 
+      const playersList = playersData.players || playersData || [];
+      const waiverWirePlayers = Array.isArray(playersList) ? playersList.filter((player: any) => 
         !takenPlayerIds.has(player.id)
-      ) || [];
+      ) : [];
 
       console.log(`After filtering: ${waiverWirePlayers.length} available players`);
 
@@ -993,9 +994,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const waiverWirePlayers = playersData.players?.filter((player: any) => 
+      const playersList = playersData.players || playersData || [];
+      const waiverWirePlayers = Array.isArray(playersList) ? playersList.filter((player: any) => 
         !takenPlayerIds.has(player.id)
-      ) || [];
+      ) : [];
 
 
       // Helper functions to match frontend data mapping
