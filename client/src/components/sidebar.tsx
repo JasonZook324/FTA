@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -9,6 +9,7 @@ const navigation = [
   { name: "Team Rosters", href: "/rosters", icon: Users },
   { name: "Matchups", href: "/matchups", icon: Calendar },
   { name: "Player Details", href: "/players", icon: UsersRound },
+  { name: "AI Recommendations", href: "/ai-recommendations", icon: Brain },
 ];
 
 export default function Sidebar() {

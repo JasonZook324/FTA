@@ -7,6 +7,7 @@ import {
   type EspnCredentials 
 } from "@shared/schema";
 import { z } from "zod";
+import { geminiService } from './geminiService';
 
 // ESPN API service
 class EspnApiService {
@@ -431,6 +432,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(matchupsData);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // AI Recommendations route
+  app.post("/api/leagues/:leagueId/ai-recommendations", async (req, res) => {
+    try {
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get comprehensive league data for AI analysis
+      const [standingsData, playersData] = await Promise.all([
+        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getPlayers(credentials, league.sport, league.season, league.espnLeagueId)
+      ]);
+
+      // Combine league data for AI analysis
+      const leagueAnalysisData = {
+        league: {
+          name: league.name,
+          sport: league.sport,
+          season: league.season,
+          settings: standingsData.settings
+        },
+        teams: standingsData.teams,
+        standings: standingsData.teams?.map((team: any) => ({
+          teamName: `${team.location} ${team.nickname}`,
+          wins: team.record?.overall?.wins || 0,
+          losses: team.record?.overall?.losses || 0,
+          pointsFor: team.record?.overall?.pointsFor || 0,
+          pointsAgainst: team.record?.overall?.pointsAgainst || 0
+        })),
+        availablePlayers: playersData.slice(0, 50) // Top 50 available players
+      };
+
+      const analysis = await geminiService.analyzeLeague(leagueAnalysisData);
+      res.json(analysis);
+    } catch (error: any) {
+      console.error('AI Analysis Error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // AI Question route
+  app.post("/api/leagues/:leagueId/ai-question", async (req, res) => {
+    try {
+      const { question } = req.body;
+      if (!question) {
+        return res.status(400).json({ message: "Question is required" });
+      }
+
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get basic league data for context
+      const standingsData = await espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId);
+      
+      const contextData = {
+        league: {
+          name: league.name,
+          sport: league.sport,
+          season: league.season
+        },
+        teams: standingsData.teams
+      };
+
+      const answer = await geminiService.askQuestion(question, contextData);
+      res.json({ answer });
+    } catch (error: any) {
+      console.error('AI Question Error:', error);
       res.status(500).json({ message: error.message });
     }
   });

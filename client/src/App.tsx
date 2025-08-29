@@ -10,6 +10,7 @@ import Standings from "@/pages/standings";
 import Rosters from "@/pages/rosters";
 import Matchups from "@/pages/matchups";
 import Players from "@/pages/players";
+import AIRecommendations from "@/pages/ai-recommendations";
 import Sidebar from "@/components/sidebar";
 
 function Router() {
@@ -25,6 +26,7 @@ function Router() {
           <Route path="/rosters" component={Rosters} />
           <Route path="/matchups" component={Matchups} />
           <Route path="/players" component={Players} />
+          <Route path="/ai-recommendations" component={AIRecommendations} />
           <Route component={NotFound} />
         </Switch>
       </div>
