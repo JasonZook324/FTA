@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, UsersRound, Search } from "lucide-react";
+import { RefreshCw, UsersRound, Search, Download } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,16 +15,36 @@ export default function Players() {
   const [selectedSport, setSelectedSport] = useState<string>("ffl");
   const [selectedSeason, setSelectedSeason] = useState<string>("2025");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"all" | "waiver">("all");
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
-    queryKey: ["/api/players", selectedSport, selectedSeason],
-    queryParams: { userId },
+    queryKey: ["/api/players", selectedSport, selectedSeason, userId],
+    queryFn: async () => {
+      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?userId=${userId}`);
+      if (!response.ok) throw new Error('Failed to fetch players');
+      return response.json();
+    },
     enabled: !!selectedSport && !!selectedSeason,
   });
 
-  const filteredPlayers = playersData?.players?.filter((player: any) =>
-    player.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  // Query user leagues
+  const { data: leagues } = useQuery({
+    queryKey: ["/api/leagues", userId],
+  });
+
+  // Query waiver wire data
+  const { data: waiverWireData, isLoading: waiverWireLoading } = useQuery({
+    queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"],
+    enabled: !!selectedLeagueId && viewMode === "waiver",
+  });
+
+  const currentData = viewMode === "waiver" ? waiverWireData : playersData;
+  const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
+
+  const filteredPlayers = currentData?.players?.filter((player: any) =>
+    player.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (player.proTeamId && player.proTeamId.toString().includes(searchTerm))
   ) || [];
 
@@ -61,6 +82,21 @@ export default function Players() {
             <p className="text-muted-foreground">Browse player statistics and information</p>
           </div>
           <div className="flex items-center space-x-3">
+            {viewMode === "waiver" && (
+              <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
+                <SelectTrigger className="w-48" data-testid="select-league">
+                  <SelectValue placeholder="Select a league" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leagues?.map((league: any) => (
+                    <SelectItem key={league.id} value={league.id}>
+                      {league.name} ({league.season})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
             <Select value={selectedSport} onValueChange={setSelectedSport}>
               <SelectTrigger className="w-40" data-testid="select-sport">
                 <SelectValue />
@@ -84,11 +120,32 @@ export default function Players() {
               </SelectContent>
             </Select>
             
+            {viewMode === "waiver" && selectedLeagueId && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  window.open(`/api/leagues/${selectedLeagueId}/waiver-wire/export`, '_blank');
+                }}
+                data-testid="button-export-waiver"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+            )}
+            
             <Button
               variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ 
-                queryKey: ["/api/players", selectedSport, selectedSeason] 
-              })}
+              onClick={() => {
+                if (viewMode === "waiver" && selectedLeagueId) {
+                  queryClient.invalidateQueries({ 
+                    queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"] 
+                  });
+                } else {
+                  queryClient.invalidateQueries({ 
+                    queryKey: ["/api/players", selectedSport, selectedSeason] 
+                  });
+                }
+              }}
               data-testid="button-refresh"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -100,12 +157,24 @@ export default function Players() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-6">
+        <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "all" | "waiver")} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="all" data-testid="tab-all-players">All Players</TabsTrigger>
+            <TabsTrigger value="waiver" data-testid="tab-waiver-wire">Waiver Wire</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <Card data-testid="card-players">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center space-x-2">
                 <UsersRound className="w-5 h-5" />
-                <span>Player Database</span>
+                <span>{viewMode === "waiver" ? "Waiver Wire Players" : "Player Database"}</span>
+                {viewMode === "waiver" && waiverWireData && (
+                  <Badge variant="secondary" className="ml-2">
+                    {waiverWireData.total} available
+                  </Badge>
+                )}
               </CardTitle>
               <div className="flex items-center space-x-2">
                 <Search className="w-4 h-4 text-muted-foreground" />
@@ -121,7 +190,12 @@ export default function Players() {
           </CardHeader>
           
           <CardContent>
-            {playersLoading ? (
+            {viewMode === "waiver" && !selectedLeagueId ? (
+              <div className="text-center py-8">
+                <UsersRound className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Select a league to view waiver wire players</p>
+              </div>
+            ) : currentLoading ? (
               <div className="space-y-3">
                 {[...Array(10)].map((_, i) => (
                   <div key={i} className="animate-pulse flex space-x-4">
@@ -188,7 +262,8 @@ export default function Players() {
               <div className="text-center py-8">
                 <UsersRound className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">
-                  {searchTerm ? "No players found matching your search" : "No player data available"}
+                  {searchTerm ? "No players found matching your search" : 
+                   viewMode === "waiver" ? "No waiver wire players available" : "No player data available"}
                 </p>
               </div>
             )}

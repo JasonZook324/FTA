@@ -407,6 +407,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Waiver wire route - get available players not on any roster
+  app.get("/api/leagues/:leagueId/waiver-wire", async (req, res) => {
+    try {
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get all players
+      const playersData = await espnApiService.getPlayers(
+        credentials,
+        league.sport,
+        league.season
+      );
+
+      // Get all rosters to identify taken players
+      const rostersData = await espnApiService.getRosters(
+        credentials,
+        league.sport,
+        league.season,
+        league.espnLeagueId
+      );
+
+      // Extract taken player IDs from all rosters
+      const takenPlayerIds = new Set();
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any) => {
+          if (team.roster?.entries) {
+            team.roster.entries.forEach((entry: any) => {
+              if (entry.playerPoolEntry?.player?.id) {
+                takenPlayerIds.add(entry.playerPoolEntry.player.id);
+              }
+            });
+          }
+        });
+      }
+
+      // Filter out taken players to get waiver wire
+      const waiverWirePlayers = playersData.players?.filter((player: any) => 
+        !takenPlayerIds.has(player.id)
+      ) || [];
+
+      res.json({ 
+        players: waiverWirePlayers,
+        total: waiverWirePlayers.length,
+        takenPlayers: takenPlayerIds.size
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export waiver wire as CSV
+  app.get("/api/leagues/:leagueId/waiver-wire/export", async (req, res) => {
+    try {
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get waiver wire players (reuse logic from above)
+      const playersData = await espnApiService.getPlayers(
+        credentials,
+        league.sport,
+        league.season
+      );
+
+      const rostersData = await espnApiService.getRosters(
+        credentials,
+        league.sport,
+        league.season,
+        league.espnLeagueId
+      );
+
+      const takenPlayerIds = new Set();
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any) => {
+          if (team.roster?.entries) {
+            team.roster.entries.forEach((entry: any) => {
+              if (entry.playerPoolEntry?.player?.id) {
+                takenPlayerIds.add(entry.playerPoolEntry.player.id);
+              }
+            });
+          }
+        });
+      }
+
+      const waiverWirePlayers = playersData.players?.filter((player: any) => 
+        !takenPlayerIds.has(player.id)
+      ) || [];
+
+      // Convert to CSV format
+      const getPositionName = (positionId: number): string => {
+        const positions: Record<number, string> = {
+          1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF"
+        };
+        return positions[positionId] || "UNK";
+      };
+
+      const csvHeader = "Player Name,Position,Team,Ownership %,Status\n";
+      const csvRows = waiverWirePlayers.map((player: any) => {
+        const name = `"${player.fullName || 'Unknown'}"`;
+        const position = getPositionName(player.defaultPositionId);
+        const team = player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent";
+        const ownership = player.ownership?.percentOwned?.toFixed(1) || "0.0";
+        const status = player.injured ? "Injured" : "Active";
+        return `${name},${position},"${team}",${ownership}%,${status}`;
+      }).join('\n');
+
+      const csvContent = csvHeader + csvRows;
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="waiver-wire-${league.name.replace(/[^a-zA-Z0-9]/g, '-')}-${league.season}.csv"`);
+      res.send(csvContent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
