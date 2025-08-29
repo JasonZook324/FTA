@@ -457,7 +457,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       // Get waiver wire players (using existing logic from waiver-wire route)
-      const playersData = await espnApiService.getPlayers(credentials, league.sport, league.season);
+      const playersResponse = await espnApiService.getPlayers(credentials, league.sport, league.season);
+      
+      // Handle different possible API response structures
+      let playersData = [];
+      if (Array.isArray(playersResponse)) {
+        playersData = playersResponse;
+      } else if (playersResponse?.players && Array.isArray(playersResponse.players)) {
+        playersData = playersResponse.players;
+      } else {
+        console.log('Unexpected players API response structure:', typeof playersResponse);
+        console.log('Players response keys:', Object.keys(playersResponse || {}));
+        playersData = []; // Fallback to empty array
+      }
       
       // Extract taken player IDs from all rosters
       const takenPlayerIds = new Set();
