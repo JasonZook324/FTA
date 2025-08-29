@@ -9,10 +9,6 @@ interface MatchupCardProps {
 }
 
 export default function MatchupCard({ data, isLoading, leagueId, week }: MatchupCardProps) {
-  console.log('MatchupCard data:', data);
-  console.log('Data keys:', data ? Object.keys(data) : 'no data');
-  console.log('Schedule exists:', !!data?.schedule);
-  
   if (isLoading) {
     return (
       <Card data-testid="matchups-loading">
@@ -36,7 +32,8 @@ export default function MatchupCard({ data, isLoading, leagueId, week }: Matchup
     );
   }
 
-  if (!data?.schedule) {
+  // ESPN API returns matchup data in the members array, with team info in teams array
+  if (!data?.members || data.members.length === 0 || !data?.teams || data.teams.length === 0) {
     return (
       <Card data-testid="matchups-empty">
         <CardHeader>
@@ -85,12 +82,15 @@ export default function MatchupCard({ data, isLoading, leagueId, week }: Matchup
       
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.schedule.map((matchup: any, index: number) => {
-            const homeTeam = data.teams?.find((t: any) => t.id === matchup.home.teamId);
-            const awayTeam = data.teams?.find((t: any) => t.id === matchup.away.teamId);
-            const status = getMatchupStatus(matchup);
+          {/* ESPN API stores matchup data in the members array, not schedule */}
+          {(data.members || []).map((matchup: any, index: number) => {
+            const homeTeam = data.teams?.find((t: any) => t.id === matchup.home?.teamId);
+            const awayTeam = data.teams?.find((t: any) => t.id === matchup.away?.teamId);
             
-            if (!homeTeam || !awayTeam) return null;
+            // Skip if we can't find the teams or matchup doesn't have proper structure
+            if (!homeTeam || !awayTeam || !matchup.home || !matchup.away) return null;
+            
+            const status = getMatchupStatus(matchup);
             
             return (
               <div

@@ -20,6 +20,15 @@ export default function Matchups() {
   // Query matchups data
   const { data: matchupsData, isLoading: matchupsLoading } = useQuery({
     queryKey: ["/api/leagues", selectedLeagueId, "matchups", selectedWeek].filter(Boolean),
+    queryFn: async () => {
+      const weekParam = selectedWeek && selectedWeek !== "current" ? `?week=${selectedWeek}` : "?week=current";
+      const url = `/api/leagues/${selectedLeagueId}/matchups${weekParam}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch matchups: ${response.status}`);
+      }
+      return response.json();
+    },
     enabled: !!selectedLeagueId,
   });
 

@@ -95,7 +95,18 @@ class EspnApiService {
       throw new Error(`ESPN API Error: ${response.status} ${response.statusText}`);
     }
     
-    return response.json();
+    const data = await response.json();
+    console.log('Matchups API response keys:', Object.keys(data));
+    console.log('Schedule data:', data.schedule ? 'exists' : 'does not exist');
+    console.log('Members data:', data.members ? `exists with ${data.members.length} items` : 'does not exist');
+    console.log('Teams data:', data.teams ? `exists with ${data.teams.length} items` : 'does not exist');
+    
+    // Log the structure of members if it exists (may contain matchup data)
+    if (data.members && data.members.length > 0) {
+      console.log('First member structure:', Object.keys(data.members[0]));
+    }
+    
+    return data;
   }
 
   async getRosters(
