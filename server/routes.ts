@@ -126,6 +126,14 @@ class EspnApiService {
     const data = await response.json();
     console.log('Main API returned keys:', Object.keys(data));
     
+    // Debug: Log team and member data structure
+    if (data.teams && data.teams[0]) {
+      console.log('Rosters API - Team data sample:', JSON.stringify(data.teams[0], null, 2));
+    }
+    if (data.members && data.members[0]) {
+      console.log('Rosters API - Member data sample:', JSON.stringify(data.members[0], null, 2));
+    }
+    
     // Method 2: If no roster in main response, try boxscore approach
     if (!data.teams?.[0]?.roster && data.schedule) {
       console.log('No direct roster data, trying boxscore approach...');
@@ -814,6 +822,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const rostersData = await rostersResponse.json();
+      
+      // Debug: Log team data structure to understand what fields are available
+      if (rostersData.teams && rostersData.teams[0]) {
+        console.log('Team data structure sample:', JSON.stringify(rostersData.teams[0], null, 2));
+      }
+      if (rostersData.members && rostersData.members[0]) {
+        console.log('Members data structure sample:', JSON.stringify(rostersData.members[0], null, 2));
+      }
       
       // Get players data for mapping
       const playersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/players?view=players_wl&view=kona_player_info&scoringPeriodId=1`;
