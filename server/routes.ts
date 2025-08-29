@@ -52,7 +52,11 @@ class EspnApiService {
     });
     
     if (!response.ok) {
-      throw new Error(`ESPN API Error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      if (response.status === 404) {
+        throw new Error(`League not found or access denied. Please check: 1) League ID is correct, 2) You're a member of this league, 3) Season year is correct (try 2024 instead of 2025), 4) League is not archived`);
+      }
+      throw new Error(`ESPN API Error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     return response.json();
