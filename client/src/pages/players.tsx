@@ -255,7 +255,9 @@ export default function Players() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  window.open(`/api/leagues/${selectedLeagueId}/waiver-wire/export`, '_blank');
+                  // Add timestamp to prevent caching
+                  const url = `/api/leagues/${selectedLeagueId}/waiver-wire/export?t=${Date.now()}`;
+                  window.open(url, '_blank');
                 }}
                 data-testid="button-export-waiver"
               >
