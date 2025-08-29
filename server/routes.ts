@@ -104,7 +104,24 @@ class EspnApiService {
     season: number,
     leagueId: string
   ) {
-    return this.getLeagueData(credentials, sport, season, leagueId, ['mRoster', 'mTeam']);
+    // Use the specific views that return roster data with players
+    const views = ['mTeam', 'mRoster', 'mMatchup', 'mSettings'];
+    const viewParam = views.join(',');
+    const url = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${viewParam}`;
+    
+    console.log('Roster API URL:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(credentials)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ESPN Roster API Error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    return response.json();
   }
 
   async getPlayers(
