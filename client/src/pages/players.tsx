@@ -46,11 +46,11 @@ export default function Players() {
   const currentData = viewMode === "waiver" ? waiverWireData : playersData;
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
-  const filteredPlayers = currentData?.players?.filter((player: any) => {
+  const filteredPlayers = currentData?.players?.filter((playerData: any) => {
     if (!searchTerm) return true; // Show all players if no search term
     
-    const name = player.fullName || player.name || player.displayName || '';
-    const teamId = player.proTeamId ? player.proTeamId.toString() : '';
+    const name = getPlayerName(playerData);
+    const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
     
     return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
            teamId.includes(searchTerm);
@@ -87,26 +87,41 @@ export default function Players() {
   };
 
   // Helper function to get player name from various possible fields
-  const getPlayerName = (player: any) => {
-    // Debug: log first few players to understand structure
-    if (Math.random() < 0.01) { // Log ~1% of players to avoid spam
-      console.log('Player data structure:', player);
-    }
+  const getPlayerName = (playerData: any) => {
+    // The actual player info is nested in playerData.player
+    const player = playerData.player || playerData;
     
-    // Try different possible name field combinations
     if (player.fullName) return player.fullName;
     if (player.name) return player.name;
     if (player.displayName) return player.displayName;
     if (player.firstName && player.lastName) return `${player.firstName} ${player.lastName}`;
-    if (player.player?.fullName) return player.player.fullName;
-    if (player.player?.name) return player.player.name;
     
     return 'Unknown Player';
   };
 
   // Helper function to get position ID from various possible fields
-  const getPlayerPositionId = (player: any) => {
+  const getPlayerPositionId = (playerData: any) => {
+    // The actual player info is nested in playerData.player
+    const player = playerData.player || playerData;
     return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
+  };
+
+  // Helper function to get ownership percentage
+  const getOwnershipPercent = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.ownership?.percentOwned?.toFixed(1) || "0.0";
+  };
+
+  // Helper function to get pro team ID
+  const getProTeamId = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.proTeamId;
+  };
+
+  // Helper function to get injury status
+  const getInjuryStatus = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
   };
 
   return (
@@ -282,17 +297,17 @@ export default function Players() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
-                            {player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent"}
+                            {getProTeamId(player) ? `Team ${getProTeamId(player)}` : "Free Agent"}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-foreground">
-                            {player.ownership?.percentOwned?.toFixed(1) || "0.0"}%
+                            {getOwnershipPercent(player)}%
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={player.injured ? "destructive" : "default"}>
-                            {player.injured ? "Injured" : "Active"}
+                          <Badge variant={getInjuryStatus(player) === "Injured" ? "destructive" : "default"}>
+                            {getInjuryStatus(player)}
                           </Badge>
                         </TableCell>
                       </TableRow>
