@@ -58,26 +58,42 @@ export default function Players() {
 
   const getPositionColor = (positionId: number) => {
     const colors: Record<number, string> = {
+      0: "bg-chart-1", // QB
       1: "bg-chart-1", // QB
       2: "bg-chart-2", // RB
       3: "bg-chart-3", // WR
       4: "bg-chart-4", // TE
       5: "bg-chart-5", // K
       16: "bg-secondary", // DEF
+      17: "bg-chart-5", // K
+      23: "bg-muted", // FLEX
     };
     return colors[positionId] || "bg-muted";
   };
 
   const getPositionName = (positionId: number) => {
     const positions: Record<number, string> = {
+      0: "QB",
       1: "QB",
       2: "RB", 
       3: "WR",
       4: "TE",
       5: "K",
       16: "DEF",
+      17: "K",
+      23: "FLEX",
     };
-    return positions[positionId] || "UNK";
+    return positions[positionId] || `POS_${positionId}`;
+  };
+
+  // Helper function to get player name from various possible fields
+  const getPlayerName = (player: any) => {
+    return player.fullName || player.name || player.displayName || player.firstName + ' ' + player.lastName || 'Unknown Player';
+  };
+
+  // Helper function to get position ID from various possible fields
+  const getPlayerPositionId = (player: any) => {
+    return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
   };
 
   return (
@@ -241,14 +257,14 @@ export default function Players() {
                       >
                         <TableCell>
                           <div className="font-medium text-foreground">
-                            {player.fullName}
+                            {getPlayerName(player)}
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge 
-                            className={`${getPositionColor(player.defaultPositionId)} text-white`}
+                            className={`${getPositionColor(getPlayerPositionId(player))} text-white`}
                           >
-                            {getPositionName(player.defaultPositionId)}
+                            {getPositionName(getPlayerPositionId(player))}
                           </Badge>
                         </TableCell>
                         <TableCell>
