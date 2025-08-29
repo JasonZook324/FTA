@@ -46,10 +46,15 @@ export default function Players() {
   const currentData = viewMode === "waiver" ? waiverWireData : playersData;
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
-  const filteredPlayers = currentData?.players?.filter((player: any) =>
-    player.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (player.proTeamId && player.proTeamId.toString().includes(searchTerm))
-  ) || [];
+  const filteredPlayers = currentData?.players?.filter((player: any) => {
+    if (!searchTerm) return true; // Show all players if no search term
+    
+    const name = player.fullName || player.name || player.displayName || '';
+    const teamId = player.proTeamId ? player.proTeamId.toString() : '';
+    
+    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           teamId.includes(searchTerm);
+  }) || [];
 
   const getPositionColor = (positionId: number) => {
     const colors: Record<number, string> = {
