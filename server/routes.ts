@@ -548,7 +548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Try all available settings sources
       const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
       
-      for (const [index, settings] of settingsSources.entries()) {
+      for (let index = 0; index < settingsSources.length; index++) {
+        const settings = settingsSources[index];
         console.log(`Checking settings source ${index}:`, Object.keys(settings || {}));
         
         // Debug: Show what's actually in scoringSettings if it exists
@@ -588,7 +589,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If still no PPR data found, try a different approach - check for specific scoring patterns
       if (receptionPoints === 0) {
         console.log('No PPR data found in standard locations, checking alternative patterns...');
-        for (const [index, settings] of settingsSources.entries()) {
+        for (let index = 0; index < settingsSources.length; index++) {
+          const settings = settingsSources[index];
           if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
             console.log(`Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
             // Look specifically for statId 53 (reception stat)
@@ -759,7 +761,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Try all available settings sources
       const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
       
-      for (const [index, settings] of settingsSources.entries()) {
+      for (let index = 0; index < settingsSources.length; index++) {
+        const settings = settingsSources[index];
         console.log(`AI Question - Checking settings source ${index}:`, Object.keys(settings || {}));
         
         // Debug: Show what's actually in scoringSettings if it exists
@@ -799,7 +802,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If still no PPR data found, try a different approach - check for specific scoring patterns
       if (receptionPoints === 0) {
         console.log('AI Question - No PPR data found in standard locations, checking alternative patterns...');
-        for (const [index, settings] of settingsSources.entries()) {
+        for (let index = 0; index < settingsSources.length; index++) {
+          const settings = settingsSources[index];
           if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
             console.log(`AI Question - Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
             // Look specifically for statId 53 (reception stat)
