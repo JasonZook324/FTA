@@ -122,7 +122,13 @@ export class MemStorage implements IStorage {
     const newLeague: League = { 
       ...league, 
       id,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      teamCount: league.teamCount ?? null,
+      currentWeek: league.currentWeek ?? null,
+      playoffTeams: league.playoffTeams ?? null,
+      scoringType: league.scoringType ?? null,
+      tradeDeadline: league.tradeDeadline ?? null,
+      settings: league.settings ?? null
     };
     this.leagues.set(id, newLeague);
     return newLeague;
@@ -150,7 +156,20 @@ export class MemStorage implements IStorage {
 
   async createTeam(team: InsertTeam): Promise<Team> {
     const id = randomUUID();
-    const newTeam: Team = { ...team, id };
+    const newTeam: Team = { 
+      ...team, 
+      id,
+      owner: team.owner ?? null,
+      abbreviation: team.abbreviation ?? null,
+      logoUrl: team.logoUrl ?? null,
+      wins: team.wins ?? null,
+      losses: team.losses ?? null,
+      ties: team.ties ?? null,
+      pointsFor: team.pointsFor ?? null,
+      pointsAgainst: team.pointsAgainst ?? null,
+      streak: team.streak ?? null,
+      rank: team.rank ?? null
+    };
     this.teams.set(id, newTeam);
     return newTeam;
   }
@@ -179,7 +198,14 @@ export class MemStorage implements IStorage {
 
   async createMatchup(matchup: InsertMatchup): Promise<Matchup> {
     const id = randomUUID();
-    const newMatchup: Matchup = { ...matchup, id };
+    const newMatchup: Matchup = { 
+      ...matchup, 
+      id,
+      homeScore: matchup.homeScore ?? null,
+      awayScore: matchup.awayScore ?? null,
+      isComplete: matchup.isComplete ?? null,
+      matchupDate: matchup.matchupDate ?? null
+    };
     this.matchups.set(id, newMatchup);
     return newMatchup;
   }
@@ -206,7 +232,14 @@ export class MemStorage implements IStorage {
 
   async createPlayer(player: InsertPlayer): Promise<Player> {
     const id = randomUUID();
-    const newPlayer: Player = { ...player, id };
+    const newPlayer: Player = { 
+      ...player, 
+      id,
+      team: player.team ?? null,
+      position: player.position ?? null,
+      isActive: player.isActive ?? null,
+      stats: player.stats ?? null
+    };
     this.players.set(id, newPlayer);
     return newPlayer;
   }
