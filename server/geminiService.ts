@@ -38,7 +38,9 @@ export class FantasyGeminiService {
 
         const rawJson = response.text;
         if (rawJson) {
-          return JSON.parse(rawJson) as FantasyAnalysis;
+          // Strip markdown code blocks if present
+          const cleanJson = rawJson.replace(/```json\s*|\s*```/g, '').trim();
+          return JSON.parse(cleanJson) as FantasyAnalysis;
         } else {
           throw new Error("Empty response from AI model");
         }
@@ -213,7 +215,7 @@ Focus on:
 
 Provide specific player names and detailed reasoning for each recommendation.
 
-**IMPORTANT: Return your response as valid JSON in this exact format:**
+**IMPORTANT: Return your response as pure JSON only, no markdown formatting, no code blocks, just the raw JSON in this exact format:**
 
 {
   "recommendations": [
