@@ -918,7 +918,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rostersData.teams.forEach((team: any) => {
           const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
           if (roster) {
-            const teamName = team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`;
+            // More robust team name extraction
+            const location = team.location || team.name || '';
+            const nickname = team.nickname || team.mascot || '';
+            const teamId = team.id || 'Unknown';
+            
+            let teamName = '';
+            if (location && nickname) {
+              teamName = `${location} ${nickname}`;
+            } else if (location || nickname) {
+              teamName = location || nickname;
+            } else {
+              teamName = `Team ${teamId}`;
+            }
+            
+            console.log(`Roster Export: Team ${team.id} name: "${teamName}"`);
             processRoster(roster, teamName, team.id);
           }
         });
@@ -935,9 +949,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                           team?.rosterForMatchupPeriod;
             
             if (roster) {
-              const teamName = team.team?.location && team.team?.nickname ? 
-                             `${team.team.location} ${team.team.nickname}` : 
-                             `Team ${team.teamId || 'Unknown'}`;
+              // More robust team name extraction for schedule data
+              const teamData = team.team || team;
+              const location = teamData.location || teamData.name || '';
+              const nickname = teamData.nickname || teamData.mascot || '';
+              const teamId = team.teamId || teamData.id || 'Unknown';
+              
+              let teamName = '';
+              if (location && nickname) {
+                teamName = `${location} ${nickname}`;
+              } else if (location || nickname) {
+                teamName = location || nickname;
+              } else {
+                teamName = `Team ${teamId}`;
+              }
+              
               processRoster(roster, teamName, team.teamId || 0);
             }
           });
