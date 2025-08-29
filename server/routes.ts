@@ -791,7 +791,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/leagues/:id/roster-export', async (req, res) => {
     try {
       const leagueId = req.params.id;
-      const storage = getStorage();
       const league = await storage.getLeague(leagueId);
       
       if (!league) {
@@ -1004,7 +1003,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
       
-      const storage = getStorage();
       const league = await storage.getLeague(leagueId);
       
       if (!league) {
