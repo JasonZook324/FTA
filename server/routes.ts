@@ -551,6 +551,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const [index, settings] of settingsSources.entries()) {
         console.log(`Checking settings source ${index}:`, Object.keys(settings || {}));
         
+        // Debug: Show what's actually in scoringSettings if it exists
+        if (settings?.scoringSettings) {
+          console.log(`Source ${index} scoringSettings keys:`, Object.keys(settings.scoringSettings));
+          console.log(`Source ${index} scoringSettings.receptionPoints:`, settings.scoringSettings.receptionPoints);
+        }
+        
         if (settings?.scoringSettings?.receptionPoints !== undefined) {
           receptionPoints = settings.scoringSettings.receptionPoints;
           console.log(`Found reception points in scoringSettings from source ${index}:`, receptionPoints);
@@ -583,18 +589,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (receptionPoints === 0) {
         console.log('No PPR data found in standard locations, checking alternative patterns...');
         for (const [index, settings] of settingsSources.entries()) {
-          if (settings?.scoringItems) {
-            const allItems = settings.scoringItems.filter((item: any) => 
-              item.points > 0 && (
-                item.statId === 53 ||
-                String(item.description || '').toLowerCase().includes('rec') ||
-                String(item.abbr || '').toLowerCase().includes('rec')
-              )
+          if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+            console.log(`Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
+            // Look specifically for statId 53 (reception stat)
+            const receptionItems = settings.scoringItems.filter((item: any) => item.statId === 53);
+            console.log(`Found ${receptionItems.length} reception items (statId 53):`, receptionItems);
+            
+            // Also check for any reception-related items
+            const allReceptionItems = settings.scoringItems.filter((item: any) => 
+              item.statId === 53 ||
+              String(item.description || '').toLowerCase().includes('rec') ||
+              String(item.abbr || '').toLowerCase().includes('rec')
             );
-            console.log(`Alternative scoring items in source ${index}:`, allItems);
-            if (allItems.length > 0) {
-              receptionPoints = allItems[0].points || allItems[0].value || 0;
+            console.log(`All reception-related items in source ${index}:`, allReceptionItems);
+            
+            // Use the first one that has points > 0
+            const validReceptionItem = allReceptionItems.find((item: any) => 
+              (item.points > 0) || (item.points === 0.5) || (item.points === 1)
+            );
+            
+            if (validReceptionItem) {
+              receptionPoints = validReceptionItem.points || validReceptionItem.value || 0;
               console.log(`Found reception points via alternative method from source ${index}:`, receptionPoints);
+              console.log(`Full item details:`, JSON.stringify(validReceptionItem, null, 2));
               break;
             }
           }
