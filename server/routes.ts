@@ -1003,7 +1003,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
-      console.log(`Team Export: Requesting team ${teamId} from league ${leagueId}`);
       
       const storage = getStorage();
       const league = await storage.getLeague(leagueId);
@@ -1030,13 +1029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rostersData = await rostersResponse.json();
       
       // Find the specific team
-      console.log(`Team Export: Available teams:`, rostersData.teams?.map((t: any) => t.id) || []);
       const team = rostersData.teams?.find((t: any) => t.id === teamId);
       if (!team) {
-        console.log(`Team Export: Team ${teamId} not found in league ${leagueId}`);
         return res.status(404).json({ message: 'Team not found' });
       }
-      console.log(`Team Export: Found team ${teamId}, processing roster...`);
 
       // Get players data for mapping
       const playersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/players?view=players_wl&view=kona_player_info&scoringPeriodId=1`;
