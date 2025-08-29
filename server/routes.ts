@@ -23,16 +23,25 @@ class EspnApiService {
 
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
+      console.log('ESPN API validation - testing credentials...');
       // Test with a simple league endpoint
-      const response = await fetch(
-        `${this.baseUrl}/ffl/seasons/2025/segments/0/leaguedefaults/1?view=mSettings`,
-        { 
-          method: 'GET',
-          headers: this.getHeaders(credentials)
-        }
-      );
+      const testUrl = `${this.baseUrl}/ffl/seasons/2025/segments/0/leaguedefaults/1?view=mSettings`;
+      console.log('ESPN API test URL:', testUrl);
+      
+      const response = await fetch(testUrl, { 
+        method: 'GET',
+        headers: this.getHeaders(credentials)
+      });
+      
+      console.log('ESPN API response status:', response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('ESPN API error response:', errorText);
+      }
+      
       return response.ok;
     } catch (error) {
+      console.log('ESPN API validation error:', error);
       return false;
     }
   }
@@ -217,15 +226,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertEspnCredentialsSchema.parse(req.body);
       
       // Validate credentials with ESPN API
-      const isValid = await espnApiService.validateCredentials({
+      console.log('Validating credentials with ESPN API...');
+      const testCredentials = {
         ...validatedData,
         id: '',
         isValid: true,
         createdAt: new Date(),
         lastValidated: null
-      });
+      };
+      console.log('Test credentials object:', { userId: testCredentials.userId, espnS2: testCredentials.espnS2?.substring(0, 20) + '...', swid: testCredentials.swid });
+      
+      const isValid = await espnApiService.validateCredentials(testCredentials);
+      console.log('ESPN API validation result:', isValid);
 
       if (!isValid) {
+        console.log('ESPN credentials validation failed');
         return res.status(400).json({ 
           message: "Invalid ESPN credentials. Please check your espn_s2 and SWID cookies." 
         });
