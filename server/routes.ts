@@ -213,6 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ESPN Credentials routes
   app.post("/api/espn-credentials", async (req, res) => {
     try {
+      console.log('Received ESPN credentials request:', JSON.stringify(req.body, null, 2));
       const validatedData = insertEspnCredentialsSchema.parse(req.body);
       
       // Validate credentials with ESPN API
