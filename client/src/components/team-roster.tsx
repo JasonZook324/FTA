@@ -56,6 +56,16 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
     return colors[position] || "bg-muted";
   };
 
+  const getNFLTeamName = (teamId: number): string => {
+    const teamNames: Record<number, string> = {
+      1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET",
+      9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN",
+      17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC",
+      25: "SF", 26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU"
+    };
+    return teamNames[teamId] || "FA";
+  };
+
   const getTeamInitials = (location: string, nickname: string) => {
     const words = [location, nickname].filter(Boolean);
     return words.map(word => word.charAt(0).toUpperCase()).join('').slice(0, 2);
@@ -156,7 +166,7 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                                   {player.fullName}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent"}
+                                  {player.proTeamId ? getNFLTeamName(player.proTeamId) : "FA"}
                                 </div>
                               </div>
                             </div>
@@ -198,7 +208,7 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                                   {player.fullName}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent"}
+                                  {player.proTeamId ? getNFLTeamName(player.proTeamId) : "FA"}
                                 </div>
                               </div>
                             </div>
