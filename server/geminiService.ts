@@ -20,72 +20,98 @@ export interface FantasyAnalysis {
 
 export class FantasyGeminiService {
   async analyzeLeague(leagueData: any, teamData?: any): Promise<FantasyAnalysis> {
-    try {
-      const prompt = this.buildAnalysisPrompt(leagueData, teamData);
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "object",
-            properties: {
-              recommendations: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    type: { type: "string", enum: ["waiver_wire", "trade", "lineup", "general"] },
-                    title: { type: "string" },
-                    description: { type: "string" },
-                    priority: { type: "string", enum: ["high", "medium", "low"] },
-                    reasoning: { type: "string" }
-                  },
-                  required: ["type", "title", "description", "priority", "reasoning"]
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const prompt = this.buildAnalysisPrompt(leagueData, teamData);
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                recommendations: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string", enum: ["waiver_wire", "trade", "lineup", "general"] },
+                      title: { type: "string" },
+                      description: { type: "string" },
+                      priority: { type: "string", enum: ["high", "medium", "low"] },
+                      reasoning: { type: "string" }
+                    },
+                    required: ["type", "title", "description", "priority", "reasoning"]
+                  }
+                },
+                summary: { type: "string" },
+                strengths: {
+                  type: "array",
+                  items: { type: "string" }
+                },
+                weaknesses: {
+                  type: "array",
+                  items: { type: "string" }
                 }
               },
-              summary: { type: "string" },
-              strengths: {
-                type: "array",
-                items: { type: "string" }
-              },
-              weaknesses: {
-                type: "array",
-                items: { type: "string" }
-              }
-            },
-            required: ["recommendations", "summary", "strengths", "weaknesses"]
-          }
-        },
-        contents: prompt
-      });
+              required: ["recommendations", "summary", "strengths", "weaknesses"]
+            }
+          },
+          contents: prompt
+        });
 
-      const rawJson = response.text;
-      if (rawJson) {
-        return JSON.parse(rawJson) as FantasyAnalysis;
-      } else {
-        throw new Error("Empty response from AI model");
+        const rawJson = response.text;
+        if (rawJson) {
+          return JSON.parse(rawJson) as FantasyAnalysis;
+        } else {
+          throw new Error("Empty response from AI model");
+        }
+      } catch (error: any) {
+        console.log(`AI Analysis attempt ${attempt} failed:`, error.message);
+        
+        // Check if it's a rate limit or overload error
+        if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('UNAVAILABLE')) {
+          if (attempt < maxRetries) {
+            const delay = baseDelay * attempt; // Exponential backoff
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        // If it's the last attempt or not a retryable error, throw
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to analyze fantasy data after ${maxRetries} attempts: ${error.message}`);
+        }
       }
-    } catch (error) {
-      throw new Error(`Failed to analyze fantasy data: ${error}`);
     }
+    
+    throw new Error("Unexpected error in analyzeLeague");
   }
 
   async askQuestion(question: string, leagueData: any): Promise<string> {
-    try {
-      const userTeam = leagueData.userTeam || {};
-      const scoringSettings = leagueData.scoringSettings || {};
-      const weekContext = leagueData.weekContext || {};
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const userTeam = leagueData.userTeam || {};
+        const scoringSettings = leagueData.scoringSettings || {};
+        const weekContext = leagueData.weekContext || {};
 
-      // Format scoring type for display
-      let scoringFormat = 'Standard';
-      if (scoringSettings.isFullPPR) {
-        scoringFormat = 'Full PPR';
-      } else if (scoringSettings.isHalfPPR) {
-        scoringFormat = 'Half PPR';
-      }
+        // Format scoring type for display
+        let scoringFormat = 'Standard';
+        if (scoringSettings.isFullPPR) {
+          scoringFormat = 'Full PPR';
+        } else if (scoringSettings.isHalfPPR) {
+          scoringFormat = 'Half PPR';
+        }
 
-      const contextPrompt = `
+        const contextPrompt = `
 You are a fantasy football expert assistant. Answer the user's question using this comprehensive league context:
 
 ==== YOUR TEAM ROSTER ====
@@ -110,15 +136,33 @@ Provide a detailed, specific response that considers:
 - Specific actionable advice based on the data above
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: contextPrompt
-      });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: contextPrompt
+        });
 
-      return response.text || "I couldn't generate a response to your question.";
-    } catch (error) {
-      throw new Error(`Failed to answer question: ${error}`);
+        return response.text || "I couldn't generate a response to your question.";
+      } catch (error: any) {
+        console.log(`AI Question attempt ${attempt} failed:`, error.message);
+        
+        // Check if it's a rate limit or overload error
+        if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('UNAVAILABLE')) {
+          if (attempt < maxRetries) {
+            const delay = baseDelay * attempt; // Exponential backoff
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        // If it's the last attempt or not a retryable error, throw
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to answer question after ${maxRetries} attempts. The AI service is currently overloaded - please try again in a few moments.`);
+        }
+      }
     }
+    
+    throw new Error("Unexpected error in askQuestion");
   }
 
   private buildAnalysisPrompt(leagueData: any, teamData?: any): string {
