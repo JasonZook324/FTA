@@ -459,12 +459,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Extract taken player IDs from all rosters
       const takenPlayerIds = new Set();
+      console.log('Processing roster data structure:', { 
+        hasTeams: !!rostersData.teams, 
+        teamCount: rostersData.teams?.length,
+        firstTeam: rostersData.teams?.[0] ? {
+          hasRoster: !!rostersData.teams[0].roster,
+          hasEntries: !!rostersData.teams[0].roster?.entries,
+          entryCount: rostersData.teams[0].roster?.entries?.length,
+          firstEntry: rostersData.teams[0].roster?.entries?.[0]
+        } : null
+      });
+
       if (rostersData.teams) {
         rostersData.teams.forEach((team: any) => {
           if (team.roster?.entries) {
             team.roster.entries.forEach((entry: any) => {
-              if (entry.playerPoolEntry?.player?.id) {
-                takenPlayerIds.add(entry.playerPoolEntry.player.id);
+              // Try multiple possible player ID locations
+              const playerId = entry.playerPoolEntry?.player?.id || 
+                              entry.player?.id || 
+                              entry.playerId;
+              
+              if (playerId) {
+                takenPlayerIds.add(playerId);
               }
             });
           }
