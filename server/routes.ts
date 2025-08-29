@@ -558,15 +558,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
           console.log(`Checking ${settings.scoringItems.length} scoring items in source ${index}`);
           // Look for reception scoring in scoringItems (ESPN often puts it here)
-          const receptionScoringItem = settings.scoringItems.find((item: any) => 
-            item.statId === 53 || // Reception stat ID in ESPN
-            item.description?.toLowerCase().includes('reception') ||
-            item.abbr === 'REC'
-          );
+          console.log('Searching through scoring items for reception scoring...');
+          const receptionScoringItem = settings.scoringItems.find((item: any) => {
+            const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
+              item.description?.toLowerCase().includes('reception') ||
+              item.abbr === 'REC';
+            if (isReceptionStat) {
+              console.log('Found reception scoring item:', JSON.stringify(item, null, 2));
+            }
+            return isReceptionStat;
+          });
           if (receptionScoringItem) {
             receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
             console.log(`Found reception points in scoringItems from source ${index}:`, receptionPoints);
             break;
+          } else {
+            // Debug: Show a few scoring items to understand the structure
+            console.log('Sample scoring items (first 3):', JSON.stringify(settings.scoringItems.slice(0, 3), null, 2));
           }
         }
       }
@@ -698,11 +706,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get comprehensive data for enhanced context (same as recommendations)
-      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
+      const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
         espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
         espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster'])
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster']),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
       ]);
+      
+      // Get settings from multiple sources (same as recommendations)
+      const settingsFromStandings = standingsData.settings || {};
+      const settingsFromLeague = leagueDetailsData.settings || {};
+      const settingsFromFull = fullLeagueData.settings || {};
+      
+      // Merge settings data from all sources
+      const combinedSettings = {
+        ...settingsFromStandings,
+        ...settingsFromLeague, 
+        ...settingsFromFull
+      };
 
       // Find user's team and get roster data
       const userTeam = standingsData.teams?.[0];
@@ -718,8 +739,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let scoringType = 'Standard';
       
       // Check multiple possible paths for scoring settings
-      // Try combined settings first, then individual sources
-      const settingsSources = [combinedSettings, settingsFromStandings, leagueDetailsData.settings];
+      // Try all available settings sources
+      const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
       
       for (const settings of settingsSources) {
         if (settings?.scoringSettings?.receptionPoints !== undefined) {
