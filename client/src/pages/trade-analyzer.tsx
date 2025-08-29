@@ -78,6 +78,23 @@ export default function TradeAnalyzer() {
     return teamId; // Fallback to original team identifier
   };
 
+  // Replace all "Team X" references in text with actual team names
+  const replaceTeamNamesInText = (text: string): string => {
+    if (!rostersData?.teams) return text;
+    
+    let updatedText = text;
+    
+    // Replace all instances of "Team X" with actual team names
+    rostersData.teams.forEach((team: any) => {
+      const teamPattern = new RegExp(`Team\\s+${team.id}`, 'g');
+      if (team.name && team.name !== `Team ${team.id}`) {
+        updatedText = updatedText.replace(teamPattern, team.name);
+      }
+    });
+    
+    return updatedText;
+  };
+
   // Trade analysis mutation
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
@@ -235,21 +252,21 @@ export default function TradeAnalyzer() {
             <CardContent className="space-y-4">
               <div>
                 <h3 className="font-semibold mb-2">Player Value Assessment</h3>
-                <p className="text-sm text-muted-foreground">{(tradeAnalysisMutation.data as TradeAnalysis)?.playerValue}</p>
+                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.playerValue || '')}</p>
               </div>
               
               <Separator />
               
               <div>
                 <h3 className="font-semibold mb-2">Market Analysis</h3>
-                <p className="text-sm text-muted-foreground">{(tradeAnalysisMutation.data as TradeAnalysis)?.marketAnalysis}</p>
+                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.marketAnalysis || '')}</p>
               </div>
 
               <Separator />
 
               <div>
                 <h3 className="font-semibold mb-2">Summary</h3>
-                <p className="text-sm text-muted-foreground">{(tradeAnalysisMutation.data as TradeAnalysis)?.summary}</p>
+                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.summary || '')}</p>
               </div>
             </CardContent>
           </Card>
@@ -297,12 +314,12 @@ export default function TradeAnalyzer() {
 
                   <div>
                     <h4 className="font-medium mb-2">Trade Rationale</h4>
-                    <p className="text-sm text-muted-foreground">{option.tradeRationale}</p>
+                    <p className="text-sm text-muted-foreground">{replaceTeamNamesInText(option.tradeRationale)}</p>
                   </div>
 
                   <div>
                     <h4 className="font-medium mb-2">Benefit Analysis</h4>
-                    <p className="text-sm text-muted-foreground">{option.benefitAnalysis}</p>
+                    <p className="text-sm text-muted-foreground">{replaceTeamNamesInText(option.benefitAnalysis)}</p>
                   </div>
                 </CardContent>
               </Card>
