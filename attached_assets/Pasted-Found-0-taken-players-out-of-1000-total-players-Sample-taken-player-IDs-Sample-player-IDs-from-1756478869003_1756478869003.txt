@@ -1,0 +1,89 @@
+Found 0 taken players out of 1000 total players
+Sample taken player IDs: []
+Sample player IDs from players list: [ 4362628, 3929630, 4429795, 4430807, 4262921 ]
+After filtering: 1000 available players
+2:44:33 PM [express] GET /api/leagues/5586ccf9-cdae-4e89-8191-8385f8c6a793/waiver-wire 304 in 1628ms…
+2:46:34 PM [express] GET /api/leagues/default-user 304 in 1ms :: [{"userId":"default-user","espnLeag…
+2:46:36 PM [express] GET /api/players/ffl/2025 304 in 1603ms :: {"players":[{"draftAuctionValue":0,"…
+Fetching rosters for league: 1713644125
+Roster API returned: {
+  hasData: true,
+  keys: [
+    'gameId',
+    'id',
+    'members',
+    'scoringPeriodId',
+    'seasonId',
+    'segmentId',
+    'settings',
+    'status',
+    'teams'
+  ],
+  hasTeams: true,
+  teamCount: 14
+}
+First team data sample: {
+  "abbrev": "JAZ1",
+  "id": 1,
+  "owners": [
+    "{A2AD9186-6325-4D90-840D-C62AFEC99239}"
+  ]
+}
+Processing roster data structure: {
+  hasTeams: true,
+  teamCount: 14,
+  firstTeam: {
+    id: 1,
+    hasRoster: false,
+    hasEntries: false,
+    entryCount: undefined,
+    firstEntry: undefined
+  }
+}
+Found 0 taken players out of 1000 total players
+Sample taken player IDs: []
+Sample player IDs from players list: [ 4362628, 3929630, 4429795, 4430807, 4262921 ]
+After filtering: 1000 available players
+2:46:40 PM [express] GET /api/leagues/5586ccf9-cdae-4e89-8191-8385f8c6a793/waiver-wire 200 in 1641ms…
+2:46:47 PM [express] GET /api/leagues/default-user 304 in 1ms :: [{"userId":"default-user","espnLeag…
+2:46:49 PM [express] GET /api/players/ffl/2025 304 in 1643ms :: {"players":[{"draftAuctionValue":0,"…
+Fetching rosters for league: 1713644125
+Roster API returned: {
+  hasData: true,
+  keys: [
+    'gameId',
+    'id',
+    'members',
+    'scoringPeriodId',
+    'seasonId',
+    'segmentId',
+    'settings',
+    'status',
+    'teams'
+  ],
+  hasTeams: true,
+  teamCount: 14
+}
+First team data sample: {
+  "abbrev": "JAZ1",
+  "id": 1,
+  "owners": [
+    "{A2AD9186-6325-4D90-840D-C62AFEC99239}"
+  ]
+}
+Processing roster data structure: {
+  hasTeams: true,
+  teamCount: 14,
+  firstTeam: {
+    id: 1,
+    hasRoster: false,
+    hasEntries: false,
+    entryCount: undefined,
+    firstEntry: undefined
+  }
+}
+Found 0 taken players out of 1000 total players
+Sample taken player IDs: []
+Sample player IDs from players list: [ 4362628, 3929630, 4429795, 4430807, 4262921 ]
+After filtering: 1000 available players
+2:46:55 PM [express] GET /api/leagues/5586ccf9-cdae-4e89-8191-8385f8c6a793/waiver-wire 200 in 1880ms…

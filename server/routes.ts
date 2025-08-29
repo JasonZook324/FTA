@@ -511,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const takenPlayerIds = new Set();
 
       // Parse roster data from multiple possible locations
-      function extractPlayerIds(roster: any, source: string) {
+      const extractPlayerIds = (roster: any, source: string) => {
         if (!roster?.entries) return;
         
         roster.entries.forEach((entry: any) => {
@@ -525,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Found taken player ID from ${source}:`, playerId);
           }
         });
-      }
+      };
 
       // Method 1: Check teams directly
       if (rostersData.teams) {
