@@ -87,8 +87,6 @@ class EspnApiService {
     const viewParam = views.join(',');
     const url = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${viewParam}${weekParam}`;
     
-    console.log('Matchups API URL:', url);
-    
     const response = await fetch(url, {
       method: 'GET',
       headers: this.getHeaders(credentials)
@@ -99,66 +97,22 @@ class EspnApiService {
     }
     
     const data = await response.json();
-    console.log('Matchups API response keys:', Object.keys(data));
-    console.log('Schedule data:', data.schedule ? `exists with ${data.schedule.length} items` : 'does not exist');
-    console.log('Members data:', data.members ? `exists with ${data.members.length} items` : 'does not exist');
-    console.log('Teams data:', data.teams ? `exists with ${data.teams.length} items` : 'does not exist');
     
-    // Log teams structure to see if matchup data is nested there
-    if (data.teams && data.teams.length > 0) {
-      console.log('First team structure:', Object.keys(data.teams[0]));
-      const firstTeam = data.teams[0];
-      
-      // Check common ESPN matchup fields within teams
-      if (firstTeam.roster) {
-        console.log('Team has roster data');
-      }
-      if (firstTeam.record) {
-        console.log('Team has record data');
-      }
-      if (firstTeam.schedule) {
-        console.log('Team has individual schedule!');
-      }
-    }
-    
-    // Log schedule structure if it exists
-    if (data.schedule && data.schedule.length > 0) {
-      console.log('First schedule item structure:', Object.keys(data.schedule[0]));
-      console.log('First schedule item:', JSON.stringify(data.schedule[0], null, 2));
-    }
-    
-    // If still no schedule, try different ESPN views known to work for fantasy football
+    // If no schedule data, try alternative ESPN views for matchups
     if (!data.schedule) {
-      console.log('No schedule in main response, trying fantasy football specific views...');
-      const ffViews = ['mRoster', 'mTeam', 'mSettings', 'mStandings'];
-      const ffUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${ffViews.join(',')}${weekParam}`;
+      const altViews = ['mBoxscore', 'mMatchup', 'mTeam'];
+      const altUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=${altViews.join(',')}${weekParam}`;
       
-      const ffResponse = await fetch(ffUrl, {
+      const altResponse = await fetch(altUrl, {
         method: 'GET',
         headers: this.getHeaders(credentials)
       });
       
-      if (ffResponse.ok) {
-        const ffData = await ffResponse.json();
-        console.log('Fantasy Football API response keys:', Object.keys(ffData));
-        
-        // Check if teams have schedule data in this response
-        if (ffData.teams && ffData.teams[0] && ffData.teams[0].schedule) {
-          console.log('Found team schedule data in FF response!');
-          return ffData;
+      if (altResponse.ok) {
+        const altData = await altResponse.json();
+        if (altData.schedule) {
+          return altData;
         }
-        
-        if (ffData.schedule) {
-          console.log('Found league schedule in FF response!');
-          return ffData;
-        }
-      }
-      
-      // Last resort: try to construct matchups from teams data
-      console.log('No schedule found anywhere, checking if we can build matchups from teams...');
-      if (data.teams && data.teams.length >= 2) {
-        // ESPN sometimes requires us to build matchups from the teams' current week data
-        console.log('Attempting to construct matchups from teams data...');
       }
     }
     

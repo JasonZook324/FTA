@@ -40,9 +40,22 @@ export default function MatchupCard({ data, isLoading, leagueId, week }: Matchup
           <CardTitle>Weekly Matchups</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No matchup data available. Check your league configuration and try refreshing.
-          </p>
+          <div className="text-center py-8 space-y-4">
+            <p className="text-muted-foreground">
+              No matchup data available for this league.
+            </p>
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p><strong>Possible reasons:</strong></p>
+              <ul className="text-left max-w-md mx-auto space-y-1">
+                <li>• League is set to a future season (e.g., 2025) that hasn't started</li>
+                <li>• Matchups haven't been generated yet by ESPN</li>
+                <li>• League settings don't include regular season matchups</li>
+              </ul>
+              <p className="mt-4">
+                <strong>Suggestion:</strong> Try loading a league from the current or previous season (e.g., 2024) to see matchup data.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
