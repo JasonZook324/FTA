@@ -38,11 +38,17 @@ export class FantasyGeminiService {
 
         const rawJson = response.text;
         if (rawJson) {
+          console.log('Raw AI response (first 200 chars):', rawJson.substring(0, 200));
+          
           // Strip markdown code blocks and any other formatting
           let cleanJson = rawJson.trim();
           
-          // Remove markdown code blocks
-          cleanJson = cleanJson.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+          console.log('After initial trim (first 100 chars):', cleanJson.substring(0, 100));
+          
+          // Remove markdown code blocks more aggressively
+          cleanJson = cleanJson.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```\s*$/, '');
+          
+          console.log('After removing markdown (first 100 chars):', cleanJson.substring(0, 100));
           
           // Remove any leading/trailing whitespace and newlines
           cleanJson = cleanJson.trim();
@@ -51,11 +57,13 @@ export class FantasyGeminiService {
           const jsonStart = cleanJson.indexOf('{');
           const jsonEnd = cleanJson.lastIndexOf('}');
           
+          console.log('JSON bounds found:', { jsonStart, jsonEnd, length: cleanJson.length });
+          
           if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
             cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
           }
           
-          console.log('Attempting to parse JSON:', cleanJson.substring(0, 100) + '...');
+          console.log('Final JSON to parse (first 200 chars):', cleanJson.substring(0, 200));
           return JSON.parse(cleanJson) as FantasyAnalysis;
         } else {
           throw new Error("Empty response from AI model");
