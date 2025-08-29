@@ -238,13 +238,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch league data from ESPN
-      const leagueData = await espnApiService.getLeagueData(
-        credentials,
-        sport,
-        season,
-        espnLeagueId,
-        ['mTeam', 'mSettings']
-      );
+      console.log(`Attempting to load league: ${espnLeagueId}, sport: ${sport}, season: ${season}`);
+      
+      let leagueData;
+      try {
+        leagueData = await espnApiService.getLeagueData(
+          credentials,
+          sport,
+          season,
+          espnLeagueId,
+          ['mTeam', 'mSettings']
+        );
+        console.log('League data loaded successfully');
+      } catch (apiError: any) {
+        console.error('ESPN API Error Details:', {
+          message: apiError.message,
+          url: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${sport}/seasons/${season}/segments/0/leagues/${espnLeagueId}?view=mTeam,mSettings`,
+          sport,
+          season,
+          leagueId: espnLeagueId
+        });
+        throw apiError;
+      }
 
       // Parse and store league information
       const leagueInfo = {
