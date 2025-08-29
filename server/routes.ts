@@ -449,14 +449,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      // Get comprehensive league data for AI analysis
-      const [standingsData, playersData] = await Promise.all([
+      // Get comprehensive data for the 4 required AI analysis points
+      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
         espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getPlayers(credentials, league.sport, league.season, league.espnLeagueId)
+        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster'])
       ]);
 
-      // Combine league data for AI analysis
+      // Get waiver wire players (using existing logic from waiver-wire route)
+      const playersData = await espnApiService.getPlayers(credentials, league.sport, league.season);
+      
+      // Extract taken player IDs from all rosters
+      const takenPlayerIds = new Set();
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any) => {
+          const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
+          if (roster?.entries) {
+            roster.entries.forEach((entry: any) => {
+              const playerId = entry.playerPoolEntry?.player?.id || entry.player?.id || entry.playerId || entry.id;
+              if (playerId) {
+                takenPlayerIds.add(playerId);
+              }
+            });
+          }
+        });
+      }
+
+      // Filter to get only available waiver wire players
+      const waiverWirePlayers = playersData.filter((playerData: any) => {
+        const player = playerData.player || playerData;
+        return !takenPlayerIds.has(player.id);
+      }).slice(0, 50); // Top 50 available
+
+      // Find user's team (for now, use the first team as default)
+      // TODO: Add user team identification logic based on team ownership
+      const userTeam = standingsData.teams?.[0];
+      let userRoster = null;
+      
+      if (userTeam && rostersData.teams) {
+        const userTeamData = rostersData.teams.find((t: any) => t.id === userTeam.id);
+        userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
+      }
+
+      // Extract scoring settings
+      const scoringSettings = {
+        scoringType: leagueDetailsData.settings?.scoringSettings?.scoringType || 'Standard',
+        isHalfPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 0.5,
+        isFullPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 1.0,
+        isStandard: !leagueDetailsData.settings?.scoringSettings?.receptionPoints || leagueDetailsData.settings.scoringSettings.receptionPoints === 0,
+        receptionPoints: leagueDetailsData.settings?.scoringSettings?.receptionPoints || 0,
+        scoringItems: leagueDetailsData.settings?.scoringSettings?.scoringItems || {}
+      };
+
+      // Get current week context
+      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || 1;
+      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
+      const weekContext = {
+        currentWeek: currentScoringPeriod,
+        seasonType,
+        season: league.season,
+        totalWeeks: leagueDetailsData.settings?.scheduleSettings?.matchupPeriodCount || 17
+      };
+
+      // Build comprehensive analysis data with the 4 required data points
       const leagueAnalysisData = {
+        // 1. Your Team's Roster
+        userTeam: {
+          name: userTeam ? `${userTeam.location} ${userTeam.nickname}` : 'Unknown Team',
+          roster: userRoster?.entries?.map((entry: any) => {
+            const player = entry.playerPoolEntry?.player || entry.player;
+            return {
+              name: player?.fullName || 'Unknown Player',
+              position: player?.defaultPositionId,
+              lineupSlot: entry.lineupSlotId, // 0-8 starters, 20+ bench, 21 IR
+              isStarter: entry.lineupSlotId < 20,
+              isBench: entry.lineupSlotId === 20,
+              isIR: entry.lineupSlotId === 21,
+              team: player?.proTeamId
+            };
+          }) || []
+        },
+        
+        // 2. Available Waiver Wire Players
+        waiverWire: {
+          topAvailable: waiverWirePlayers.slice(0, 25).map((playerData: any) => {
+            const player = playerData.player || playerData;
+            return {
+              name: player.fullName || 'Unknown Player',
+              position: player.defaultPositionId,
+              team: player.proTeamId,
+              projectedPoints: player.stats?.find((s: any) => s.statSourceId === 1)?.appliedTotal || 0,
+              ownership: player.ownership?.percentOwned || 0
+            };
+          })
+        },
+        
+        // 3. League's Scoring Settings
+        scoringSettings,
+        
+        // 4. Current Week/Context
+        weekContext,
+        
+        // Additional context data
         league: {
           name: league.name,
           sport: league.sport,
@@ -470,8 +564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           losses: team.record?.overall?.losses || 0,
           pointsFor: team.record?.overall?.pointsFor || 0,
           pointsAgainst: team.record?.overall?.pointsAgainst || 0
-        })),
-        availablePlayers: playersData.slice(0, 50) // Top 50 available players
+        })) || []
       };
 
       const analysis = await geminiService.analyzeLeague(leagueAnalysisData);
@@ -500,10 +593,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      // Get basic league data for context
-      const standingsData = await espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId);
+      // Get comprehensive data for enhanced context (same as recommendations)
+      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
+        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster'])
+      ]);
+
+      // Find user's team and get roster data
+      const userTeam = standingsData.teams?.[0];
+      let userRoster = null;
+      
+      if (userTeam && rostersData.teams) {
+        const userTeamData = rostersData.teams.find((t: any) => t.id === userTeam.id);
+        userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
+      }
+
+      // Extract scoring settings
+      const scoringSettings = {
+        scoringType: leagueDetailsData.settings?.scoringSettings?.scoringType || 'Standard',
+        isHalfPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 0.5,
+        isFullPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 1.0,
+        isStandard: !leagueDetailsData.settings?.scoringSettings?.receptionPoints || leagueDetailsData.settings.scoringSettings.receptionPoints === 0,
+        receptionPoints: leagueDetailsData.settings?.scoringSettings?.receptionPoints || 0
+      };
+
+      // Get current week context
+      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || 1;
+      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
+      const weekContext = {
+        currentWeek: currentScoringPeriod,
+        seasonType,
+        season: league.season
+      };
       
       const contextData = {
+        userTeam: {
+          name: userTeam ? `${userTeam.location} ${userTeam.nickname}` : 'Unknown Team',
+          roster: userRoster?.entries?.map((entry: any) => {
+            const player = entry.playerPoolEntry?.player || entry.player;
+            return {
+              name: player?.fullName || 'Unknown Player',
+              position: player?.defaultPositionId,
+              isStarter: entry.lineupSlotId < 20,
+              isBench: entry.lineupSlotId === 20,
+              isIR: entry.lineupSlotId === 21
+            };
+          }) || []
+        },
+        scoringSettings,
+        weekContext,
         league: {
           name: league.name,
           sport: league.sport,
