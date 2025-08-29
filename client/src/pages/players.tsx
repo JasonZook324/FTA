@@ -47,28 +47,6 @@ export default function Players() {
   const currentData = viewMode === "waiver" ? waiverWireData : playersData;
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
-  const filteredPlayers = currentData?.players?.filter((playerData: any) => {
-    // Position filter
-    if (selectedPosition !== "all") {
-      const playerPosition = getPositionName(getPlayerPositionId(playerData));
-      if (playerPosition !== selectedPosition) {
-        return false;
-      }
-    }
-    
-    // Search filter
-    if (searchTerm) {
-      const name = getPlayerName(playerData);
-      const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
-      
-      if (!name.toLowerCase().includes(searchTerm.toLowerCase()) && !teamId.includes(searchTerm)) {
-        return false;
-      }
-    }
-    
-    return true;
-  }) || [];
-
   const getPositionColor = (positionId: number) => {
     const colors: Record<number, string> = {
       0: "bg-chart-1", // QB
@@ -98,6 +76,28 @@ export default function Players() {
     };
     return positions[positionId] || `POS_${positionId}`;
   };
+
+  const filteredPlayers = currentData?.players?.filter((playerData: any) => {
+    // Position filter
+    if (selectedPosition !== "all") {
+      const playerPosition = getPositionName(getPlayerPositionId(playerData));
+      if (playerPosition !== selectedPosition) {
+        return false;
+      }
+    }
+    
+    // Search filter
+    if (searchTerm) {
+      const name = getPlayerName(playerData);
+      const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
+      
+      if (!name.toLowerCase().includes(searchTerm.toLowerCase()) && !teamId.includes(searchTerm)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }) || [];
 
   // Helper function to get player name from various possible fields
   const getPlayerName = (playerData: any) => {
