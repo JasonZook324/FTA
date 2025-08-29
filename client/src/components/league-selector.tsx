@@ -54,8 +54,9 @@ export default function LeagueSelector({ userId, disabled }: LeagueSelectorProps
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
     },
     onError: (error: Error) => {
+      console.error('League load error:', error);
       toast({
-        title: "Load Failed",
+        title: "Load Failed", 
         description: error.message,
         variant: "destructive",
       });
