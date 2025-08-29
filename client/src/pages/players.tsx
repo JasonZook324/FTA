@@ -262,7 +262,22 @@ export default function Players() {
                 data-testid="button-export-waiver"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Export CSV
+                Export Waiver Wire
+              </Button>
+            )}
+            
+            {selectedLeagueId && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Add timestamp to prevent caching
+                  const url = `/api/leagues/${selectedLeagueId}/roster-export?t=${Date.now()}`;
+                  window.open(url, '_blank');
+                }}
+                data-testid="button-export-rosters"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Team Rosters
               </Button>
             )}
             
