@@ -171,7 +171,9 @@ export default function AIRecommendations() {
               {questionAnswer && (
                 <div className="mt-4 p-4 bg-muted rounded-lg" data-testid="ai-answer">
                   <h4 className="font-semibold mb-2">AI Response:</h4>
-                  <p className="text-sm whitespace-pre-wrap">{questionAnswer.answer}</p>
+                  <div className="max-h-80 overflow-y-auto">
+                    <p className="text-sm whitespace-pre-wrap">{questionAnswer.answer}</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -187,7 +189,9 @@ export default function AIRecommendations() {
                 <CardTitle>League Analysis Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">{analysisData.summary}</p>
+                <div className="max-h-40 overflow-y-auto">
+                  <p className="text-sm">{analysisData.summary}</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -198,14 +202,16 @@ export default function AIRecommendations() {
                   <CardTitle className="text-green-600">Strengths</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {analysisData.strengths.map((strength, index) => (
-                      <li key={index} className="text-sm flex items-start gap-2">
-                        <span className="text-green-500 mt-1">•</span>
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="max-h-60 overflow-y-auto">
+                    <ul className="space-y-2">
+                      {analysisData.strengths.map((strength, index) => (
+                        <li key={index} className="text-sm flex items-start gap-2">
+                          <span className="text-green-500 mt-1">•</span>
+                          {strength}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -214,14 +220,16 @@ export default function AIRecommendations() {
                   <CardTitle className="text-red-600">Areas for Improvement</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {analysisData.weaknesses.map((weakness, index) => (
-                      <li key={index} className="text-sm flex items-start gap-2">
-                        <span className="text-red-500 mt-1">•</span>
-                        {weakness}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="max-h-60 overflow-y-auto">
+                    <ul className="space-y-2">
+                      {analysisData.weaknesses.map((weakness, index) => (
+                        <li key={index} className="text-sm flex items-start gap-2">
+                          <span className="text-red-500 mt-1">•</span>
+                          {weakness}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -232,24 +240,26 @@ export default function AIRecommendations() {
                 <CardTitle>Strategic Recommendations</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {analysisData.recommendations.map((rec, index) => (
-                    <div key={index} className="border border-border rounded-lg p-4" data-testid={`recommendation-${index}`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {getTypeIcon(rec.type)}
-                          <h4 className="font-semibold">{rec.title}</h4>
+                <div className="max-h-96 overflow-y-auto">
+                  <div className="space-y-4">
+                    {analysisData.recommendations.map((rec, index) => (
+                      <div key={index} className="border border-border rounded-lg p-4" data-testid={`recommendation-${index}`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {getTypeIcon(rec.type)}
+                            <h4 className="font-semibold">{rec.title}</h4>
+                          </div>
+                          <Badge className={getPriorityColor(rec.priority)}>
+                            {rec.priority}
+                          </Badge>
                         </div>
-                        <Badge className={getPriorityColor(rec.priority)}>
-                          {rec.priority}
-                        </Badge>
+                        <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                        <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                          <strong>Reasoning:</strong> {rec.reasoning}
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
-                      <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                        <strong>Reasoning:</strong> {rec.reasoning}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
