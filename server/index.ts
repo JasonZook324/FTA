@@ -62,8 +62,8 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   
-  // For Windows development, use simple listen syntax
-  if (process.env.NODE_ENV === 'development' && process.platform === 'win32') {
+  // For local development, always use localhost
+  if (process.env.NODE_ENV === 'development') {
     server.listen(port, 'localhost', () => {
       log(`serving on port ${port} (localhost)`);
     });
