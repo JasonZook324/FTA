@@ -562,11 +562,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receptionPoints = settings.scoringSettings.receptionPoints;
           console.log(`Found reception points in scoringSettings from source ${index}:`, receptionPoints);
           break;
-        } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
-          console.log(`Checking ${settings.scoringItems.length} scoring items in source ${index}`);
+        } else if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
+          const scoringItems = settings.scoringSettings.scoringItems;
+          console.log(`Checking ${scoringItems.length} scoring items in source ${index}`);
+          console.log('First 5 scoring items:', JSON.stringify(scoringItems.slice(0, 5), null, 2));
           // Look for reception scoring in scoringItems (ESPN often puts it here)
           console.log('Searching through scoring items for reception scoring...');
-          const receptionScoringItem = settings.scoringItems.find((item: any) => {
+          const receptionScoringItem = scoringItems.find((item: any) => {
             const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
               item.description?.toLowerCase().includes('reception') ||
               item.abbr === 'REC';
@@ -581,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
           } else {
             // Debug: Show a few scoring items to understand the structure
-            console.log('Sample scoring items (first 3):', JSON.stringify(settings.scoringItems.slice(0, 3), null, 2));
+            console.log('Sample scoring items (first 3):', JSON.stringify(scoringItems.slice(0, 3), null, 2));
           }
         }
       }
@@ -591,14 +593,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('No PPR data found in standard locations, checking alternative patterns...');
         for (let index = 0; index < settingsSources.length; index++) {
           const settings = settingsSources[index];
-          if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
-            console.log(`Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
+          if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
+            const scoringItems = settings.scoringSettings.scoringItems;
+            console.log(`Alternative search in source ${index}: checking ${scoringItems.length} items`);
             // Look specifically for statId 53 (reception stat)
-            const receptionItems = settings.scoringItems.filter((item: any) => item.statId === 53);
+            const receptionItems = scoringItems.filter((item: any) => item.statId === 53);
             console.log(`Found ${receptionItems.length} reception items (statId 53):`, receptionItems);
             
             // Also check for any reception-related items
-            const allReceptionItems = settings.scoringItems.filter((item: any) => 
+            const allReceptionItems = scoringItems.filter((item: any) => 
               item.statId === 53 ||
               String(item.description || '').toLowerCase().includes('rec') ||
               String(item.abbr || '').toLowerCase().includes('rec')
@@ -775,11 +778,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receptionPoints = settings.scoringSettings.receptionPoints;
           console.log(`AI Question - Found reception points in scoringSettings from source ${index}:`, receptionPoints);
           break;
-        } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
-          console.log(`AI Question - Checking ${settings.scoringItems.length} scoring items in source ${index}`);
+        } else if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
+          const scoringItems = settings.scoringSettings.scoringItems;
+          console.log(`AI Question - Checking ${scoringItems.length} scoring items in source ${index}`);
+          console.log('AI Question - First 5 scoring items:', JSON.stringify(scoringItems.slice(0, 5), null, 2));
           // Look for reception scoring in scoringItems (ESPN often puts it here)
           console.log('AI Question - Searching through scoring items for reception scoring...');
-          const receptionScoringItem = settings.scoringItems.find((item: any) => {
+          const receptionScoringItem = scoringItems.find((item: any) => {
             const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
               item.description?.toLowerCase().includes('reception') ||
               item.abbr === 'REC';
@@ -794,7 +799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
           } else {
             // Debug: Show a few scoring items to understand the structure
-            console.log('AI Question - Sample scoring items (first 3):', JSON.stringify(settings.scoringItems.slice(0, 3), null, 2));
+            console.log('AI Question - Sample scoring items (first 3):', JSON.stringify(scoringItems.slice(0, 3), null, 2));
           }
         }
       }
