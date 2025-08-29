@@ -759,25 +759,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Try all available settings sources
       const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
       
-      for (const settings of settingsSources) {
+      for (const [index, settings] of settingsSources.entries()) {
+        console.log(`AI Question - Checking settings source ${index}:`, Object.keys(settings || {}));
+        
+        // Debug: Show what's actually in scoringSettings if it exists
+        if (settings?.scoringSettings) {
+          console.log(`AI Question - Source ${index} scoringSettings keys:`, Object.keys(settings.scoringSettings));
+          console.log(`AI Question - Source ${index} scoringSettings.receptionPoints:`, settings.scoringSettings.receptionPoints);
+        }
+        
         if (settings?.scoringSettings?.receptionPoints !== undefined) {
           receptionPoints = settings.scoringSettings.receptionPoints;
-          console.log('Found reception points in scoringSettings:', receptionPoints);
+          console.log(`AI Question - Found reception points in scoringSettings from source ${index}:`, receptionPoints);
           break;
         } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+          console.log(`AI Question - Checking ${settings.scoringItems.length} scoring items in source ${index}`);
           // Look for reception scoring in scoringItems (ESPN often puts it here)
-          const receptionScoringItem = settings.scoringItems.find((item: any) => 
-            item.statId === 53 || // Reception stat ID in ESPN
-            item.description?.toLowerCase().includes('reception') ||
-            item.abbr === 'REC'
-          );
+          console.log('AI Question - Searching through scoring items for reception scoring...');
+          const receptionScoringItem = settings.scoringItems.find((item: any) => {
+            const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
+              item.description?.toLowerCase().includes('reception') ||
+              item.abbr === 'REC';
+            if (isReceptionStat) {
+              console.log('AI Question - Found reception scoring item:', JSON.stringify(item, null, 2));
+            }
+            return isReceptionStat;
+          });
           if (receptionScoringItem) {
             receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
-            console.log('Found reception points in scoringItems:', receptionPoints);
+            console.log(`AI Question - Found reception points in scoringItems from source ${index}:`, receptionPoints);
             break;
+          } else {
+            // Debug: Show a few scoring items to understand the structure
+            console.log('AI Question - Sample scoring items (first 3):', JSON.stringify(settings.scoringItems.slice(0, 3), null, 2));
           }
         }
       }
+      
+      // If still no PPR data found, try a different approach - check for specific scoring patterns
+      if (receptionPoints === 0) {
+        console.log('AI Question - No PPR data found in standard locations, checking alternative patterns...');
+        for (const [index, settings] of settingsSources.entries()) {
+          if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+            console.log(`AI Question - Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
+            // Look specifically for statId 53 (reception stat)
+            const receptionItems = settings.scoringItems.filter((item: any) => item.statId === 53);
+            console.log(`AI Question - Found ${receptionItems.length} reception items (statId 53):`, receptionItems);
+            
+            // Also check for any reception-related items
+            const allReceptionItems = settings.scoringItems.filter((item: any) => 
+              item.statId === 53 ||
+              String(item.description || '').toLowerCase().includes('rec') ||
+              String(item.abbr || '').toLowerCase().includes('rec')
+            );
+            console.log(`AI Question - All reception-related items in source ${index}:`, allReceptionItems);
+            
+            // Use the first one that has points > 0
+            const validReceptionItem = allReceptionItems.find((item: any) => 
+              (item.points > 0) || (item.points === 0.5) || (item.points === 1)
+            );
+            
+            if (validReceptionItem) {
+              receptionPoints = validReceptionItem.points || validReceptionItem.value || 0;
+              console.log(`AI Question - Found reception points via alternative method from source ${index}:`, receptionPoints);
+              console.log(`AI Question - Full item details:`, JSON.stringify(validReceptionItem, null, 2));
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log('AI Question - Final extracted reception points:', receptionPoints);
       
       const scoringSettings = {
         scoringType: leagueDetailsData.settings?.scoringType || scoringType,
