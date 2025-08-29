@@ -491,14 +491,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
       }
 
-      // Extract scoring settings
+      // Debug: Log the actual league settings structure to understand ESPN API response
+      console.log('League Details Data Structure:');
+      console.log('- leagueDetailsData.settings keys:', Object.keys(leagueDetailsData.settings || {}));
+      console.log('- settings object:', JSON.stringify(leagueDetailsData.settings, null, 2));
+      
+      // Extract scoring settings from various possible locations in ESPN API
+      let receptionPoints = 0;
+      let scoringType = 'Standard';
+      
+      // Check multiple possible paths for scoring settings
+      if (leagueDetailsData.settings?.scoringSettings?.receptionPoints !== undefined) {
+        receptionPoints = leagueDetailsData.settings.scoringSettings.receptionPoints;
+      } else if (leagueDetailsData.settings?.scoringItems) {
+        // Look for reception scoring in scoringItems (ESPN often puts it here)
+        const receptionScoringItem = leagueDetailsData.settings.scoringItems.find((item: any) => 
+          item.statId === 53 || // Reception stat ID in ESPN
+          item.description?.toLowerCase().includes('reception') ||
+          item.abbr === 'REC'
+        );
+        if (receptionScoringItem) {
+          receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+        }
+      }
+      
+      console.log('Extracted reception points:', receptionPoints);
+      
       const scoringSettings = {
-        scoringType: leagueDetailsData.settings?.scoringSettings?.scoringType || 'Standard',
-        isHalfPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 0.5,
-        isFullPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 1.0,
-        isStandard: !leagueDetailsData.settings?.scoringSettings?.receptionPoints || leagueDetailsData.settings.scoringSettings.receptionPoints === 0,
-        receptionPoints: leagueDetailsData.settings?.scoringSettings?.receptionPoints || 0,
-        scoringItems: leagueDetailsData.settings?.scoringSettings?.scoringItems || {}
+        scoringType: leagueDetailsData.settings?.scoringType || scoringType,
+        isHalfPPR: receptionPoints === 0.5,
+        isFullPPR: receptionPoints === 1.0,
+        isStandard: receptionPoints === 0,
+        receptionPoints: receptionPoints,
+        scoringItems: leagueDetailsData.settings?.scoringItems || {},
+        rawSettings: leagueDetailsData.settings // Include raw settings for debugging
       };
 
       // Get current week context
@@ -609,13 +635,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
       }
 
-      // Extract scoring settings
+      // Extract scoring settings from various possible locations in ESPN API
+      let receptionPoints = 0;
+      let scoringType = 'Standard';
+      
+      // Check multiple possible paths for scoring settings
+      if (leagueDetailsData.settings?.scoringSettings?.receptionPoints !== undefined) {
+        receptionPoints = leagueDetailsData.settings.scoringSettings.receptionPoints;
+      } else if (leagueDetailsData.settings?.scoringItems) {
+        // Look for reception scoring in scoringItems (ESPN often puts it here)
+        const receptionScoringItem = leagueDetailsData.settings.scoringItems.find((item: any) => 
+          item.statId === 53 || // Reception stat ID in ESPN
+          item.description?.toLowerCase().includes('reception') ||
+          item.abbr === 'REC'
+        );
+        if (receptionScoringItem) {
+          receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
+        }
+      }
+      
       const scoringSettings = {
-        scoringType: leagueDetailsData.settings?.scoringSettings?.scoringType || 'Standard',
-        isHalfPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 0.5,
-        isFullPPR: leagueDetailsData.settings?.scoringSettings?.receptionPoints === 1.0,
-        isStandard: !leagueDetailsData.settings?.scoringSettings?.receptionPoints || leagueDetailsData.settings.scoringSettings.receptionPoints === 0,
-        receptionPoints: leagueDetailsData.settings?.scoringSettings?.receptionPoints || 0
+        scoringType: leagueDetailsData.settings?.scoringType || scoringType,
+        isHalfPPR: receptionPoints === 0.5,
+        isFullPPR: receptionPoints === 1.0,
+        isStandard: receptionPoints === 0,
+        receptionPoints: receptionPoints
       };
 
       // Get current week context
