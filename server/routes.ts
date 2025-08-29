@@ -1173,6 +1173,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Expires', '0');
       res.send(csvContent);
     } catch (error: any) {
+      console.error('Team export error:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ message: error.message });
     }
   });
