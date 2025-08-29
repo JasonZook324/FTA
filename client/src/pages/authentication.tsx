@@ -34,7 +34,7 @@ export default function Authentication() {
   });
 
   // Query existing credentials
-  const { data: credentials, isLoading } = useQuery({
+  const { data: credentials, isLoading } = useQuery<EspnCredentials>({
     queryKey: ["/api/espn-credentials", userId],
   });
 

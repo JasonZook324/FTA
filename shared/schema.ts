@@ -80,6 +80,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export const insertEspnCredentialsSchema = createInsertSchema(espnCredentials).omit({
   id: true,
+  isValid: true,
   createdAt: true,
   lastValidated: true,
 });
