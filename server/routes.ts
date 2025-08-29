@@ -109,7 +109,7 @@ class EspnApiService {
     
     // Method 1: Current scoring period with specific roster views
     const currentWeek = new Date().getMonth() < 8 ? 1 : Math.ceil((new Date().getTime() - new Date(season, 8, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const mainUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=${currentWeek}`;
+    const mainUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=${currentWeek}&nocache=${Date.now()}`;
     
     console.log('Main roster API URL:', mainUrl);
     
