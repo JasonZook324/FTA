@@ -47,6 +47,44 @@ export default function Players() {
   const currentData = viewMode === "waiver" ? waiverWireData : playersData;
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
+  // Helper function to get player name from various possible fields
+  const getPlayerName = (playerData: any) => {
+    // The actual player info is nested in playerData.player
+    const player = playerData.player || playerData;
+    
+    if (player.fullName) return player.fullName;
+    if (player.name) return player.name;
+    if (player.displayName) return player.displayName;
+    if (player.firstName && player.lastName) return `${player.firstName} ${player.lastName}`;
+    
+    return 'Unknown Player';
+  };
+
+  // Helper function to get position ID from various possible fields
+  const getPlayerPositionId = (playerData: any) => {
+    // The actual player info is nested in playerData.player
+    const player = playerData.player || playerData;
+    return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
+  };
+
+  // Helper function to get ownership percentage
+  const getOwnershipPercent = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.ownership?.percentOwned?.toFixed(1) || "0.0";
+  };
+
+  // Helper function to get pro team ID
+  const getProTeamId = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.proTeamId;
+  };
+
+  // Helper function to get injury status
+  const getInjuryStatus = (playerData: any) => {
+    const player = playerData.player || playerData;
+    return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+  };
+
   const getPositionColor = (positionId: number) => {
     const colors: Record<number, string> = {
       0: "bg-chart-1", // QB
@@ -98,44 +136,6 @@ export default function Players() {
     
     return true;
   }) || [];
-
-  // Helper function to get player name from various possible fields
-  const getPlayerName = (playerData: any) => {
-    // The actual player info is nested in playerData.player
-    const player = playerData.player || playerData;
-    
-    if (player.fullName) return player.fullName;
-    if (player.name) return player.name;
-    if (player.displayName) return player.displayName;
-    if (player.firstName && player.lastName) return `${player.firstName} ${player.lastName}`;
-    
-    return 'Unknown Player';
-  };
-
-  // Helper function to get position ID from various possible fields
-  const getPlayerPositionId = (playerData: any) => {
-    // The actual player info is nested in playerData.player
-    const player = playerData.player || playerData;
-    return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
-  };
-
-  // Helper function to get ownership percentage
-  const getOwnershipPercent = (playerData: any) => {
-    const player = playerData.player || playerData;
-    return player.ownership?.percentOwned?.toFixed(1) || "0.0";
-  };
-
-  // Helper function to get pro team ID
-  const getProTeamId = (playerData: any) => {
-    const player = playerData.player || playerData;
-    return player.proTeamId;
-  };
-
-  // Helper function to get injury status
-  const getInjuryStatus = (playerData: any) => {
-    const player = playerData.player || playerData;
-    return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
-  };
 
   return (
     <>
