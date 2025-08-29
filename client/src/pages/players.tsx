@@ -23,10 +23,13 @@ export default function Players() {
     queryKey: ["/api/players", selectedSport, selectedSeason, userId],
     queryFn: async () => {
       const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?userId=${userId}`);
-      if (!response.ok) throw new Error('Failed to fetch players');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch players: ${response.status} ${errorText}`);
+      }
       return response.json();
     },
-    enabled: !!selectedSport && !!selectedSeason,
+    enabled: !!selectedSport && !!selectedSeason && viewMode === "all",
   });
 
   // Query user leagues
@@ -90,12 +93,12 @@ export default function Players() {
                     <SelectValue placeholder="Select a league" />
                   </SelectTrigger>
                   <SelectContent>
-                    {leagues?.length > 0 ? leagues.map((league: any) => (
+                    {Array.isArray(leagues) && leagues.length > 0 ? leagues.map((league: any) => (
                       <SelectItem key={league.id} value={league.id}>
                         {league.name} ({league.season})
                       </SelectItem>
                     )) : (
-                      <SelectItem value="" disabled>No leagues found - load a league first</SelectItem>
+                      <SelectItem value="no-leagues" disabled>No leagues found - load a league first</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -175,9 +178,9 @@ export default function Players() {
               <CardTitle className="flex items-center space-x-2">
                 <UsersRound className="w-5 h-5" />
                 <span>{viewMode === "waiver" ? "Waiver Wire Players" : "Player Database"}</span>
-                {viewMode === "waiver" && waiverWireData && (
+                {viewMode === "waiver" && waiverWireData && typeof waiverWireData === 'object' && 'total' in waiverWireData && (
                   <Badge variant="secondary" className="ml-2">
-                    {waiverWireData.total} available
+                    {(waiverWireData as any).total} available
                   </Badge>
                 )}
               </CardTitle>
