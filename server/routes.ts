@@ -461,15 +461,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle different possible API response structures
       let playersData = [];
+      console.log('Raw playersResponse type:', typeof playersResponse);
+      console.log('Is Array?', Array.isArray(playersResponse));
+      
       if (Array.isArray(playersResponse)) {
         playersData = playersResponse;
+        console.log('Using direct array, length:', playersData.length);
       } else if (playersResponse?.players && Array.isArray(playersResponse.players)) {
         playersData = playersResponse.players;
+        console.log('Using players property, length:', playersData.length);
       } else {
         console.log('Unexpected players API response structure:', typeof playersResponse);
         console.log('Players response keys:', Object.keys(playersResponse || {}));
+        console.log('Full response:', JSON.stringify(playersResponse, null, 2));
         playersData = []; // Fallback to empty array
       }
+      
+      // Double-check playersData is an array before filtering
+      if (!Array.isArray(playersData)) {
+        console.error('ERROR: playersData is not an array!', typeof playersData);
+        playersData = []; // Force it to be an array
+      }
+      
+      console.log('Final playersData type:', typeof playersData, 'isArray:', Array.isArray(playersData), 'length:', playersData.length);
       
       // Extract taken player IDs from all rosters
       const takenPlayerIds = new Set();
