@@ -459,10 +459,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Extract taken player IDs from all rosters
       const takenPlayerIds = new Set();
+      console.log('Full roster data structure:', JSON.stringify(rostersData, null, 2).substring(0, 2000));
       console.log('Processing roster data structure:', { 
         hasTeams: !!rostersData.teams, 
         teamCount: rostersData.teams?.length,
         firstTeam: rostersData.teams?.[0] ? {
+          id: rostersData.teams[0].id,
           hasRoster: !!rostersData.teams[0].roster,
           hasEntries: !!rostersData.teams[0].roster?.entries,
           entryCount: rostersData.teams[0].roster?.entries?.length,
