@@ -56,6 +56,9 @@ class EspnApiService {
       if (response.status === 404) {
         throw new Error(`League not found or access denied. Please check: 1) League ID is correct, 2) You're a member of this league, 3) Season year is correct (try 2024 instead of 2025), 4) League is not archived`);
       }
+      if (response.status === 401) {
+        throw new Error(`ESPN authentication failed. Your credentials don't have access to this league. Please check: 1) You're actually a member of this league, 2) Your ESPN cookies haven't expired, 3) League isn't set to private/friends-only, 4) Try refreshing your ESPN cookies`);
+      }
       throw new Error(`ESPN API Error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
