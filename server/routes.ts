@@ -618,13 +618,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.espnLeagueId
       );
 
+      // Use the same comprehensive roster detection logic as the main waiver wire route
       const takenPlayerIds = new Set();
+      
+      // Parse roster data from multiple possible locations
+      const extractPlayerIds = (roster: any, source: string) => {
+        if (!roster?.entries) return;
+        
+        roster.entries.forEach((entry: any) => {
+          const playerId = entry.playerPoolEntry?.player?.id || 
+                          entry.player?.id || 
+                          entry.playerId ||
+                          entry.id;
+          
+          if (playerId) {
+            takenPlayerIds.add(playerId);
+          }
+        });
+      };
+
+      // Method 1: Check teams directly
       if (rostersData.teams) {
-        rostersData.teams.forEach((team: any) => {
-          if (team.roster?.entries) {
-            team.roster.entries.forEach((entry: any) => {
-              if (entry.playerPoolEntry?.player?.id) {
-                takenPlayerIds.add(entry.playerPoolEntry.player.id);
+        rostersData.teams.forEach((team: any, index: number) => {
+          const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
+          if (roster) {
+            extractPlayerIds(roster, `team-${index}`);
+          }
+        });
+      }
+
+      // Method 2: Check schedule/matchups for roster data 
+      if (rostersData.schedule) {
+        rostersData.schedule.forEach((matchup: any, matchupIndex: number) => {
+          ['home', 'away'].forEach(side => {
+            const team = matchup[side];
+            
+            // Check multiple roster locations in matchup data
+            const roster = team?.roster || 
+                          team?.rosterForCurrentScoringPeriod || 
+                          team?.rosterForMatchupPeriod;
+            
+            if (roster) {
+              extractPlayerIds(roster, `matchup-${matchupIndex}-${side}`);
+            }
+          });
+        });
+      }
+
+      // Method 3: Check if there's lineup data in a different structure
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any, index: number) => {
+          // Some ESPN responses have lineup data separately
+          if (team.lineup) {
+            team.lineup.forEach((player: any) => {
+              if (player.playerId) {
+                takenPlayerIds.add(player.playerId);
               }
             });
           }
@@ -635,7 +683,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         !takenPlayerIds.has(player.id)
       ) || [];
 
-      // Convert to CSV format
+      // Helper functions to match frontend data mapping
+      const getTeamName = (teamId: number): string => {
+        const teamNames: Record<number, string> = {
+          1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET",
+          9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN",
+          17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC",
+          25: "SF", 26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU"
+        };
+        return teamNames[teamId] || `Team ${teamId}`;
+      };
+
       const getPositionName = (positionId: number): string => {
         const positions: Record<number, string> = {
           0: "QB", 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 
@@ -644,26 +702,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return positions[positionId] || `POS_${positionId}`;
       };
 
-      const csvHeader = "Player Name,Position,Team,Ownership %,Status\n";
-      const csvRows = waiverWirePlayers.map((player: any) => {
-        // Handle different possible player name fields
-        const name = `"${player.fullName || player.name || player.displayName || 'Unknown Player'}"`;
+      const getPlayerName = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        return player.fullName || player.name || player.displayName || 
+               (player.firstName && player.lastName ? `${player.firstName} ${player.lastName}` : 'Unknown Player');
+      };
+
+      const getPlayerPositionId = (playerData: any): number => {
+        const player = playerData.player || playerData;
+        return player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
+      };
+
+      const getProTeamId = (playerData: any): number => {
+        const player = playerData.player || playerData;
+        return player.proTeamId;
+      };
+
+      const getOwnershipPercent = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        return player.ownership?.percentOwned?.toFixed(1) || "0.0";
+      };
+
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+      };
+
+      const getProjectedPoints = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const projection = player.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
+                          player.projectedStats ||
+                          player.outlook?.projectedStats;
         
-        // Handle position ID - could be in different fields
-        const positionId = player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
-        const position = getPositionName(positionId);
+        if (projection?.appliedTotal !== undefined) {
+          return projection.appliedTotal.toFixed(1);
+        }
+        if (projection?.total !== undefined) {
+          return projection.total.toFixed(1);
+        }
+        return "-";
+      };
+
+      const getOpponent = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const opponent = player.opponent || 
+                        player.nextOpponent ||
+                        player.schedule?.find((game: any) => game.isThisWeek);
         
-        // Handle team information
-        const team = player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent";
+        if (opponent?.teamId) {
+          return `vs ${getTeamName(opponent.teamId)}`;
+        }
+        if (opponent?.opponentTeamId) {
+          return `vs ${getTeamName(opponent.opponentTeamId)}`;
+        }
+        return "-";
+      };
+
+      const csvHeader = "Player Name,Position,Team,Opponent,Projected Points,Ownership %,Status\n";
+      const csvRows = waiverWirePlayers.map((playerData: any) => {
+        const name = `"${getPlayerName(playerData)}"`;
+        const position = getPositionName(getPlayerPositionId(playerData));
+        const team = getProTeamId(playerData) ? getTeamName(getProTeamId(playerData)) : "Free Agent";
+        const opponent = getOpponent(playerData);
+        const projectedPoints = getProjectedPoints(playerData);
+        const ownership = getOwnershipPercent(playerData);
+        const status = getInjuryStatus(playerData);
         
-        // Handle ownership percentage
-        const ownership = player.ownership?.percentOwned?.toFixed(1) || 
-                         player.percentOwned?.toFixed(1) || "0.0";
-        
-        // Handle injury status
-        const status = player.injured || player.injuryStatus ? "Injured" : "Active";
-        
-        return `${name},${position},"${team}",${ownership}%,${status}`;
+        return `${name},${position},"${team}","${opponent}",${projectedPoints},${ownership}%,${status}`;
       }).join('\n');
 
       const csvContent = csvHeader + csvRows;
