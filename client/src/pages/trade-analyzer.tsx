@@ -136,18 +136,19 @@ export default function TradeAnalyzer() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="trade-analyzer-page">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 overflow-y-auto">
+      <div className="container mx-auto p-6 space-y-6" data-testid="trade-analyzer-page">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold" data-testid="page-title">Trade Analyzer</h1>
           <p className="text-muted-foreground" data-testid="page-description">
             Get AI-powered trade suggestions for your fantasy football team
           </p>
         </div>
-      </div>
+        </div>
 
-      {/* Player Selection Card */}
-      <Card data-testid="player-selection-card">
+        {/* Player Selection Card */}
+        <Card data-testid="player-selection-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -306,6 +307,7 @@ export default function TradeAnalyzer() {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }
