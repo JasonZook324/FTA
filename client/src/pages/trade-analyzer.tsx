@@ -58,6 +58,23 @@ export default function TradeAnalyzer() {
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
+  // Create team name mapping from roster data
+  const getTeamName = (teamId: string): string => {
+    if (!rostersData?.teams) return teamId;
+    
+    const team = rostersData.teams.find((t: any) => t.id.toString() === teamId.toString());
+    if (team?.name && team.name !== `Team ${team.id}`) {
+      return team.name;
+    }
+    
+    // Try to construct name from location and nickname
+    if (team?.location && team?.nickname) {
+      return `${team.location} ${team.nickname}`;
+    }
+    
+    return teamId; // Fallback to original team identifier
+  };
+
   // Trade analysis mutation
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
@@ -241,7 +258,7 @@ export default function TradeAnalyzer() {
               <Card key={index} data-testid={`trade-option-${index}`}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{option.targetTeam}</CardTitle>
+                    <CardTitle className="text-lg">{getTeamName(option.targetTeam)}</CardTitle>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={getFairnessColor(option.fairnessRating)}>
                         {option.fairnessRating}/10 Fairness
