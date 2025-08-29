@@ -61,14 +61,7 @@ export default function TradeAnalyzer() {
   // Trade analysis mutation
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
-      const response = await apiRequest(`/api/leagues/${selectedLeagueId}/trade-analysis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      return response;
+      return apiRequest('POST', `/api/leagues/${selectedLeagueId}/trade-analysis`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
