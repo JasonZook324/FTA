@@ -9,6 +9,10 @@ interface MatchupCardProps {
 }
 
 export default function MatchupCard({ data, isLoading, leagueId, week }: MatchupCardProps) {
+  console.log('MatchupCard data:', data);
+  console.log('Data keys:', data ? Object.keys(data) : 'no data');
+  console.log('Schedule exists:', !!data?.schedule);
+  
   if (isLoading) {
     return (
       <Card data-testid="matchups-loading">
