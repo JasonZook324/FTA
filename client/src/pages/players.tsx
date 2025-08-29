@@ -17,6 +17,7 @@ export default function Players() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"all" | "waiver">("all");
+  const [selectedPosition, setSelectedPosition] = useState<string>("all");
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
@@ -47,13 +48,25 @@ export default function Players() {
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
   const filteredPlayers = currentData?.players?.filter((playerData: any) => {
-    if (!searchTerm) return true; // Show all players if no search term
+    // Position filter
+    if (selectedPosition !== "all") {
+      const playerPosition = getPositionName(getPlayerPositionId(playerData));
+      if (playerPosition !== selectedPosition) {
+        return false;
+      }
+    }
     
-    const name = getPlayerName(playerData);
-    const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
+    // Search filter
+    if (searchTerm) {
+      const name = getPlayerName(playerData);
+      const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
+      
+      if (!name.toLowerCase().includes(searchTerm.toLowerCase()) && !teamId.includes(searchTerm)) {
+        return false;
+      }
+    }
     
-    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           teamId.includes(searchTerm);
+    return true;
   }) || [];
 
   const getPositionColor = (positionId: number) => {
@@ -234,6 +247,24 @@ export default function Players() {
                 )}
               </CardTitle>
               <div className="flex items-center space-x-2">
+                <Select
+                  value={selectedPosition}
+                  onValueChange={setSelectedPosition}
+                  data-testid="select-position-filter"
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Positions</SelectItem>
+                    <SelectItem value="QB">QB</SelectItem>
+                    <SelectItem value="RB">RB</SelectItem>
+                    <SelectItem value="WR">WR</SelectItem>
+                    <SelectItem value="TE">TE</SelectItem>
+                    <SelectItem value="K">K</SelectItem>
+                    <SelectItem value="DEF">DEF</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Search className="w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search players..."
