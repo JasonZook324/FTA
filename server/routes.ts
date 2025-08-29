@@ -104,12 +104,16 @@ class EspnApiService {
     season: number,
     leagueId: string
   ) {
-    // Use the correct ESPN views to get roster data with players
-    const url = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mTeam&view=mRoster&view=mMatchup`;
+    // Try multiple ESPN API approaches to get roster data
+    console.log('Attempting to get roster data with multiple methods...');
     
-    console.log('Roster API URL:', url);
+    // Method 1: Current scoring period with specific roster views
+    const currentWeek = new Date().getMonth() < 8 ? 1 : Math.ceil((new Date().getTime() - new Date(season, 8, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const mainUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=${currentWeek}`;
     
-    const response = await fetch(url, {
+    console.log('Main roster API URL:', mainUrl);
+    
+    const response = await fetch(mainUrl, {
       method: 'GET',
       headers: this.getHeaders(credentials)
     });
@@ -120,23 +124,32 @@ class EspnApiService {
     }
     
     const data = await response.json();
+    console.log('Main API returned keys:', Object.keys(data));
     
-    // If still no roster data, try alternative approach using current week matchups
-    if (data.teams && data.teams.length > 0 && !data.teams[0].roster) {
-      console.log('No roster data found, trying current week matchups approach...');
+    // Method 2: If no roster in main response, try boxscore approach
+    if (!data.teams?.[0]?.roster && data.schedule) {
+      console.log('No direct roster data, trying boxscore approach...');
       
-      const currentWeek = data.scoringPeriodId || 1;
-      const matchupUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mMatchup&view=mMatchupScore&scoringPeriodId=${currentWeek}`;
-      
-      const matchupResponse = await fetch(matchupUrl, {
-        method: 'GET',
-        headers: this.getHeaders(credentials)
-      });
-      
-      if (matchupResponse.ok) {
-        const matchupData = await matchupResponse.json();
-        console.log('Matchup data keys:', Object.keys(matchupData));
-        return matchupData;
+      for (const matchup of data.schedule.slice(0, 3)) { // Try first few matchups
+        if (matchup.home?.teamId) {
+          const boxscoreUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mBoxscore&view=mMatchup&scoringPeriodId=${currentWeek}`;
+          
+          const boxResponse = await fetch(boxscoreUrl, {
+            method: 'GET', 
+            headers: this.getHeaders(credentials)
+          });
+          
+          if (boxResponse.ok) {
+            const boxData = await boxResponse.json();
+            console.log('Boxscore API returned keys:', Object.keys(boxData));
+            
+            // Check if boxscore has lineup data
+            if (boxData.schedule?.[0]?.home?.roster || boxData.schedule?.[0]?.away?.roster) {
+              console.log('Found roster data in boxscore!');
+              return boxData;
+            }
+          }
+        }
       }
     }
     
@@ -522,43 +535,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } : null
       });
 
-      if (rostersData.teams) {
-        rostersData.teams.forEach((team: any) => {
-          // Check multiple possible roster locations
-          const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
+      // Parse roster data from multiple possible locations
+      function extractPlayerIds(roster: any, source: string) {
+        if (!roster?.entries) return;
+        
+        roster.entries.forEach((entry: any) => {
+          const playerId = entry.playerPoolEntry?.player?.id || 
+                          entry.player?.id || 
+                          entry.playerId ||
+                          entry.id;
           
-          if (roster?.entries) {
-            roster.entries.forEach((entry: any) => {
-              // Try multiple possible player ID locations
-              const playerId = entry.playerPoolEntry?.player?.id || 
-                              entry.player?.id || 
-                              entry.playerId ||
-                              entry.id;
-              
-              if (playerId) {
-                takenPlayerIds.add(playerId);
-                console.log('Found taken player ID:', playerId);
-              }
-            });
+          if (playerId) {
+            takenPlayerIds.add(playerId);
+            console.log(`Found taken player ID from ${source}:`, playerId);
           }
         });
       }
 
-      // Also check schedule/matchups for roster data
+      // Method 1: Check teams directly
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any, index: number) => {
+          const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
+          if (roster) {
+            extractPlayerIds(roster, `team-${index}`);
+          }
+        });
+      }
+
+      // Method 2: Check schedule/matchups for roster data 
       if (rostersData.schedule) {
-        rostersData.schedule.forEach((matchup: any) => {
+        rostersData.schedule.forEach((matchup: any, matchupIndex: number) => {
           ['home', 'away'].forEach(side => {
             const team = matchup[side];
-            if (team?.rosterForCurrentScoringPeriod?.entries) {
-              team.rosterForCurrentScoringPeriod.entries.forEach((entry: any) => {
-                const playerId = entry.playerPoolEntry?.player?.id || entry.player?.id;
-                if (playerId) {
-                  takenPlayerIds.add(playerId);
-                  console.log('Found taken player ID from matchup:', playerId);
-                }
-              });
+            
+            // Check multiple roster locations in matchup data
+            const roster = team?.roster || 
+                          team?.rosterForCurrentScoringPeriod || 
+                          team?.rosterForMatchupPeriod;
+            
+            if (roster) {
+              extractPlayerIds(roster, `matchup-${matchupIndex}-${side}`);
             }
           });
+        });
+      }
+
+      // Method 3: Check if there's lineup data in a different structure
+      if (rostersData.teams) {
+        rostersData.teams.forEach((team: any, index: number) => {
+          // Some ESPN responses have lineup data separately
+          if (team.lineup) {
+            team.lineup.forEach((player: any) => {
+              if (player.playerId) {
+                takenPlayerIds.add(player.playerId);
+                console.log(`Found taken player ID from lineup-${index}:`, player.playerId);
+              }
+            });
+          }
         });
       }
 
