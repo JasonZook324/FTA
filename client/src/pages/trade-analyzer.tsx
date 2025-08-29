@@ -62,14 +62,17 @@ export default function TradeAnalyzer() {
   const getTeamName = (teamId: string): string => {
     if (!rostersData?.teams) return teamId;
     
-    const team = rostersData.teams.find((t: any) => t.id.toString() === teamId.toString());
+    // Extract team ID number from strings like "Team 4"
+    const teamIdNumber = teamId.replace(/^Team\s+/, '');
+    
+    // Find team by matching both the original string and the extracted number
+    const team = rostersData.teams.find((t: any) => 
+      t.id.toString() === teamId.toString() || 
+      t.id.toString() === teamIdNumber
+    );
+    
     if (team?.name && team.name !== `Team ${team.id}`) {
       return team.name;
-    }
-    
-    // Try to construct name from location and nickname
-    if (team?.location && team?.nickname) {
-      return `${team.location} ${team.nickname}`;
     }
     
     return teamId; // Fallback to original team identifier
