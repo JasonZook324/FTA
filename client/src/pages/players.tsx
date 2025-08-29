@@ -96,6 +96,56 @@ export default function Players() {
     return teamNames[teamId] || `Team ${teamId}`;
   };
 
+  // Helper function to get projected fantasy points
+  const getProjectedPoints = (playerData: any) => {
+    const player = playerData.player || playerData;
+    // Check for projected stats in various possible locations
+    const projection = player.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
+                      player.projectedStats ||
+                      player.outlook?.projectedStats;
+    
+    if (projection?.appliedTotal !== undefined) {
+      return projection.appliedTotal.toFixed(1);
+    }
+    if (projection?.total !== undefined) {
+      return projection.total.toFixed(1);
+    }
+    return "-";
+  };
+
+  // Helper function to get opponent team
+  const getOpponent = (playerData: any) => {
+    const player = playerData.player || playerData;
+    // Check for opponent info in various possible locations
+    const opponent = player.opponent || 
+                    player.nextOpponent ||
+                    player.schedule?.find((game: any) => game.isThisWeek);
+    
+    if (opponent?.teamId) {
+      return `vs ${getTeamName(opponent.teamId)}`;
+    }
+    if (opponent?.opponentTeamId) {
+      return `vs ${getTeamName(opponent.opponentTeamId)}`;
+    }
+    return "-";
+  };
+
+  // Helper function to get game status/time
+  const getGameStatus = (playerData: any) => {
+    const player = playerData.player || playerData;
+    const gameInfo = player.gameStatus || 
+                    player.schedule?.find((game: any) => game.isThisWeek) ||
+                    player.nextGame;
+    
+    if (gameInfo?.gameTime) {
+      return new Date(gameInfo.gameTime).toLocaleDateString();
+    }
+    if (gameInfo?.status) {
+      return gameInfo.status;
+    }
+    return "-";
+  };
+
   const getPositionColor = (positionId: number) => {
     const colors: Record<number, string> = {
       0: "bg-chart-1", // QB
@@ -314,6 +364,8 @@ export default function Players() {
                       <TableHead>Player</TableHead>
                       <TableHead>Position</TableHead>
                       <TableHead>Team</TableHead>
+                      <TableHead>Opponent</TableHead>
+                      <TableHead>Proj. Pts</TableHead>
                       <TableHead>% Owned</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -340,6 +392,16 @@ export default function Players() {
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
                             {getProTeamId(player) ? getTeamName(getProTeamId(player)) : "Free Agent"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {getOpponent(player)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-foreground font-medium">
+                            {getProjectedPoints(player)}
                           </span>
                         </TableCell>
                         <TableCell>
