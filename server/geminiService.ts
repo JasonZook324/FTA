@@ -1,7 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Initialize Gemini AI with debug logging
+const apiKey = process.env.GEMINI_API_KEY;
+console.log('Gemini API Key exists:', !!apiKey);
+console.log('Gemini API Key length:', apiKey?.length || 0);
+
+const ai = new GoogleGenAI({ apiKey: apiKey || "" });
 
 export interface FantasyRecommendation {
   type: 'waiver_wire' | 'trade' | 'lineup' | 'general';
@@ -29,38 +33,6 @@ export class FantasyGeminiService {
         
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                recommendations: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      type: { type: "string", enum: ["waiver_wire", "trade", "lineup", "general"] },
-                      title: { type: "string" },
-                      description: { type: "string" },
-                      priority: { type: "string", enum: ["high", "medium", "low"] },
-                      reasoning: { type: "string" }
-                    },
-                    required: ["type", "title", "description", "priority", "reasoning"]
-                  }
-                },
-                summary: { type: "string" },
-                strengths: {
-                  type: "array",
-                  items: { type: "string" }
-                },
-                weaknesses: {
-                  type: "array",
-                  items: { type: "string" }
-                }
-              },
-              required: ["recommendations", "summary", "strengths", "weaknesses"]
-            }
-          },
           contents: prompt
         });
 
@@ -240,6 +212,23 @@ Focus on:
 - Specific players to drop to make roster moves
 
 Provide specific player names and detailed reasoning for each recommendation.
+
+**IMPORTANT: Return your response as valid JSON in this exact format:**
+
+{
+  "recommendations": [
+    {
+      "type": "waiver_wire" | "trade" | "lineup" | "general",
+      "title": "Brief recommendation title",
+      "description": "Detailed description of the recommendation",
+      "priority": "high" | "medium" | "low",
+      "reasoning": "Specific reasoning with player names and data"
+    }
+  ],
+  "summary": "Overall assessment of the team and situation",
+  "strengths": ["List of team strengths"],
+  "weaknesses": ["List of team weaknesses and gaps"]
+}
 `;
   }
 }
