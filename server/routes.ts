@@ -999,20 +999,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Export individual team roster
   app.get('/api/leagues/:id/teams/:teamId/roster-export', async (req, res) => {
+    console.log(`Team export endpoint hit: leagueId=${req.params.id}, teamId=${req.params.teamId}`);
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
+      console.log(`Parsed teamId: ${teamId}`);
       
+      console.log(`Getting league: ${leagueId}`);
       const league = await storage.getLeague(leagueId);
       
       if (!league) {
+        console.log(`League not found: ${leagueId}`);
         return res.status(404).json({ message: 'League not found' });
       }
+      console.log(`League found:`, league);
 
+      console.log(`Getting credentials for default-user`);
       const credentials = await storage.getESPNCredentials('default-user');
       if (!credentials) {
+        console.log(`ESPN credentials not found`);
         return res.status(404).json({ message: 'ESPN credentials not found' });
       }
+      console.log(`Credentials found`);
+
+      console.log(`About to fetch roster data...`);
 
       // Get roster data using the same method as full roster export
       const rostersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/segments/0/leagues/${league.espnLeagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1&nocache=${Date.now()}`;
