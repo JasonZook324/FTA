@@ -61,11 +61,40 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
     return words.map(word => word.charAt(0).toUpperCase()).join('').slice(0, 2);
   };
 
+  // Helper function to get owner info from members data
+  const getOwnerInfo = (team: any) => {
+    if (!team.owners || !data.members) return 'Unknown Owner';
+    
+    // Find the primary owner (first one)
+    const ownerId = team.owners[0]?.id || team.owners[0];
+    const member = data.members.find((m: any) => m.id === ownerId);
+    
+    if (member) {
+      return member.displayName || 
+             (member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : 'Unknown Owner');
+    }
+    return 'Unknown Owner';
+  };
+
+  // Helper function to get team name with better fallbacks
+  const getTeamName = (team: any) => {
+    // Try various team name combinations
+    if (team.location && team.nickname) {
+      return `${team.location} ${team.nickname}`;
+    }
+    if (team.location) return team.location;
+    if (team.nickname) return team.nickname;
+    if (team.name) return team.name;
+    return `Team ${team.id}`;
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" data-testid="rosters-grid">
       {data.teams.map((team: any) => {
         const roster = team.roster?.entries || [];
-        const initials = getTeamInitials(team.location, team.nickname);
+        const teamName = getTeamName(team);
+        const initials = getTeamInitials(team.location || teamName.split(' ')[0], team.nickname || teamName.split(' ')[1] || '');
+        const ownerName = getOwnerInfo(team);
         
         return (
           <Card key={team.id} data-testid={`card-team-${team.id}`}>
@@ -79,13 +108,10 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                 </div>
                 <div>
                   <CardTitle className="text-lg">
-                    {[team.location, team.nickname].filter(Boolean).join(' ') || `Team ${team.id}`}
+                    {teamName}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {team.owners?.[0]?.displayName || 
-                     (team.owners?.[0]?.firstName && team.owners?.[0]?.lastName ? 
-                      `${team.owners[0].firstName} ${team.owners[0].lastName}` : 
-                      'Unknown Owner')}
+                    {ownerName}
                   </p>
                 </div>
               </div>
