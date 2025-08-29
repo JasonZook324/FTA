@@ -1,0 +1,57 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+3:36:35 PM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+3:36:38 PM [express] GET /api/espn-credentials/default-user 404 in 2ms :: {"message":"ESPN credentia…
+3:37:40 PM [express] POST /api/espn-credentials 200 in 126ms :: {"message":"ESPN credentials saved s…
+3:37:40 PM [express] GET /api/espn-credentials/default-user 200 in 1ms :: {"userId":"default-user","…
+3:37:41 PM [express] GET /api/leagues/default-user 200 in 1ms :: []
+Attempting to load league: 1713644125, sport: ffl, season: 2025
+League data loaded successfully
+3:37:45 PM [express] POST /api/leagues/default-user/load 200 in 113ms :: {"league":{"userId":"defaul…
+3:37:45 PM [express] GET /api/leagues/default-user 200 in 1ms :: [{"userId":"default-user","espnLeag…
+Attempting to get roster data with multiple methods...
+Main roster API URL: https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1713644125?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1&nocache=1756481872491
+Main API returned keys: [
+  'draftDetail',
+  'gameId',
+  'id',
+  'members',
+  'schedule',
+  'scoringPeriodId',
+  'seasonId',
+  'segmentId',
+  'status',
+  'teams'
+]
+3:37:52 PM [express] GET /api/leagues/58fb81b4-a370-489a-bdce-7ff821c74031/rosters 200 in 285ms :: {…
+Team export endpoint hit: leagueId=58fb81b4-a370-489a-bdce-7ff821c74031, teamId=1
+Parsed teamId: 1
+Getting league: 58fb81b4-a370-489a-bdce-7ff821c74031
+League found: {
+  userId: 'default-user',
+  espnLeagueId: '1713644125',
+  name: 'Zook Family and Friends League',
+  sport: 'ffl',
+  season: 2025,
+  teamCount: 14,
+  currentWeek: 1,
+  playoffTeams: 6,
+  scoringType: 'Head-to-Head Points',
+  tradeDeadline: null,
+  settings: { name: 'Zook Family and Friends League' },
+  id: '58fb81b4-a370-489a-bdce-7ff821c74031',
+  lastUpdated: 2025-08-29T15:37:45.534Z
+}
+Getting credentials for default-user
+Team export error: TypeError: storage.getESPNCredentials is not a function
+    at <anonymous> (/home/runner/workspace/server/routes.ts:1018:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+Error stack: TypeError: storage.getESPNCredentials is not a function
+    at <anonymous> (/home/runner/workspace/server/routes.ts:1018:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+3:37:55 PM [express] GET /api/leagues/58fb81b4-a370-489a-bdce-7ff821c74031/teams/1/roster-export 500…
