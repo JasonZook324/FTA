@@ -4,8 +4,11 @@ import {
   type League, type InsertLeague,
   type Team, type InsertTeam,
   type Matchup, type InsertMatchup,
-  type Player, type InsertPlayer
+  type Player, type InsertPlayer,
+  users, espnCredentials, leagues, teams, matchups, players
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -254,4 +257,181 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  // ESPN Credentials methods - The core improvement for persistence
+  async getEspnCredentials(userId: string): Promise<EspnCredentials | undefined> {
+    const [cred] = await db
+      .select()
+      .from(espnCredentials)
+      .where(eq(espnCredentials.userId, userId));
+    return cred || undefined;
+  }
+
+  async createEspnCredentials(credentials: InsertEspnCredentials): Promise<EspnCredentials> {
+    // Delete any existing credentials for this user first (upsert behavior)
+    await db.delete(espnCredentials).where(eq(espnCredentials.userId, credentials.userId));
+    
+    const [cred] = await db
+      .insert(espnCredentials)
+      .values({
+        ...credentials,
+        isValid: true,
+        createdAt: new Date(),
+        lastValidated: null
+      })
+      .returning();
+    return cred;
+  }
+
+  async updateEspnCredentials(userId: string, updates: Partial<EspnCredentials>): Promise<EspnCredentials | undefined> {
+    const [updated] = await db
+      .update(espnCredentials)
+      .set({
+        ...updates,
+        lastValidated: updates.lastValidated || new Date()
+      })
+      .where(eq(espnCredentials.userId, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // League methods
+  async getLeagues(userId: string): Promise<League[]> {
+    return await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.userId, userId));
+  }
+
+  async getLeague(id: string): Promise<League | undefined> {
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, id));
+    return league || undefined;
+  }
+
+  async createLeague(league: InsertLeague): Promise<League> {
+    const [newLeague] = await db
+      .insert(leagues)
+      .values({
+        ...league,
+        lastUpdated: new Date()
+      })
+      .returning();
+    return newLeague;
+  }
+
+  async updateLeague(id: string, updates: Partial<League>): Promise<League | undefined> {
+    const [updated] = await db
+      .update(leagues)
+      .set({
+        ...updates,
+        lastUpdated: new Date()
+      })
+      .where(eq(leagues.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Team methods
+  async getTeams(leagueId: string): Promise<Team[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.leagueId, leagueId));
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    const [newTeam] = await db
+      .insert(teams)
+      .values(team)
+      .returning();
+    return newTeam;
+  }
+
+  async updateTeam(id: string, updates: Partial<Team>): Promise<Team | undefined> {
+    const [updated] = await db
+      .update(teams)
+      .set(updates)
+      .where(eq(teams.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Matchup methods
+  async getMatchups(leagueId: string, week?: number): Promise<Matchup[]> {
+    let query = db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
+    
+    if (week !== undefined) {
+      query = query.where(eq(matchups.week, week));
+    }
+    
+    return await query;
+  }
+
+  async createMatchup(matchup: InsertMatchup): Promise<Matchup> {
+    const [newMatchup] = await db
+      .insert(matchups)
+      .values(matchup)
+      .returning();
+    return newMatchup;
+  }
+
+  async updateMatchup(id: string, updates: Partial<Matchup>): Promise<Matchup | undefined> {
+    const [updated] = await db
+      .update(matchups)
+      .set(updates)
+      .where(eq(matchups.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Player methods
+  async getPlayers(): Promise<Player[]> {
+    return await db.select().from(players);
+  }
+
+  async getPlayer(espnPlayerId: number): Promise<Player | undefined> {
+    const [player] = await db
+      .select()
+      .from(players)
+      .where(eq(players.espnPlayerId, espnPlayerId));
+    return player || undefined;
+  }
+
+  async createPlayer(player: InsertPlayer): Promise<Player> {
+    const [newPlayer] = await db
+      .insert(players)
+      .values(player)
+      .returning();
+    return newPlayer;
+  }
+
+  async updatePlayer(id: string, updates: Partial<Player>): Promise<Player | undefined> {
+    const [updated] = await db
+      .update(players)
+      .set(updates)
+      .where(eq(players.id, id))
+      .returning();
+    return updated || undefined;
+  }
+}
+
+export const storage = new DatabaseStorage();
