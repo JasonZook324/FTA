@@ -449,10 +449,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`Found ${takenPlayerIds.size} taken players out of ${playersData.players?.length || 0} total players`);
+      console.log('Sample taken player IDs:', Array.from(takenPlayerIds).slice(0, 5));
+      console.log('Sample player IDs from players list:', playersData.players?.slice(0, 5).map((p: any) => p.id));
+
       // Filter out taken players to get waiver wire
       const waiverWirePlayers = playersData.players?.filter((player: any) => 
         !takenPlayerIds.has(player.id)
       ) || [];
+
+      console.log(`After filtering: ${waiverWirePlayers.length} available players`);
 
       res.json({ 
         players: waiverWirePlayers,
