@@ -88,7 +88,20 @@ export default function Players() {
 
   // Helper function to get player name from various possible fields
   const getPlayerName = (player: any) => {
-    return player.fullName || player.name || player.displayName || player.firstName + ' ' + player.lastName || 'Unknown Player';
+    // Debug: log first few players to understand structure
+    if (Math.random() < 0.01) { // Log ~1% of players to avoid spam
+      console.log('Player data structure:', player);
+    }
+    
+    // Try different possible name field combinations
+    if (player.fullName) return player.fullName;
+    if (player.name) return player.name;
+    if (player.displayName) return player.displayName;
+    if (player.firstName && player.lastName) return `${player.firstName} ${player.lastName}`;
+    if (player.player?.fullName) return player.player.fullName;
+    if (player.player?.name) return player.player.name;
+    
+    return 'Unknown Player';
   };
 
   // Helper function to get position ID from various possible fields
