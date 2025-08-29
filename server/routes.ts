@@ -511,18 +511,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert to CSV format
       const getPositionName = (positionId: number): string => {
         const positions: Record<number, string> = {
-          1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF"
+          0: "QB", 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 
+          16: "DEF", 17: "K", 23: "FLEX"
         };
-        return positions[positionId] || "UNK";
+        return positions[positionId] || `POS_${positionId}`;
       };
 
       const csvHeader = "Player Name,Position,Team,Ownership %,Status\n";
       const csvRows = waiverWirePlayers.map((player: any) => {
-        const name = `"${player.fullName || 'Unknown'}"`;
-        const position = getPositionName(player.defaultPositionId);
+        // Handle different possible player name fields
+        const name = `"${player.fullName || player.name || player.displayName || 'Unknown Player'}"`;
+        
+        // Handle position ID - could be in different fields
+        const positionId = player.defaultPositionId ?? player.positionId ?? player.position ?? 0;
+        const position = getPositionName(positionId);
+        
+        // Handle team information
         const team = player.proTeamId ? `Team ${player.proTeamId}` : "Free Agent";
-        const ownership = player.ownership?.percentOwned?.toFixed(1) || "0.0";
-        const status = player.injured ? "Injured" : "Active";
+        
+        // Handle ownership percentage
+        const ownership = player.ownership?.percentOwned?.toFixed(1) || 
+                         player.percentOwned?.toFixed(1) || "0.0";
+        
+        // Handle injury status
+        const status = player.injured || player.injuryStatus ? "Injured" : "Active";
+        
         return `${name},${position},"${team}",${ownership}%,${status}`;
       }).join('\n');
 
