@@ -10,7 +10,7 @@ import MatchupCard from "@/components/matchup-card";
 export default function Matchups() {
   const [userId] = useState("default-user");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
-  const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const [selectedWeek, setSelectedWeek] = useState<string>("current");
 
   // Query user leagues
   const { data: leagues } = useQuery({
@@ -55,7 +55,7 @@ export default function Matchups() {
                   <SelectValue placeholder="Week" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Current</SelectItem>
+                  <SelectItem value="current">Current</SelectItem>
                   {weekOptions.map((week) => (
                     <SelectItem key={week} value={week.toString()}>
                       Week {week}

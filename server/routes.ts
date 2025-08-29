@@ -406,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.sport,
         league.season,
         league.espnLeagueId,
-        week ? parseInt(week as string) : undefined
+        week && week !== "current" ? parseInt(week as string) : undefined
       );
 
       res.json(matchupsData);
