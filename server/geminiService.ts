@@ -22,6 +22,24 @@ export interface FantasyAnalysis {
   weaknesses: string[];
 }
 
+export interface TradeOption {
+  targetTeam: string;
+  targetTeamId: string;
+  playersOffered: string[];
+  playersRequested: string[];
+  tradeRationale: string;
+  fairnessRating: number; // 1-10 scale
+  benefitAnalysis: string;
+}
+
+export interface TradeAnalysis {
+  selectedPlayer: string;
+  playerValue: string;
+  tradeOptions: TradeOption[];
+  marketAnalysis: string;
+  summary: string;
+}
+
 export class FantasyGeminiService {
   async analyzeLeague(leagueData: any, teamData?: any): Promise<FantasyAnalysis> {
     const maxRetries = 3;
@@ -256,6 +274,140 @@ Provide specific player names and detailed reasoning for each recommendation.
   "weaknesses": ["List of team weaknesses and gaps"]
 }
 `;
+  }
+
+  async analyzeTrade(selectedPlayer: string, userTeam: any, allTeams: any[], leagueSettings: any): Promise<TradeAnalysis> {
+    const maxRetries = 3;
+    const baseDelay = 2000;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const prompt = this.buildTradeAnalysisPrompt(selectedPlayer, userTeam, allTeams, leagueSettings);
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt
+        });
+
+        const rawJson = response.text;
+        if (rawJson) {
+          console.log('Raw trade analysis response (first 200 chars):', rawJson.substring(0, 200));
+          
+          // Clean JSON response using same logic as analyzeLeague
+          let cleanJson = rawJson.trim();
+          cleanJson = cleanJson.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```\s*$/, '');
+          cleanJson = cleanJson.trim();
+          
+          const jsonStart = cleanJson.indexOf('{');
+          const jsonEnd = cleanJson.lastIndexOf('}');
+          
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+          }
+          
+          return JSON.parse(cleanJson) as TradeAnalysis;
+        } else {
+          throw new Error("Empty response from AI model");
+        }
+      } catch (error: any) {
+        console.log(`Trade analysis attempt ${attempt} failed:`, error.message);
+        
+        if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('UNAVAILABLE')) {
+          if (attempt < maxRetries) {
+            const delay = baseDelay * attempt;
+            console.log(`Retrying trade analysis in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to analyze trade options after ${maxRetries} attempts: ${error.message}`);
+        }
+      }
+    }
+    
+    throw new Error("Unexpected error in analyzeTrade");
+  }
+
+  private buildTradeAnalysisPrompt(selectedPlayer: string, userTeam: any, allTeams: any[], leagueSettings: any): string {
+    // Format scoring type
+    let scoringFormat = 'Standard';
+    if (leagueSettings.receptionPoints === 1) {
+      scoringFormat = 'Full PPR';
+    } else if (leagueSettings.receptionPoints === 0.5) {
+      scoringFormat = 'Half PPR';
+    }
+
+    // Format user roster
+    const userRoster = userTeam.roster?.map((player: any) => {
+      return `${player.name} (${player.position}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
+    }).join('\n') || 'No roster data';
+
+    // Format other teams with their rosters
+    const otherTeamsData = allTeams.filter(team => team.id !== userTeam.id).map(team => {
+      const teamRoster = team.roster?.map((player: any) => {
+        return `${player.name} (${player.position}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
+      }).join('\n  ') || 'No roster data';
+
+      return `=== ${team.name} (${team.record?.wins}-${team.record?.losses}) ===
+  ${teamRoster}`;
+    }).join('\n\n');
+
+    return `
+You are an expert fantasy football trade analyzer. Analyze potential trade opportunities for the selected player.
+
+==== YOUR TEAM: ${userTeam.name} ====
+Record: ${userTeam.record?.wins}-${userTeam.record?.losses}
+Points For: ${userTeam.record?.pointsFor}
+Points Against: ${userTeam.record?.pointsAgainst}
+
+Your Current Roster:
+${userRoster}
+
+==== SELECTED PLAYER FOR TRADE ====
+${selectedPlayer}
+
+==== LEAGUE SETTINGS ====
+Scoring: ${scoringFormat} (${leagueSettings.receptionPoints || 0} points per reception)
+Season: ${leagueSettings.season}
+
+==== ALL OTHER TEAMS ====
+${otherTeamsData}
+
+==== TRADE ANALYSIS REQUESTED ====
+Based on the data above, provide a comprehensive trade analysis for "${selectedPlayer}". Focus on:
+
+1. **Player Value Assessment**: Analyze the selected player's current value and trade appeal
+2. **Realistic Trade Partners**: Identify teams that would benefit from this player and have valuable pieces to offer
+3. **Fair Trade Proposals**: Suggest 3-5 specific trade scenarios with different teams
+4. **Market Analysis**: Overall trade market assessment for this player type
+
+For each trade option, consider:
+- Team needs and roster construction
+- Player values in your scoring format
+- Team records and playoff positioning
+- Realistic likelihood of acceptance
+
+**IMPORTANT: Return your response as pure JSON only, no markdown formatting, no code blocks, just the raw JSON in this exact format:**
+
+{
+  "selectedPlayer": "${selectedPlayer}",
+  "playerValue": "Assessment of player's current trade value and appeal",
+  "tradeOptions": [
+    {
+      "targetTeam": "Team Name",
+      "targetTeamId": "team_id",
+      "playersOffered": ["${selectedPlayer}"],
+      "playersRequested": ["Player from target team"],
+      "tradeRationale": "Why this trade makes sense for both teams",
+      "fairnessRating": 7,
+      "benefitAnalysis": "How this helps your team specifically"
+    }
+  ],
+  "marketAnalysis": "Overall analysis of trade market for this player position/type",
+  "summary": "Overall assessment and trading strategy recommendations"
+}`;
   }
 }
 

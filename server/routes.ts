@@ -923,6 +923,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function for position mapping
+  const getPositionName = (positionId: number): string => {
+    const positions: { [key: number]: string } = {
+      1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'
+    };
+    return positions[positionId] || `POS_${positionId}`;
+  };
+
+  // Trade analysis route
+  app.post("/api/leagues/:leagueId/trade-analysis", async (req, res) => {
+    try {
+      const { selectedPlayer } = req.body;
+      if (!selectedPlayer) {
+        return res.status(400).json({ message: "Selected player is required" });
+      }
+
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get comprehensive roster data for all teams
+      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
+        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
+      ]);
+
+      // Extract scoring settings
+      const combinedSettings = {
+        ...standingsData.settings,
+        ...leagueDetailsData.settings,
+        season: league.season
+      };
+
+      let receptionPoints = 0;
+      const settingsSources = [combinedSettings, leagueDetailsData.settings, standingsData.settings];
+      
+      for (const settings of settingsSources) {
+        if (settings?.scoringSettings?.scoringItems) {
+          const receptionItem = settings.scoringSettings.scoringItems.find((item: any) => item.statId === 53);
+          if (receptionItem?.points !== undefined) {
+            receptionPoints = receptionItem.points;
+            break;
+          }
+        }
+      }
+
+      const leagueSettings = {
+        receptionPoints,
+        season: league.season,
+        scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
+      };
+
+      // Find user's team from standings
+      const userTeam = standingsData.teams?.[0];
+      if (!userTeam) {
+        return res.status(404).json({ message: "User team not found" });
+      }
+
+      // Get roster data for all teams
+      const allTeams = rostersData.teams?.map((team: any) => {
+        const standingsTeam = standingsData.teams?.find((t: any) => t.id === team.id);
+        return {
+          id: team.id,
+          name: team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`,
+          roster: team.roster?.entries?.map((entry: any) => ({
+            name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
+            position: getPositionName(entry.playerPoolEntry?.player?.defaultPositionId) || 'FLEX',
+            isStarter: entry.lineupSlotId !== 20, // 20 is typically bench
+            playerId: entry.playerPoolEntry?.player?.id
+          })) || [],
+          record: {
+            wins: standingsTeam?.record?.overall?.wins || 0,
+            losses: standingsTeam?.record?.overall?.losses || 0,
+            pointsFor: standingsTeam?.record?.overall?.pointsFor || 0,
+            pointsAgainst: standingsTeam?.record?.overall?.pointsAgainst || 0
+          }
+        };
+      }) || [];
+
+      // Find the complete user team data with roster
+      const userTeamWithRoster = allTeams.find(team => team.id === userTeam.id) || {
+        id: userTeam.id,
+        name: userTeam.location && userTeam.nickname ? `${userTeam.location} ${userTeam.nickname}` : 'Your Team',
+        roster: [],
+        record: {
+          wins: userTeam.record?.overall?.wins || 0,
+          losses: userTeam.record?.overall?.losses || 0,
+          pointsFor: userTeam.record?.overall?.pointsFor || 0,
+          pointsAgainst: userTeam.record?.overall?.pointsAgainst || 0
+        }
+      };
+
+      // Call Gemini trade analysis
+      const tradeAnalysis = await geminiService.analyzeTrade(
+        selectedPlayer,
+        userTeamWithRoster,
+        allTeams,
+        leagueSettings
+      );
+
+      res.json(tradeAnalysis);
+    } catch (error: any) {
+      console.error('Trade Analysis Error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Rosters route
   app.get("/api/leagues/:leagueId/rosters", async (req, res) => {
     try {
