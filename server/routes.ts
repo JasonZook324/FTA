@@ -683,6 +683,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         !takenPlayerIds.has(player.id)
       ) || [];
 
+      console.log(`CSV Export: Found ${takenPlayerIds.size} taken players, ${waiverWirePlayers.length} available players`);
+      console.log('CSV Export: Sample available player:', waiverWirePlayers[0] ? JSON.stringify(waiverWirePlayers[0], null, 2).substring(0, 500) : 'No players');
+
       // Helper functions to match frontend data mapping
       const getTeamName = (teamId: number): string => {
         const teamNames: Record<number, string> = {
@@ -773,9 +776,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const csvContent = csvHeader + csvRows;
 
-      // Set headers for file download
+      console.log(`CSV Export: Generated CSV with ${csvRows.split('\n').length} rows`);
+      console.log('CSV Export: First few CSV rows:', csvContent.substring(0, 400));
+
+      // Set headers for file download with cache busting
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="waiver-wire-${league.name.replace(/[^a-zA-Z0-9]/g, '-')}-${league.season}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="waiver-wire-${Date.now()}.csv"`);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       res.send(csvContent);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
