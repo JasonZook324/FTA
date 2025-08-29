@@ -256,8 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }) as EspnCredentials;
       } else {
         credentials = await storage.createEspnCredentials({
-          ...validatedData,
-          lastValidated: new Date()
+          ...validatedData
         });
       }
 
