@@ -450,22 +450,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get comprehensive data for the 4 required AI analysis points
-      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
+      const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
         espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
         espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster', 'mScoreboard'])
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster', 'mScoreboard']),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
       ]);
       
-      // Also try getting settings directly from standings data which often has more complete info
+      // Try to get settings from multiple sources
       const settingsFromStandings = standingsData.settings || {};
-      console.log('Settings from standings data:', JSON.stringify(settingsFromStandings, null, 2));
+      const settingsFromLeague = leagueDetailsData.settings || {};
+      const settingsFromFull = fullLeagueData.settings || {};
       
-      // Merge settings data from multiple sources
+      console.log('Settings from standings:', JSON.stringify(settingsFromStandings, null, 2));
+      console.log('Settings from league details:', JSON.stringify(settingsFromLeague, null, 2));
+      console.log('Settings from full league:', JSON.stringify(settingsFromFull, null, 2));
+      
+      // Merge settings data from all sources
       const combinedSettings = {
-        ...leagueDetailsData.settings,
-        ...settingsFromStandings
+        ...settingsFromStandings,
+        ...settingsFromLeague, 
+        ...settingsFromFull
       };
-      console.log('Combined settings:', JSON.stringify(combinedSettings, null, 2));
+      console.log('Final combined settings:', JSON.stringify(combinedSettings, null, 2));
 
       // Get waiver wire players (using existing logic from waiver-wire route)
       const playersResponse = await espnApiService.getPlayers(credentials, league.sport, league.season);
@@ -538,15 +545,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let scoringType = 'Standard';
       
       // Check multiple possible paths for scoring settings
-      // Try combined settings first, then individual sources
-      const settingsSources = [combinedSettings, settingsFromStandings, leagueDetailsData.settings];
+      // Try all available settings sources
+      const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
       
-      for (const settings of settingsSources) {
+      for (const [index, settings] of settingsSources.entries()) {
+        console.log(`Checking settings source ${index}:`, Object.keys(settings || {}));
+        
         if (settings?.scoringSettings?.receptionPoints !== undefined) {
           receptionPoints = settings.scoringSettings.receptionPoints;
-          console.log('Found reception points in scoringSettings:', receptionPoints);
+          console.log(`Found reception points in scoringSettings from source ${index}:`, receptionPoints);
           break;
         } else if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
+          console.log(`Checking ${settings.scoringItems.length} scoring items in source ${index}`);
           // Look for reception scoring in scoringItems (ESPN often puts it here)
           const receptionScoringItem = settings.scoringItems.find((item: any) => 
             item.statId === 53 || // Reception stat ID in ESPN
@@ -555,13 +565,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           if (receptionScoringItem) {
             receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
-            console.log('Found reception points in scoringItems:', receptionPoints);
+            console.log(`Found reception points in scoringItems from source ${index}:`, receptionPoints);
             break;
           }
         }
       }
       
-      console.log('Extracted reception points:', receptionPoints);
+      // If still no PPR data found, try a different approach - check for specific scoring patterns
+      if (receptionPoints === 0) {
+        console.log('No PPR data found in standard locations, checking alternative patterns...');
+        for (const [index, settings] of settingsSources.entries()) {
+          if (settings?.scoringItems) {
+            const allItems = settings.scoringItems.filter((item: any) => 
+              item.points > 0 && (
+                item.statId === 53 ||
+                String(item.description || '').toLowerCase().includes('rec') ||
+                String(item.abbr || '').toLowerCase().includes('rec')
+              )
+            );
+            console.log(`Alternative scoring items in source ${index}:`, allItems);
+            if (allItems.length > 0) {
+              receptionPoints = allItems[0].points || allItems[0].value || 0;
+              console.log(`Found reception points via alternative method from source ${index}:`, receptionPoints);
+              break;
+            }
+          }
+        }
+      }
+      
+      console.log('Final extracted reception points:', receptionPoints);
       
       const scoringSettings = {
         scoringType: leagueDetailsData.settings?.scoringType || scoringType,
