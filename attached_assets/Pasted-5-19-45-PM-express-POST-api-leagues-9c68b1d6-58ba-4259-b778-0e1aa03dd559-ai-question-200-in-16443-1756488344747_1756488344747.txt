@@ -1,0 +1,76 @@
+5:19:45 PM [express] POST /api/leagues/9c68b1d6-58ba-4259-b778-0e1aa03dd559/ai-question 200 in 16443…
+Attempting to get roster data with multiple methods...
+Main roster API URL: https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1713644125?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1&nocache=1756488301378
+Main API returned keys: [
+  'draftDetail',
+  'gameId',
+  'id',
+  'members',
+  'schedule',
+  'scoringPeriodId',
+  'seasonId',
+  'segmentId',
+  'status',
+  'teams'
+]
+AI Question - Checking settings source 0: [
+  'name',
+  'acquisitionSettings',
+  'draftSettings',
+  'financeSettings',
+  'isAutoReactivate',
+  'isCustomizable',
+  'isPublic',
+  'restrictionType',
+  'rosterSettings',
+  'scheduleSettings',
+  'scoringSettings',
+  'size',
+  'tradeSettings'
+]
+AI Question - Source 0 scoringSettings keys: [
+  'allowOutOfPositionScoring',
+  'homeTeamBonus',
+  'matchupTieRule',
+  'matchupTieRuleBy',
+  'playerRankType',
+  'playoffHomeTeamBonus',
+  'playoffMatchupTieRule',
+  'playoffMatchupTieRuleBy',
+  'scoringItems',
+  'scoringType'
+]
+AI Question - Source 0 scoringSettings.receptionPoints: undefined
+AI Question - Checking settings source 1: [
+  'acquisitionSettings',
+  'draftSettings',
+  'financeSettings',
+  'isAutoReactivate',
+  'isCustomizable',
+  'isPublic',
+  'name',
+  'restrictionType',
+  'rosterSettings',
+  'scheduleSettings',
+  'scoringSettings',
+  'size',
+  'tradeSettings'
+]
+AI Question - Source 1 scoringSettings keys: [
+  'allowOutOfPositionScoring',
+  'homeTeamBonus',
+  'matchupTieRule',
+  'matchupTieRuleBy',
+  'playerRankType',
+  'playoffHomeTeamBonus',
+  'playoffMatchupTieRule',
+  'playoffMatchupTieRuleBy',
+  'scoringItems',
+  'scoringType'
+]
+AI Question - Source 1 scoringSettings.receptionPoints: undefined
+AI Question - Checking settings source 2: [ 'name' ]
+AI Question - Checking settings source 3: [ 'name' ]
+AI Question - No PPR data found in standard locations, checking alternative patterns...
+AI Question - Final extracted reception points: 0
+5:25:22 PM [express] POST /api/leagues/9c68b1d6-58ba-4259-b778-0e1aa03dd559/ai-question 200 in 20740…
