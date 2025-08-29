@@ -38,8 +38,24 @@ export class FantasyGeminiService {
 
         const rawJson = response.text;
         if (rawJson) {
-          // Strip markdown code blocks if present
-          const cleanJson = rawJson.replace(/```json\s*|\s*```/g, '').trim();
+          // Strip markdown code blocks and any other formatting
+          let cleanJson = rawJson.trim();
+          
+          // Remove markdown code blocks
+          cleanJson = cleanJson.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+          
+          // Remove any leading/trailing whitespace and newlines
+          cleanJson = cleanJson.trim();
+          
+          // Find the JSON object (starts with { and ends with })
+          const jsonStart = cleanJson.indexOf('{');
+          const jsonEnd = cleanJson.lastIndexOf('}');
+          
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+          }
+          
+          console.log('Attempting to parse JSON:', cleanJson.substring(0, 100) + '...');
           return JSON.parse(cleanJson) as FantasyAnalysis;
         } else {
           throw new Error("Empty response from AI model");
