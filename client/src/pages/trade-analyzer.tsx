@@ -174,14 +174,14 @@ export default function TradeAnalyzer() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="container mx-auto p-6 space-y-6" data-testid="trade-analyzer-page">
+      <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6" data-testid="trade-analyzer-page">
         <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="page-title">Trade Analyzer</h1>
-          <p className="text-muted-foreground" data-testid="page-description">
-            Get AI-powered trade suggestions for your fantasy football team
-          </p>
-        </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="page-title">Trade Analyzer</h1>
+            <p className="text-muted-foreground text-sm sm:text-base" data-testid="page-description">
+              Get AI-powered trade suggestions for your fantasy football team
+            </p>
+          </div>
         </div>
 
         {/* Player Selection Card */}
@@ -196,20 +196,20 @@ export default function TradeAnalyzer() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <Select value={selectedPlayer} onValueChange={setSelectedPlayer} data-testid="player-select">
-                <SelectTrigger>
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder="Choose a player..." />
                 </SelectTrigger>
                 <SelectContent>
                   {userRoster.map((player: Player) => (
                     <SelectItem key={`${player.playerId}-${player.name}`} value={player.name}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 py-1">
                         <Badge variant="outline" className="text-xs">
                           {player.position}
                         </Badge>
-                        {player.name}
+                        <span className="text-sm">{player.name}</span>
                         {player.isStarter && <Star className="h-3 w-3" />}
                       </div>
                     </SelectItem>
@@ -220,17 +220,17 @@ export default function TradeAnalyzer() {
             <Button
               onClick={handleAnalyzeTrade}
               disabled={!selectedPlayer || tradeAnalysisMutation.isPending}
-              className="w-full"
+              className="w-full h-12 text-base"
               data-testid="analyze-trade-button"
             >
               {tradeAnalysisMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Analyzing...
                 </>
               ) : (
                 <>
-                  <TrendingUp className="mr-2 h-4 w-4" />
+                  <TrendingUp className="mr-2 h-5 w-5" />
                   Analyze Trade Options
                 </>
               )}
@@ -287,12 +287,12 @@ export default function TradeAnalyzer() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <h4 className="font-medium text-sm text-muted-foreground mb-2">You Give</h4>
-                      <div className="space-y-1">
+                      <div className="flex flex-wrap gap-2">
                         {option.playersOffered.map((player, playerIndex) => (
-                          <Badge key={playerIndex} variant="secondary" className="mr-2">
+                          <Badge key={playerIndex} variant="secondary" className="text-xs">
                             {player}
                           </Badge>
                         ))}
@@ -300,9 +300,9 @@ export default function TradeAnalyzer() {
                     </div>
                     <div>
                       <h4 className="font-medium text-sm text-muted-foreground mb-2">You Get</h4>
-                      <div className="space-y-1">
+                      <div className="flex flex-wrap gap-2">
                         {option.playersRequested.map((player, playerIndex) => (
-                          <Badge key={playerIndex} variant="default" className="mr-2">
+                          <Badge key={playerIndex} variant="default" className="text-xs">
                             {player}
                           </Badge>
                         ))}

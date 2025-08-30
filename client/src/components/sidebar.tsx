@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const navigation = [
   { name: "Authentication", href: "/authentication", icon: Key },
@@ -15,9 +16,33 @@ const navigation = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="w-64 bg-card border-r border-border flex flex-col" data-testid="sidebar">
+    <>
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-card border border-border rounded-md shadow-lg"
+        data-testid="mobile-menu-button"
+      >
+        {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsOpen(false)}
+          data-testid="mobile-overlay"
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={cn(
+        "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )} data-testid="sidebar">
       {/* Logo and Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center space-x-3">
@@ -43,15 +68,16 @@ export default function Sidebar() {
                 <Link href={item.href}>
                   <a
                     className={cn(
-                      "flex items-center space-x-3 px-3 py-2 rounded-md transition-colors",
+                      "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
                       isActive 
                         ? "bg-primary text-primary-foreground" 
                         : "text-foreground hover:bg-secondary"
                     )}
                     data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    onClick={() => setIsOpen(false)}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.name}</span>
+                    <Icon className="w-5 h-5" />
+                    <span className="text-sm">{item.name}</span>
                   </a>
                 </Link>
               </li>
@@ -70,6 +96,7 @@ export default function Sidebar() {
           Ready for ESPN API calls
         </p>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

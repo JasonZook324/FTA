@@ -18,7 +18,7 @@ function Router() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         <Switch>
           <Route path="/" component={Authentication} />
           <Route path="/authentication" component={Authentication} />
