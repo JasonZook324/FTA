@@ -370,6 +370,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete ESPN credentials (disconnect account)
+  app.delete("/api/espn-credentials/:userId", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEspnCredentials(req.params.userId);
+      
+      if (deleted) {
+        res.json({ 
+          success: true, 
+          message: "ESPN account disconnected successfully" 
+        });
+      } else {
+        res.status(404).json({ 
+          success: false, 
+          message: "No credentials found to delete" 
+        });
+      }
+    } catch (error: any) {
+      console.error("Delete credentials error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Failed to disconnect account" 
+      });
+    }
+  });
+
   // League routes
   app.get("/api/leagues/:userId", async (req, res) => {
     try {

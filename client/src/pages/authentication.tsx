@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, Shield, LogIn } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, Shield, LogIn, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EspnLoginModal } from "@/components/espn-login-modal";
 
@@ -87,6 +87,37 @@ export default function Authentication() {
     onError: (error: Error) => {
       toast({
         title: "Validation Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect ESPN account mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/espn-credentials/${userId}`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Disconnected",
+          description: "ESPN account disconnected successfully",
+        });
+        setShowManualEntry(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to disconnect account",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Disconnect Error",
         description: error.message,
         variant: "destructive",
       });
@@ -349,6 +380,19 @@ export default function Authentication() {
                       Manual Setup
                     </Button>
                   )}
+                </div>
+                
+                <div className="pt-4 border-t">
+                  <Button
+                    onClick={() => disconnectMutation.mutate()}
+                    disabled={disconnectMutation.isPending}
+                    variant="destructive"
+                    className="w-full"
+                    data-testid="button-disconnect"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect ESPN Account"}
+                  </Button>
                 </div>
               </div>
             </CardContent>

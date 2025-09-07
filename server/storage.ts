@@ -22,6 +22,7 @@ export interface IStorage {
   getEspnCredentials(userId: string): Promise<EspnCredentials | undefined>;
   createEspnCredentials(credentials: InsertEspnCredentials): Promise<EspnCredentials>;
   updateEspnCredentials(userId: string, credentials: Partial<EspnCredentials>): Promise<EspnCredentials | undefined>;
+  deleteEspnCredentials(userId: string): Promise<boolean>;
 
   // League methods
   getLeagues(userId: string): Promise<League[]>;
@@ -117,6 +118,14 @@ export class MemStorage implements IStorage {
     const updated: EspnCredentials = { ...existing, ...updates };
     this.espnCredentials.set(existing.id, updated);
     return updated;
+  }
+
+  async deleteEspnCredentials(userId: string): Promise<boolean> {
+    const existing = await this.getEspnCredentials(userId);
+    if (!existing) return false;
+    
+    this.espnCredentials.delete(existing.id);
+    return true;
   }
 
   // League methods
@@ -331,6 +340,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(espnCredentials.userId, userId))
       .returning();
     return updated || undefined;
+  }
+
+  async deleteEspnCredentials(userId: string): Promise<boolean> {
+    const deletedRows = await db
+      .delete(espnCredentials)
+      .where(eq(espnCredentials.userId, userId));
+    return (deletedRows.rowCount || 0) > 0;
   }
 
   // League methods
