@@ -276,8 +276,8 @@ export class HeadlessBrowserService {
       console.log('Login submitted, checking for success...');
 
       // Check if login was successful by looking for ESPN content or error messages
-      const currentUrl = page.url();
-      console.log('Current URL after login:', currentUrl);
+      const finalUrl = page.url();
+      console.log('Current URL after login:', finalUrl);
 
       // Look for error indicators
       const errorSelectors = [
