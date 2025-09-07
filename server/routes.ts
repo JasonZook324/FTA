@@ -316,7 +316,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.json({ 
             success: true, 
             message: "Login completed successfully",
-            leagues 
+            leagues,
+            credentials: {
+              espnS2: credentials.espnS2,
+              swid: credentials.swid
+            }
           });
         } else {
           res.status(400).json({ 
