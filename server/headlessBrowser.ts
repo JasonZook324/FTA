@@ -89,36 +89,76 @@ export class HeadlessBrowserService {
         timeout: 30000
       });
 
-      // Wait for login form to be visible
-      await page.waitForSelector('input[type="email"], input[placeholder*="email"], input[name*="email"]', { 
-        timeout: 15000 
-      });
+      // Wait for page to load and check for redirects
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      let currentUrl = page.url();
+      console.log('Current URL after initial load:', currentUrl);
 
-      console.log('Login form detected, entering credentials...');
+      // If we're still on ESPN, try to find and click login button
+      if (currentUrl.includes('espn.com')) {
+        try {
+          // Look for login buttons/links
+          const loginButton = await page.$('button, a[href*="login"], input[type="submit"]');
+          if (loginButton) {
+            console.log('Found login button, clicking...');
+            await loginButton.click();
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            currentUrl = page.url();
+            console.log('URL after clicking login:', currentUrl);
+          }
+        } catch (e) {
+          console.log('No clickable login element found');
+        }
+      }
 
-      // Find and fill email field
+      // Try Disney login page directly if ESPN doesn't work
+      if (!currentUrl.includes('disney') && !currentUrl.includes('disneyid')) {
+        console.log('Trying Disney login page directly...');
+        await page.goto('https://registerdisney.go.com/jgc/v8/client/ESPN-ONESITE.WEB-PROD/guest/login', {
+          waitUntil: 'networkidle2',
+          timeout: 30000
+        });
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        currentUrl = page.url();
+        console.log('Disney page URL:', currentUrl);
+      }
+
+      // Wait for login form to be visible with multiple selectors
       const emailSelectors = [
         'input[type="email"]',
         'input[placeholder*="email"]', 
         'input[name*="email"]',
         'input[id*="email"]',
-        '#did-ui-view input[type="text"]'
+        '#did-ui-view input[type="text"]',
+        'input[name="loginValue"]',
+        'input[name="username"]',
+        'input'
       ];
 
       let emailInput = null;
       for (const selector of emailSelectors) {
         try {
+          await page.waitForSelector(selector, { timeout: 5000 });
           emailInput = await page.$(selector);
-          if (emailInput) break;
+          if (emailInput) {
+            console.log('Found email input with selector:', selector);
+            break;
+          }
         } catch (e) {
           continue;
         }
       }
 
+
       if (!emailInput) {
-        throw new Error('Could not find email input field');
+        // Try to get page content for debugging
+        const pageContent = await page.content();
+        console.log('Page content preview:', pageContent.substring(0, 500));
+        throw new Error('Could not find email input field on login page. Page may use a different authentication system.');
       }
 
+      console.log('Login form detected, entering credentials...');
       await emailInput.type(email, { delay: 100 });
       console.log('Email entered');
 
