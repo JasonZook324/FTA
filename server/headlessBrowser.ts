@@ -312,37 +312,101 @@ export class HeadlessBrowserService {
           }
         }
         
-        // If not found on main page, check iframes
+        // If not found on main page, focus on OneID iframe specifically
         if (!emailInput && iframes.length > 0) {
-          console.log('Checking iframes for login form...');
-          for (let i = 0; i < iframes.length; i++) {
-            try {
-              const frame = await iframes[i].contentFrame();
+          console.log('Looking for OneID iframe specifically...');
+          
+          // First, try to find the OneID iframe
+          let oneidIframe = null;
+          try {
+            oneidIframe = await page.$('#oneid-iframe');
+            if (oneidIframe) {
+              console.log('Found OneID iframe, waiting for content to load...');
+              
+              // Wait longer for OneID iframe to fully load
+              await new Promise(resolve => setTimeout(resolve, 10000));
+              
+              const frame = await oneidIframe.contentFrame();
               if (frame) {
-                console.log(`Checking iframe ${i + 1}...`);
+                console.log('Accessing OneID iframe content...');
                 
-                // Look for inputs within the iframe
-                for (const selector of emailSelectors) {
-                  try {
-                    await frame.waitForSelector(selector, { timeout: 2000 });
-                    const frameInputs = await frame.$$(selector);
-                    
-                    if (frameInputs.length > 0) {
-                      emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
-                      if (emailInput) {
-                        console.log(`Found email input in iframe ${i + 1}`);
-                        break;
+                // Wait for the iframe to be ready
+                try {
+                  await frame.waitForSelector('body', { timeout: 5000 });
+                  
+                  // Check what's inside the OneID iframe
+                  const frameContent = await frame.content();
+                  console.log('OneID iframe content preview:', frameContent.substring(0, 500));
+                  
+                  // Look for all inputs in the iframe
+                  const allFrameInputs = await frame.evaluate(() => {
+                    const inputs = Array.from(document.querySelectorAll('input'));
+                    return inputs.map(input => ({
+                      type: input.type,
+                      name: input.name || '',
+                      id: input.id || '',
+                      placeholder: input.placeholder || '',
+                      className: input.className || ''
+                    }));
+                  });
+                  console.log('OneID iframe inputs:', allFrameInputs);
+                  
+                  // Look for email inputs in OneID iframe
+                  for (const selector of emailSelectors) {
+                    try {
+                      const frameInputs = await frame.$$(selector);
+                      if (frameInputs.length > 0) {
+                        emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
+                        if (emailInput) {
+                          console.log('Found email input in OneID iframe');
+                          break;
+                        }
                       }
+                    } catch (e) {
+                      continue;
                     }
-                  } catch (e) {
-                    continue;
                   }
+                } catch (e) {
+                  console.log('OneID iframe not ready or accessible:', (e as Error).message);
                 }
-                if (emailInput) break;
               }
-            } catch (e) {
-              console.log(`Failed to access iframe ${i + 1}:`, (e as Error).message);
-              continue;
+            }
+          } catch (e) {
+            console.log('Could not access OneID iframe:', (e as Error).message);
+          }
+          
+          // If OneID iframe didn't work, check other iframes
+          if (!emailInput) {
+            console.log('Checking other iframes for login form...');
+            for (let i = 0; i < iframes.length; i++) {
+              try {
+                const frame = await iframes[i].contentFrame();
+                if (frame) {
+                  console.log(`Checking iframe ${i + 1}...`);
+                  
+                  // Look for inputs within the iframe
+                  for (const selector of emailSelectors) {
+                    try {
+                      await frame.waitForSelector(selector, { timeout: 2000 });
+                      const frameInputs = await frame.$$(selector);
+                      
+                      if (frameInputs.length > 0) {
+                        emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
+                        if (emailInput) {
+                          console.log(`Found email input in iframe ${i + 1}`);
+                          break;
+                        }
+                      }
+                    } catch (e) {
+                      continue;
+                    }
+                  }
+                  if (emailInput) break;
+                }
+              } catch (e) {
+                console.log(`Failed to access iframe ${i + 1}:`, (e as Error).message);
+                continue;
+              }
             }
           }
         }
