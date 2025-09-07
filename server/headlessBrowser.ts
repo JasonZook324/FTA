@@ -27,6 +27,7 @@ export class HeadlessBrowserService {
     try {
       this.browser = await puppeteer.launch({
         headless: true,
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -35,7 +36,13 @@ export class HeadlessBrowserService {
           '--no-first-run',
           '--no-zygote',
           '--single-process',
-          '--disable-gpu'
+          '--disable-gpu',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-default-apps',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
         ]
       });
       console.log('Headless browser initialized successfully');
@@ -128,11 +135,13 @@ export class HeadlessBrowserService {
       for (const selector of continueSelectors) {
         try {
           if (selector.includes('contains')) {
-            // Use XPath for text-based selectors
-            const xpath = `//button[contains(text(), '${selector.split('"')[1]}')]`;
-            const elements = await page.$x(xpath);
-            if (elements.length > 0) {
-              continueButton = elements[0];
+            // Use evaluate for text-based selectors
+            const text = selector.split('"')[1];
+            continueButton = await page.evaluateHandle((text) => {
+              const buttons = Array.from(document.querySelectorAll('button'));
+              return buttons.find(button => button.textContent?.includes(text)) || null;
+            }, text);
+            if (continueButton && await continueButton.asElement()) {
               break;
             }
           } else {
@@ -144,8 +153,8 @@ export class HeadlessBrowserService {
         }
       }
 
-      if (continueButton) {
-        await continueButton.click();
+      if (continueButton && await continueButton.asElement()) {
+        await (continueButton as any).click();
         console.log('Clicked continue button');
         
         // Wait for password field to appear (multi-step login)
@@ -193,10 +202,12 @@ export class HeadlessBrowserService {
       for (const selector of submitSelectors) {
         try {
           if (selector.includes('contains')) {
-            const xpath = `//button[contains(text(), '${selector.split('"')[1]}')]`;
-            const elements = await page.$x(xpath);
-            if (elements.length > 0) {
-              submitButton = elements[0];
+            const text = selector.split('"')[1];
+            submitButton = await page.evaluateHandle((text) => {
+              const buttons = Array.from(document.querySelectorAll('button'));
+              return buttons.find(button => button.textContent?.includes(text)) || null;
+            }, text);
+            if (submitButton && await submitButton.asElement()) {
               break;
             }
           } else {
@@ -213,10 +224,14 @@ export class HeadlessBrowserService {
       }
 
       // Click submit and wait for navigation
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-        submitButton.click()
-      ]);
+      if (submitButton && await submitButton.asElement()) {
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
+          (submitButton as any).click()
+        ]);
+      } else {
+        throw new Error('Could not find or click submit button');
+      }
 
       console.log('Login submitted, checking for success...');
 
@@ -238,9 +253,12 @@ export class HeadlessBrowserService {
       for (const selector of errorSelectors) {
         try {
           if (selector.includes('contains')) {
-            const xpath = `//div[contains(text(), '${selector.split('"')[1]}')]`;
-            const elements = await page.$x(xpath);
-            if (elements.length > 0) {
+            const text = selector.split('"')[1];
+            const errorFound = await page.evaluate((text) => {
+              const divs = Array.from(document.querySelectorAll('div'));
+              return divs.some(div => div.textContent?.includes(text));
+            }, text);
+            if (errorFound) {
               hasError = true;
               break;
             }
@@ -341,7 +359,8 @@ export class HeadlessBrowserService {
         const leagueElements = document.querySelectorAll('[data-testid*="league"], .league-item, .fantasy-league');
         const extractedLeagues = [];
 
-        for (const element of leagueElements) {
+        const elementsArray = Array.from(leagueElements);
+        for (const element of elementsArray) {
           const nameElement = element.querySelector('.league-name, .team-name, h3, h4');
           const name = nameElement?.textContent?.trim() || 'ESPN Fantasy League';
           
