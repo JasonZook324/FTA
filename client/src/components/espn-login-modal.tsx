@@ -14,21 +14,12 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-const emailSchema = z.object({
+const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-});
-
-const passwordSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-const leagueSelectionSchema = z.object({
-  leagueId: z.string().min(1, "Please select a league"),
-});
-
-type EmailFormData = z.infer<typeof emailSchema>;
-type PasswordFormData = z.infer<typeof passwordSchema>;
-type LeagueSelectionData = z.infer<typeof leagueSelectionSchema>;
+type LoginFormData = z.infer<typeof loginSchema>;
 
 interface League {
   id: string;
@@ -43,70 +34,40 @@ interface EspnLoginModalProps {
   onSuccess?: () => void;
 }
 
-type LoginStep = "email" | "password" | "leagues" | "success";
+type LoginStep = "login" | "success";
 
 export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModalProps) {
-  const [currentStep, setCurrentStep] = useState<LoginStep>("email");
-  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [currentStep, setCurrentStep] = useState<LoginStep>("login");
   const [availableLeagues, setAvailableLeagues] = useState<League[]>([]);
   const { toast } = useToast();
 
-  const emailForm = useForm<EmailFormData>({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { email: "" },
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
   });
 
-  const passwordForm = useForm<PasswordFormData>({
-    resolver: zodResolver(passwordSchema),
-    defaultValues: { password: "" },
-  });
-
-  const leagueForm = useForm<LeagueSelectionData>({
-    resolver: zodResolver(leagueSelectionSchema),
-    defaultValues: { leagueId: "" },
-  });
-
-  // Step 1: Submit email
-  const emailMutation = useMutation({
-    mutationFn: async (data: EmailFormData) => {
-      const response = await apiRequest("POST", "/api/auth/espn/email", data);
+  // Direct login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginFormData) => {
+      const response = await apiRequest("POST", "/api/auth/espn/login", data);
       return response.json();
     },
     onSuccess: (data) => {
       if (data.success) {
-        setLoginData(prev => ({ ...prev, email: emailForm.getValues("email") }));
-        setCurrentStep("password");
-      } else {
+        setCurrentStep("success");
+        if (data.leagues) {
+          setAvailableLeagues(data.leagues);
+        }
         toast({
-          title: "Email Error",
-          description: data.message || "Failed to verify email",
-          variant: "destructive",
+          title: "Success",
+          description: "Successfully signed in to ESPN Fantasy!",
         });
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Step 2: Submit password
-  const passwordMutation = useMutation({
-    mutationFn: async (data: PasswordFormData) => {
-      const response = await apiRequest("POST", "/api/auth/espn/password", {
-        email: loginData.email,
-        password: data.password,
-      });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success && data.leagues) {
-        setLoginData(prev => ({ ...prev, password: passwordForm.getValues("password") }));
-        setAvailableLeagues(data.leagues);
-        setCurrentStep("leagues");
+        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+        setTimeout(() => {
+          onOpenChange(false);
+          onSuccess?.();
+          resetForms();
+        }, 2000);
       } else {
         toast({
           title: "Authentication Failed",
@@ -124,53 +85,10 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     },
   });
 
-  // Step 3: Select league and complete login
-  const leagueMutation = useMutation({
-    mutationFn: async (data: LeagueSelectionData) => {
-      const response = await apiRequest("POST", "/api/auth/espn/complete", {
-        email: loginData.email,
-        password: loginData.password,
-        leagueId: data.leagueId,
-      });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        setCurrentStep("success");
-        toast({
-          title: "Success",
-          description: "Successfully signed in to ESPN Fantasy!",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
-        setTimeout(() => {
-          onOpenChange(false);
-          onSuccess?.();
-          resetForms();
-        }, 2000);
-      } else {
-        toast({
-          title: "Login Failed",
-          description: data.message || "Failed to complete login",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const resetForms = () => {
-    setCurrentStep("email");
-    setLoginData({ email: "", password: "" });
+    setCurrentStep("login");
     setAvailableLeagues([]);
-    emailForm.reset();
-    passwordForm.reset();
-    leagueForm.reset();
+    loginForm.reset();
   };
 
   const handleClose = () => {
@@ -178,7 +96,7 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     resetForms();
   };
 
-  const renderEmailStep = () => (
+  const renderLoginStep = () => (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -186,14 +104,14 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
           Sign in to ESPN
         </CardTitle>
         <CardDescription>
-          Enter your ESPN account email to get started
+          Enter your ESPN account credentials to connect your fantasy leagues
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...emailForm}>
-          <form onSubmit={emailForm.handleSubmit((data) => emailMutation.mutate(data))} className="space-y-4">
+        <Form {...loginForm}>
+          <form onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">
             <FormField
-              control={emailForm.control}
+              control={loginForm.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
@@ -210,46 +128,8 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
                 </FormItem>
               )}
             />
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={emailMutation.isPending}
-              data-testid="button-submit-email"
-            >
-              {emailMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
-
-  const renderPasswordStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Enter Password
-        </CardTitle>
-        <CardDescription>
-          Welcome back, {loginData.email}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...passwordForm}>
-          <form onSubmit={passwordForm.handleSubmit((data) => passwordMutation.mutate(data))} className="space-y-4">
             <FormField
-              control={passwordForm.control}
+              control={loginForm.control}
               name="password"
               render={({ field }) => (
                 <FormItem>
@@ -266,112 +146,24 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
                 </FormItem>
               )}
             />
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCurrentStep("email")}
-                className="flex-1"
-                data-testid="button-back-to-email"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={passwordMutation.isPending}
-                data-testid="button-submit-password"
-              >
-                {passwordMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
-
-  const renderLeagueStep = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Select Your League
-        </CardTitle>
-        <CardDescription>
-          Choose which fantasy league you'd like to access
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...leagueForm}>
-          <form onSubmit={leagueForm.handleSubmit((data) => leagueMutation.mutate(data))} className="space-y-4">
-            <FormField
-              control={leagueForm.control}
-              name="leagueId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Available Leagues</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger data-testid="select-league">
-                        <SelectValue placeholder="Select a league..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableLeagues.map((league) => (
-                          <SelectItem key={league.id} value={league.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{league.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {league.sport.toUpperCase()} • {league.season}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loginMutation.isPending}
+              data-testid="button-login"
+            >
+              {loginMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign In
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
               )}
-            />
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCurrentStep("password")}
-                className="flex-1"
-                data-testid="button-back-to-password"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={leagueMutation.isPending}
-                data-testid="button-complete-login"
-              >
-                {leagueMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Completing...
-                  </>
-                ) : (
-                  "Complete Setup"
-                )}
-              </Button>
-            </div>
+            </Button>
           </form>
         </Form>
       </CardContent>
@@ -392,9 +184,14 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
       <CardContent>
         <div className="text-center py-6">
           <div className="text-green-600 text-4xl mb-4">✓</div>
-          <p className="text-sm text-muted-foreground">
-            Redirecting to your fantasy dashboard...
+          <p className="text-sm text-muted-foreground mb-4">
+            Authentication cookies captured and stored securely.
           </p>
+          {availableLeagues.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Found {availableLeagues.length} fantasy league{availableLeagues.length !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -411,9 +208,7 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
         </DialogHeader>
         
         <div className="py-4">
-          {currentStep === "email" && renderEmailStep()}
-          {currentStep === "password" && renderPasswordStep()}
-          {currentStep === "leagues" && renderLeagueStep()}
+          {currentStep === "login" && renderLoginStep()}
           {currentStep === "success" && renderSuccessStep()}
         </div>
 

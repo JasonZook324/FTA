@@ -272,30 +272,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ESPN Automated Authentication Routes
-  app.post("/api/auth/espn/email", async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email || typeof email !== 'string') {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Email is required" 
-        });
-      }
-
-      const result = await espnAuthService.validateEmail(email);
-      res.json(result);
-    } catch (error: any) {
-      console.error('ESPN email validation error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || "Internal server error" 
-      });
-    }
-  });
-
-  app.post("/api/auth/espn/password", async (req, res) => {
+  // ESPN Direct Authentication Route
+  app.post("/api/auth/espn/login", async (req, res) => {
     try {
       const { email, password } = req.body;
       
@@ -306,29 +284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const result = await espnAuthService.authenticateWithPassword(email, password);
-      res.json(result);
-    } catch (error: any) {
-      console.error('ESPN password authentication error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || "Authentication failed" 
-      });
-    }
-  });
-
-  app.post("/api/auth/espn/complete", async (req, res) => {
-    try {
-      const { email, password, leagueId } = req.body;
+      console.log('Starting ESPN authentication for user:', email);
       
-      if (!email || !password || !leagueId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Email, password, and league ID are required" 
-        });
-      }
-
-      const result = await espnAuthService.completeLogin(email, password, leagueId);
+      const result = await espnAuthService.authenticateWithCredentials(email, password);
       
       if (result.success && result.cookies) {
         // Store the extracted cookies using existing credential system
@@ -351,7 +309,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (isValid) {
           await storage.createEspnCredentials(credentials);
-          res.json({ success: true, message: "Login completed successfully" });
+          
+          // Get available leagues
+          const leagues = await espnAuthService.getAvailableLeagues(result.cookies.espnS2, result.cookies.swid);
+          
+          res.json({ 
+            success: true, 
+            message: "Login completed successfully",
+            leagues 
+          });
         } else {
           res.status(400).json({ 
             success: false, 
@@ -361,14 +327,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(400).json({ 
           success: false, 
-          message: result.message || "Failed to complete login" 
+          message: result.message || "Failed to authenticate with ESPN" 
         });
       }
     } catch (error: any) {
-      console.error('ESPN login completion error:', error);
+      console.error('ESPN authentication error:', error);
       res.status(500).json({ 
         success: false, 
-        message: error.message || "Failed to complete login" 
+        message: error.message || "Authentication failed" 
       });
     }
   });
