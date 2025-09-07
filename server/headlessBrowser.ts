@@ -143,7 +143,8 @@ export class HeadlessBrowserService {
         await page.evaluate(() => {
           // Look for login-related functions or events
           const loginElements = document.querySelectorAll('a, button');
-          for (const el of loginElements) {
+          const elementsArray = Array.from(loginElements);
+          for (const el of elementsArray) {
             if (el.textContent?.toLowerCase().includes('log')) {
               (el as HTMLElement).click();
               break;
@@ -187,9 +188,9 @@ export class HeadlessBrowserService {
             if (inputs.length > 0) {
               // Check each input to see if it's suitable for email
               for (const input of inputs) {
-                const inputType = await page.evaluate(el => el.type, input);
-                const inputName = await page.evaluate(el => el.name, input);
-                const inputPlaceholder = await page.evaluate(el => el.placeholder, input);
+                const inputType = await page.evaluate(el => (el as HTMLInputElement).type, input);
+                const inputName = await page.evaluate(el => (el as HTMLInputElement).name, input);
+                const inputPlaceholder = await page.evaluate(el => (el as HTMLInputElement).placeholder, input);
                 
                 console.log(`Found input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
                 
