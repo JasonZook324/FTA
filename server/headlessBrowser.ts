@@ -234,15 +234,17 @@ export class HeadlessBrowserService {
       console.log('Looking for Disney OneID elements...');
       const disneyElements = await page.evaluate(() => {
         const elements = Array.from(document.querySelectorAll('*'));
-        return elements.filter(el => 
-          el.id?.includes('disney') || 
-          el.className?.includes('disney') ||
-          el.id?.includes('oneid') ||
-          el.className?.includes('oneid')
-        ).map(el => ({
+        return elements.filter(el => {
+          const idStr = el.id || '';
+          const classStr = el.className?.toString() || '';
+          return idStr.includes('disney') || 
+                 classStr.includes('disney') ||
+                 idStr.includes('oneid') ||
+                 classStr.includes('oneid');
+        }).map(el => ({
           tagName: el.tagName,
-          id: el.id,
-          className: el.className
+          id: el.id || '',
+          className: el.className?.toString() || ''
         }));
       });
       console.log('Disney/OneID elements found:', disneyElements);
