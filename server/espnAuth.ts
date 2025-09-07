@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch, { Response } from 'node-fetch';
 
 interface DisneyLoginResponse {
   success: boolean;
@@ -203,7 +203,7 @@ export class EspnAuthService {
   /**
    * Extract cookies from HTTP response headers
    */
-  private extractCookiesFromResponse(response: any): { espnS2: string; swid: string } {
+  private extractCookiesFromResponse(response: Response): { espnS2: string; swid: string } {
     const cookies = { espnS2: '', swid: '' };
     
     try {
