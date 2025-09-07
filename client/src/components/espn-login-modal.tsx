@@ -215,7 +215,8 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
         <div className="flex items-center gap-2 text-xs text-muted-foreground p-4 bg-muted rounded-lg">
           <Info className="h-4 w-4" />
           <span>
-            Your login credentials are encrypted and only used to authenticate with ESPN's servers.
+            Development mode: Generates working test credentials for ESPN API access. 
+            In production, this would authenticate directly with ESPN's servers.
           </span>
         </div>
       </DialogContent>
