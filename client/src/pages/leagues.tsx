@@ -17,11 +17,13 @@ export default function Leagues() {
   // Query user leagues
   const { data: leagues, isLoading: leaguesLoading } = useQuery({
     queryKey: ["/api/leagues", userId],
+    staleTime: 0, // Always fetch fresh data
   });
 
   // Query ESPN credentials status  
   const { data: credentials } = useQuery<{ isValid?: boolean }>({
     queryKey: ["/api/espn-credentials", userId],
+    staleTime: 0, // Always fetch fresh data
   });
 
   return (

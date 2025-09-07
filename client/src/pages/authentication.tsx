@@ -106,13 +106,13 @@ export default function Authentication() {
           description: "ESPN account disconnected and all data cleared",
         });
         setShowManualEntry(false);
-        // Invalidate all relevant queries to reset the UI
+        // Clear ALL cached data to ensure complete reset
+        queryClient.clear();
+        
+        // Force refresh of critical queries
         queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
         queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        queryClient.removeQueries({ queryKey: ["/api/leagues"] });
-        queryClient.removeQueries({ queryKey: ["/api/teams"] });
-        queryClient.removeQueries({ queryKey: ["/api/matchups"] });
       } else {
         toast({
           title: "Error",
