@@ -81,72 +81,139 @@ export class HeadlessBrowserService {
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       await page.setViewport({ width: 1280, height: 720 });
 
-      console.log('Navigating to ESPN login page...');
+      console.log('Navigating to ESPN Fantasy homepage...');
       
-      // Navigate to ESPN login page
-      await page.goto('https://www.espn.com/login/', { 
+      // Start from ESPN Fantasy homepage (where real users would go)
+      await page.goto('https://fantasy.espn.com/', { 
         waitUntil: 'networkidle2',
         timeout: 30000
       });
 
-      // Wait for page to load and check for redirects
+      // Wait for page to fully load
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       let currentUrl = page.url();
-      console.log('Current URL after initial load:', currentUrl);
+      console.log('Current URL after fantasy page load:', currentUrl);
 
-      // If we're still on ESPN, try to find and click login button
-      if (currentUrl.includes('espn.com')) {
+      // Look for and click the actual "Log In" button that users click
+      console.log('Looking for login button...');
+      let loginClicked = false;
+      
+      // Try multiple login button selectors
+      const loginSelectors = [
+        'a:contains("Log In")',
+        'button:contains("Log In")', 
+        'a[href*="login"]',
+        '.login-link',
+        '#login-button'
+      ];
+      
+      for (const selector of loginSelectors) {
         try {
-          // Look for login buttons/links
-          const loginButton = await page.$('button, a[href*="login"], input[type="submit"]');
-          if (loginButton) {
-            console.log('Found login button, clicking...');
-            await loginButton.click();
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            currentUrl = page.url();
-            console.log('URL after clicking login:', currentUrl);
+          if (selector.includes('contains')) {
+            const text = selector.split('("')[1].split('")')[0];
+            const loginButton = await page.evaluateHandle((text) => {
+              const elements = Array.from(document.querySelectorAll('a, button'));
+              return elements.find(el => el.textContent?.trim().includes(text)) || null;
+            }, text);
+            
+            if (loginButton && await loginButton.asElement()) {
+              console.log('Found login button with text:', text);
+              await (loginButton as any).click();
+              loginClicked = true;
+              break;
+            }
+          } else {
+            const loginButton = await page.$(selector);
+            if (loginButton) {
+              console.log('Found login button with selector:', selector);
+              await loginButton.click();
+              loginClicked = true;
+              break;
+            }
           }
         } catch (e) {
-          console.log('No clickable login element found');
+          continue;
         }
       }
-
-      // Try Disney login page directly if ESPN doesn't work
-      if (!currentUrl.includes('disney') && !currentUrl.includes('disneyid')) {
-        console.log('Trying Disney login page directly...');
-        await page.goto('https://registerdisney.go.com/jgc/v8/client/ESPN-ONESITE.WEB-PROD/guest/login', {
-          waitUntil: 'networkidle2',
-          timeout: 30000
+      
+      if (!loginClicked) {
+        console.log('No login button found, trying to trigger login via script...');
+        // Try to trigger any login-related JavaScript
+        await page.evaluate(() => {
+          // Look for login-related functions or events
+          const loginElements = document.querySelectorAll('a, button');
+          for (const el of loginElements) {
+            if (el.textContent?.toLowerCase().includes('log')) {
+              (el as HTMLElement).click();
+              break;
+            }
+          }
         });
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        currentUrl = page.url();
-        console.log('Disney page URL:', currentUrl);
       }
 
-      // Wait for login form to be visible with multiple selectors
+      // Wait for navigation to login page
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      currentUrl = page.url();
+      console.log('URL after login button click:', currentUrl);
+
+      // Wait and look for login form with multiple strategies
+      console.log('Looking for login form...');
       const emailSelectors = [
         'input[type="email"]',
         'input[placeholder*="email"]', 
         'input[name*="email"]',
         'input[id*="email"]',
-        '#did-ui-view input[type="text"]',
         'input[name="loginValue"]',
         'input[name="username"]',
+        'input[type="text"]',
         'input'
       ];
 
       let emailInput = null;
-      for (const selector of emailSelectors) {
-        try {
-          await page.waitForSelector(selector, { timeout: 5000 });
-          emailInput = await page.$(selector);
-          if (emailInput) {
-            console.log('Found email input with selector:', selector);
-            break;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      // Try multiple times in case the form loads dynamically
+      while (!emailInput && attempts < maxAttempts) {
+        attempts++;
+        console.log(`Attempt ${attempts} to find email input...`);
+        
+        for (const selector of emailSelectors) {
+          try {
+            await page.waitForSelector(selector, { timeout: 5000 });
+            const inputs = await page.$$(selector);
+            
+            if (inputs.length > 0) {
+              // Check each input to see if it's suitable for email
+              for (const input of inputs) {
+                const inputType = await page.evaluate(el => el.type, input);
+                const inputName = await page.evaluate(el => el.name, input);
+                const inputPlaceholder = await page.evaluate(el => el.placeholder, input);
+                
+                console.log(`Found input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
+                
+                // This input looks like it could be for email
+                if (inputType === 'email' || 
+                    inputName?.toLowerCase().includes('email') || 
+                    inputName?.toLowerCase().includes('username') ||
+                    inputPlaceholder?.toLowerCase().includes('email') ||
+                    inputType === 'text') {
+                  emailInput = input;
+                  console.log('Selected email input with:', { inputType, inputName, inputPlaceholder });
+                  break;
+                }
+              }
+              if (emailInput) break;
+            }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          continue;
+        }
+        
+        if (!emailInput) {
+          console.log('No email input found, waiting and retrying...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
 
