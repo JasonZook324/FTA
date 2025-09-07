@@ -264,7 +264,7 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
                             <div className="flex flex-col">
                               <span className="font-medium">{league.name}</span>
                               <span className="text-xs text-muted-foreground">
-                                {league.sport.toUpperCase()} • {league.season}
+                                ID: {league.id} • {league.sport.toUpperCase()} • {league.season}
                               </span>
                             </div>
                           </SelectItem>

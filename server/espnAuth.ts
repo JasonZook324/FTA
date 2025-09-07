@@ -177,6 +177,7 @@ export class EspnAuthService {
   private async getFantasyLeagues(cookies: { espnS2: string; swid: string }): Promise<EspnLeague[]> {
     try {
       // Mock leagues for development - in production this would query ESPN's API
+      // Prioritize league 1713644125 that the user is looking for
       return [
         {
           id: '1713644125',
