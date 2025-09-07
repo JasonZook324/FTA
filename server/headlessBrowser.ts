@@ -153,10 +153,34 @@ export class HeadlessBrowserService {
         });
       }
 
-      // Wait for navigation to login page
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait for login modal/overlay to appear after clicking login button
+      console.log('Waiting for login modal/overlay to appear...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
       currentUrl = page.url();
       console.log('URL after login button click:', currentUrl);
+
+      // Look specifically for login modals/overlays that may have appeared
+      const loginModalSelectors = [
+        '[data-module="LoginModal"]',
+        '.login-modal',
+        '.auth-modal',
+        '#loginModal',
+        '.modal[id*="login"]',
+        '.overlay[id*="login"]'
+      ];
+
+      let loginModal = null;
+      for (const modalSelector of loginModalSelectors) {
+        try {
+          loginModal = await page.$(modalSelector);
+          if (loginModal) {
+            console.log('Found login modal with selector:', modalSelector);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
 
       // Wait and look for login form with multiple strategies
       console.log('Looking for login form...');
@@ -166,9 +190,7 @@ export class HeadlessBrowserService {
         'input[name*="email"]',
         'input[id*="email"]',
         'input[name="loginValue"]',
-        'input[name="username"]',
-        'input[type="text"]',
-        'input'
+        'input[name="username"]'
       ];
 
       let emailInput = null;
@@ -194,12 +216,27 @@ export class HeadlessBrowserService {
                 
                 console.log(`Found input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
                 
-                // This input looks like it could be for email
+                // Filter out search boxes and other non-login inputs
+                const isSearchBox = inputPlaceholder?.toLowerCase().includes('search') ||
+                                  inputName?.toLowerCase().includes('search') ||
+                                  inputPlaceholder?.toLowerCase().includes('sports') ||
+                                  inputPlaceholder?.toLowerCase().includes('team');
+                
+                if (isSearchBox) {
+                  console.log('Skipping search box input');
+                  continue;
+                }
+                
+                // This input looks like it could be for email/username
                 if (inputType === 'email' || 
                     inputName?.toLowerCase().includes('email') || 
                     inputName?.toLowerCase().includes('username') ||
                     inputPlaceholder?.toLowerCase().includes('email') ||
-                    inputType === 'text') {
+                    inputPlaceholder?.toLowerCase().includes('username') ||
+                    (inputType === 'text' && (
+                      inputName?.toLowerCase().includes('login') ||
+                      inputPlaceholder?.toLowerCase().includes('login')
+                    ))) {
                   emailInput = input;
                   console.log('Selected email input with:', { inputType, inputName, inputPlaceholder });
                   break;
@@ -220,10 +257,69 @@ export class HeadlessBrowserService {
 
 
       if (!emailInput) {
-        // Try to get page content for debugging
-        const pageContent = await page.content();
-        console.log('Page content preview:', pageContent.substring(0, 500));
-        throw new Error('Could not find email input field on login page. Page may use a different authentication system.');
+        // Still no login form found, try alternative approaches
+        console.log('No proper login form found, trying alternative login URLs...');
+        
+        // Try ESPN's official login page
+        try {
+          await page.goto('https://www.espn.com/login', { 
+            waitUntil: 'networkidle2', 
+            timeout: 30000 
+          });
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Look for email input again on login page
+          for (const selector of emailSelectors) {
+            try {
+              await page.waitForSelector(selector, { timeout: 3000 });
+              const inputs = await page.$$(selector);
+              
+              for (const input of inputs) {
+                const inputType = await page.evaluate(el => (el as HTMLInputElement).type, input);
+                const inputName = await page.evaluate(el => (el as HTMLInputElement).name, input);
+                const inputPlaceholder = await page.evaluate(el => (el as HTMLInputElement).placeholder, input);
+                
+                // Skip search boxes
+                const isSearchBox = inputPlaceholder?.toLowerCase().includes('search') ||
+                                  inputName?.toLowerCase().includes('search');
+                
+                if (!isSearchBox && (inputType === 'email' || 
+                    inputName?.toLowerCase().includes('email') || 
+                    inputPlaceholder?.toLowerCase().includes('email'))) {
+                  emailInput = input;
+                  console.log('Found email input on login page:', { inputType, inputName, inputPlaceholder });
+                  break;
+                }
+              }
+              if (emailInput) break;
+            } catch (e) {
+              continue;
+            }
+          }
+        } catch (e) {
+          console.log('Failed to navigate to login page:', e.message);
+        }
+        
+        if (!emailInput) {
+          // Try to get page content for debugging
+          const pageContent = await page.content();
+          console.log('Page content preview:', pageContent.substring(0, 500));
+          console.log('All inputs found on page:');
+          
+          const allInputs = await page.evaluate(() => {
+            const inputs = Array.from(document.querySelectorAll('input'));
+            return inputs.map(input => ({
+              type: input.type,
+              name: input.name || '',
+              id: input.id || '',
+              placeholder: input.placeholder || '',
+              className: input.className || ''
+            }));
+          });
+          console.log(JSON.stringify(allInputs, null, 2));
+          
+          throw new Error('Could not find email input field on login page. Page may use a different authentication system.');
+        }
       }
 
       console.log('Login form detected, entering credentials...');
