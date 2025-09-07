@@ -297,7 +297,7 @@ export class HeadlessBrowserService {
             }
           }
         } catch (e) {
-          console.log('Failed to navigate to login page:', e.message);
+          console.log('Failed to navigate to login page:', (e as Error).message);
         }
         
         if (!emailInput) {
