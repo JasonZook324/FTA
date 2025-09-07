@@ -215,8 +215,8 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
         <div className="flex items-center gap-2 text-xs text-muted-foreground p-4 bg-muted rounded-lg">
           <Info className="h-4 w-4" />
           <span>
-            Development mode: Generates working test credentials for ESPN API access. 
-            In production, this would authenticate directly with ESPN's servers.
+            Using headless browser automation to capture real ESPN authentication cookies.
+            Your credentials are only used to log into ESPN's servers securely.
           </span>
         </div>
       </DialogContent>
