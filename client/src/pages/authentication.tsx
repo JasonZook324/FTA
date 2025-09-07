@@ -103,10 +103,16 @@ export default function Authentication() {
       if (data.success) {
         toast({
           title: "Disconnected",
-          description: "ESPN account disconnected successfully",
+          description: "ESPN account disconnected and all data cleared",
         });
         setShowManualEntry(false);
+        // Invalidate all relevant queries to reset the UI
         queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.removeQueries({ queryKey: ["/api/leagues"] });
+        queryClient.removeQueries({ queryKey: ["/api/teams"] });
+        queryClient.removeQueries({ queryKey: ["/api/matchups"] });
       } else {
         toast({
           title: "Error",

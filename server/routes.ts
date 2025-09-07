@@ -373,17 +373,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete ESPN credentials (disconnect account)
   app.delete("/api/espn-credentials/:userId", async (req, res) => {
     try {
-      const deleted = await storage.deleteEspnCredentials(req.params.userId);
+      const userId = req.params.userId;
       
-      if (deleted) {
+      // Delete ESPN credentials
+      const credentialsDeleted = await storage.deleteEspnCredentials(userId);
+      
+      // Delete all associated leagues, teams, and matchups
+      const leaguesDeleted = await storage.deleteAllUserLeagues(userId);
+      
+      // Reset user's selected league
+      await storage.updateUser(userId, { selectedLeagueId: null });
+      
+      if (credentialsDeleted || leaguesDeleted) {
+        console.log(`Disconnected user ${userId}: credentials=${credentialsDeleted}, leagues=${leaguesDeleted}`);
         res.json({ 
           success: true, 
-          message: "ESPN account disconnected successfully" 
+          message: "ESPN account disconnected and all data cleared successfully" 
         });
       } else {
         res.status(404).json({ 
           success: false, 
-          message: "No credentials found to delete" 
+          message: "No data found to delete" 
         });
       }
     } catch (error: any) {

@@ -29,6 +29,7 @@ export interface IStorage {
   getLeague(id: string): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
   updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
+  deleteAllUserLeagues(userId: string): Promise<boolean>;
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
@@ -167,6 +168,31 @@ export class MemStorage implements IStorage {
     };
     this.leagues.set(id, updated);
     return updated;
+  }
+
+  async deleteAllUserLeagues(userId: string): Promise<boolean> {
+    const userLeagues = await this.getLeagues(userId);
+    let deletedCount = 0;
+    
+    for (const league of userLeagues) {
+      // Delete teams for this league
+      const leagueTeams = await this.getTeams(league.id);
+      for (const team of leagueTeams) {
+        this.teams.delete(team.id);
+      }
+      
+      // Delete matchups for this league
+      const leagueMatchups = await this.getMatchups(league.id);
+      for (const matchup of leagueMatchups) {
+        this.matchups.delete(matchup.id);
+      }
+      
+      // Delete the league itself
+      this.leagues.delete(league.id);
+      deletedCount++;
+    }
+    
+    return deletedCount > 0;
   }
 
   // Team methods
@@ -383,6 +409,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(leagues.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async deleteAllUserLeagues(userId: string): Promise<boolean> {
+    try {
+      // Get all user leagues first
+      const userLeagues = await this.getLeagues(userId);
+      
+      if (userLeagues.length === 0) {
+        return false;
+      }
+      
+      // Delete teams for all user leagues
+      for (const league of userLeagues) {
+        await db.delete(teams).where(eq(teams.leagueId, league.id));
+        await db.delete(matchups).where(eq(matchups.leagueId, league.id));
+      }
+      
+      // Delete all user leagues
+      const deletedLeagues = await db
+        .delete(leagues)
+        .where(eq(leagues.userId, userId));
+      
+      return (deletedLeagues.rowCount || 0) > 0;
+    } catch (error) {
+      console.error('Error deleting user leagues:', error);
+      return false;
+    }
   }
 
   // Team methods
