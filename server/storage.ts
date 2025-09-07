@@ -202,6 +202,16 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getTeam(id: string): Promise<Team | undefined> {
+    return this.teams.get(id);
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    return Array.from(this.teams.values()).find(
+      team => team.leagueId === leagueId && team.espnTeamId === espnTeamId
+    );
+  }
+
   async createTeam(team: InsertTeam): Promise<Team> {
     const id = randomUUID();
     const newTeam: Team = { 

@@ -22,6 +22,96 @@ class EspnApiService {
     };
   }
 
+  async loadLeague(userId: string, espnLeagueId: string): Promise<void> {
+    console.log(`Loading full league data for ESPN League ID: ${espnLeagueId}`);
+    
+    // Get credentials
+    const credentials = await storage.getEspnCredentials(userId);
+    if (!credentials || !credentials.isValid) {
+      throw new Error("Valid ESPN credentials required");
+    }
+
+    // Get league from storage to get sport and season
+    const leagues = await storage.getLeagues(userId);
+    const league = leagues.find(l => l.espnLeagueId === espnLeagueId);
+    if (!league) {
+      throw new Error("League not found in storage");
+    }
+
+    try {
+      // Fetch teams data
+      console.log(`Fetching teams data for league ${espnLeagueId}...`);
+      const leagueData = await this.getLeagueData(
+        credentials, 
+        league.sport, 
+        league.season, 
+        espnLeagueId, 
+        ['mTeam', 'mSettings']
+      );
+
+      // Store teams if they exist
+      if (leagueData.teams && Array.isArray(leagueData.teams)) {
+        console.log(`Found ${leagueData.teams.length} teams, storing in database...`);
+        for (const team of leagueData.teams) {
+          await storage.createTeam({
+            espnTeamId: team.id,
+            leagueId: league.id,
+            name: team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`,
+            owner: team.primaryOwner || 'Unknown',
+            abbreviation: team.abbrev || team.location?.substring(0, 3).toUpperCase() || 'TM',
+            logoUrl: team.logo || null,
+            wins: team.record?.overall?.wins || 0,
+            losses: team.record?.overall?.losses || 0,
+            ties: team.record?.overall?.ties || 0,
+            pointsFor: team.record?.overall?.pointsFor?.toString() || '0',
+            pointsAgainst: team.record?.overall?.pointsAgainst?.toString() || '0',
+            streak: team.record?.overall?.streakType || '',
+            rank: team.playoffSeed || team.rank || 0
+          });
+        }
+      }
+
+      // Fetch current week matchups
+      console.log(`Fetching matchups for league ${espnLeagueId}...`);
+      const matchupData = await this.getMatchups(
+        credentials,
+        league.sport,
+        league.season,
+        espnLeagueId
+      );
+
+      // Store matchups if they exist
+      if (matchupData.schedule && Array.isArray(matchupData.schedule)) {
+        console.log(`Found ${matchupData.schedule.length} matchups, storing in database...`);
+        for (const matchup of matchupData.schedule) {
+          if (matchup.home && matchup.away) {
+            // Find the corresponding teams in our storage
+            const homeTeam = await storage.getTeamByEspnId(league.id, matchup.home.teamId);
+            const awayTeam = await storage.getTeamByEspnId(league.id, matchup.away.teamId);
+            
+            if (homeTeam && awayTeam) {
+              await storage.createMatchup({
+                leagueId: league.id,
+                week: matchup.matchupPeriodId || 1,
+                homeTeamId: homeTeam.id,
+                awayTeamId: awayTeam.id,
+                homeScore: matchup.home.totalPoints?.toString() || null,
+                awayScore: matchup.away.totalPoints?.toString() || null,
+                isComplete: matchup.winner !== undefined,
+                matchupDate: matchup.matchupDate || null
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`Successfully loaded all data for league ${espnLeagueId}`);
+    } catch (error) {
+      console.error(`Error loading league data:`, error);
+      throw error;
+    }
+  }
+
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
       console.log('ESPN API validation - testing credentials...');
@@ -463,6 +553,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set this as the user's selected league
       await storage.updateUser(userId, { selectedLeagueId: league.id });
+
+      // Load league data (teams, matchups, etc.) from ESPN API
+      try {
+        console.log(`Loading league data for ESPN League ID: ${espnLeagueId}`);
+        await espnApiService.loadLeague(userId, espnLeagueId);
+        console.log(`Successfully loaded league data for ${leagueName}`);
+      } catch (error) {
+        console.error(`Failed to load league data: ${error}`);
+        // Continue anyway - league created but data load failed
+      }
 
       res.json({ 
         success: true,

@@ -181,7 +181,7 @@ export class EspnAuthService {
       return [
         {
           id: '1713644125',
-          name: 'ESPN Fantasy Football League',
+          name: 'Zook Family and Friends League',
           sport: 'ffl',
           season: 2025,
         },
