@@ -431,6 +431,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Load a specific league into the app
+  app.post("/api/leagues/load", async (req, res) => {
+    try {
+      const { userId, espnLeagueId, leagueName, sport, season } = req.body;
+      
+      if (!userId || !espnLeagueId || !leagueName || !sport || !season) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Missing required fields: userId, espnLeagueId, leagueName, sport, season" 
+        });
+      }
+
+      console.log(`Loading league ${leagueName} (${espnLeagueId}) for user ${userId}`);
+
+      // Create the league in storage
+      const league = await storage.createLeague({
+        userId,
+        espnLeagueId,
+        name: leagueName,
+        sport,
+        season,
+        status: "active"
+      });
+
+      console.log(`League created with ID: ${league.id}`);
+
+      // Set this as the user's selected league
+      await storage.updateUser(userId, { selectedLeagueId: league.id });
+
+      res.json({ 
+        success: true,
+        message: "League loaded successfully",
+        league: {
+          id: league.id,
+          name: league.name,
+          sport: league.sport,
+          season: league.season,
+          espnLeagueId: league.espnLeagueId
+        }
+      });
+    } catch (error: any) {
+      console.error("Error loading league:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message || "Failed to load league" 
+      });
+    }
+  });
+
   app.post("/api/leagues/:userId/load", async (req, res) => {
     try {
       const { espnLeagueId, sport, season } = req.body;

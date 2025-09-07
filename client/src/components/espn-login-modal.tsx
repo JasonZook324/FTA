@@ -19,7 +19,12 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+const leagueSelectionSchema = z.object({
+  leagueId: z.string().min(1, "Please select a league"),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
+type LeagueSelectionData = z.infer<typeof leagueSelectionSchema>;
 
 interface League {
   id: string;
@@ -34,7 +39,7 @@ interface EspnLoginModalProps {
   onSuccess?: () => void;
 }
 
-type LoginStep = "login" | "success";
+type LoginStep = "login" | "leagues" | "success";
 
 export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModalProps) {
   const [currentStep, setCurrentStep] = useState<LoginStep>("login");
@@ -46,6 +51,11 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     defaultValues: { email: "", password: "" },
   });
 
+  const leagueForm = useForm<LeagueSelectionData>({
+    resolver: zodResolver(leagueSelectionSchema),
+    defaultValues: { leagueId: "" },
+  });
+
   // Direct login mutation
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
@@ -54,20 +64,25 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     },
     onSuccess: (data) => {
       if (data.success) {
-        setCurrentStep("success");
-        if (data.leagues) {
+        if (data.leagues && data.leagues.length > 0) {
           setAvailableLeagues(data.leagues);
+          
+          // If only one league, auto-select it
+          if (data.leagues.length === 1) {
+            selectLeagueMutation.mutate({ leagueId: data.leagues[0].id });
+          } else {
+            // Multiple leagues - show selection
+            setCurrentStep("leagues");
+          }
+        } else {
+          // No leagues found
+          setCurrentStep("success");
+          toast({
+            title: "Success",
+            description: "Successfully signed in to ESPN Fantasy!",
+          });
         }
-        toast({
-          title: "Success",
-          description: "Successfully signed in to ESPN Fantasy!",
-        });
         queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
-        setTimeout(() => {
-          onOpenChange(false);
-          onSuccess?.();
-          resetForms();
-        }, 2000);
       } else {
         toast({
           title: "Authentication Failed",
@@ -85,10 +100,58 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     },
   });
 
+  // League selection mutation
+  const selectLeagueMutation = useMutation({
+    mutationFn: async (data: LeagueSelectionData) => {
+      const selectedLeague = availableLeagues.find(league => league.id === data.leagueId);
+      if (!selectedLeague) {
+        throw new Error("Selected league not found");
+      }
+      
+      const response = await apiRequest("POST", "/api/leagues/load", {
+        userId: "default-user",
+        espnLeagueId: selectedLeague.id,
+        leagueName: selectedLeague.name,
+        sport: selectedLeague.sport,
+        season: selectedLeague.season
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setCurrentStep("success");
+        toast({
+          title: "League Loaded",
+          description: `Successfully loaded ${data.league?.name || 'your league'}!`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+        setTimeout(() => {
+          onOpenChange(false);
+          onSuccess?.();
+          resetForms();
+        }, 2000);
+      } else {
+        toast({
+          title: "Failed to Load League",
+          description: data.message || "Could not load the selected league",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForms = () => {
     setCurrentStep("login");
     setAvailableLeagues([]);
     loginForm.reset();
+    leagueForm.reset();
   };
 
   const handleClose = () => {
@@ -170,28 +233,102 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     </Card>
   );
 
+  const renderLeagueStep = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Select Your League
+        </CardTitle>
+        <CardDescription>
+          Choose which fantasy league you'd like to load into the app
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...leagueForm}>
+          <form onSubmit={leagueForm.handleSubmit((data) => selectLeagueMutation.mutate(data))} className="space-y-4">
+            <FormField
+              control={leagueForm.control}
+              name="leagueId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Available Leagues</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger data-testid="select-league">
+                        <SelectValue placeholder="Select a league..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLeagues.map((league) => (
+                          <SelectItem key={league.id} value={league.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{league.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {league.sport.toUpperCase()} • {league.season}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCurrentStep("login")}
+                className="flex-1"
+                data-testid="button-back-to-login"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1"
+                disabled={selectLeagueMutation.isPending}
+                data-testid="button-load-league"
+              >
+                {selectLeagueMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load League"
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+
   const renderSuccessStep = () => (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-green-600">
           <Shield className="h-5 w-5" />
-          Login Successful!
+          League Loaded!
         </CardTitle>
         <CardDescription>
-          Your ESPN Fantasy account has been connected successfully.
+          Your ESPN Fantasy league has been loaded successfully.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="text-center py-6">
           <div className="text-green-600 text-4xl mb-4">✓</div>
           <p className="text-sm text-muted-foreground mb-4">
-            Authentication cookies captured and stored securely.
+            League data is now available in the app.
           </p>
-          {availableLeagues.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              Found {availableLeagues.length} fantasy league{availableLeagues.length !== 1 ? 's' : ''}
-            </div>
-          )}
+          <div className="text-xs text-muted-foreground">
+            You can now view teams, rosters, and matchups
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -209,6 +346,7 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
         
         <div className="py-4">
           {currentStep === "login" && renderLoginStep()}
+          {currentStep === "leagues" && renderLeagueStep()}
           {currentStep === "success" && renderSuccessStep()}
         </div>
 
