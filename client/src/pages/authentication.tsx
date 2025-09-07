@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, Shield, LogIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { EspnLoginModal } from "@/components/espn-login-modal";
 
 const credentialsFormSchema = insertEspnCredentialsSchema.extend({
   userId: z.string().min(1, "User ID is required"),
@@ -23,6 +24,8 @@ type CredentialsFormData = z.infer<typeof credentialsFormSchema>;
 export default function Authentication() {
   const { toast } = useToast();
   const [userId] = useState("default-user"); // In a real app, this would come from auth context
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
@@ -113,6 +116,14 @@ export default function Authentication() {
               Refresh Data
             </Button>
             <Button
+              onClick={() => setShowLoginModal(true)}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-automated-login"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Sign in with ESPN
+            </Button>
+            <Button
               onClick={() => validateCredentialsMutation.mutate()}
               disabled={validateCredentialsMutation.isPending || !credentials}
               data-testid="button-test-connection"
@@ -126,8 +137,71 @@ export default function Authentication() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Cookie Configuration */}
+        {!credentials ? (
+          // New user - show automated login option
+          <div className="max-w-2xl mx-auto">
+            <Card data-testid="card-automated-login">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl flex items-center justify-center gap-3">
+                  <Shield className="h-8 w-8 text-primary" />
+                  Connect Your ESPN Account
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Securely sign in to your ESPN Fantasy account to automatically connect your leagues
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="text-center">
+                  <Button
+                    onClick={() => setShowLoginModal(true)}
+                    size="lg"
+                    className="px-8 py-3 text-lg"
+                    data-testid="button-main-espn-login"
+                  >
+                    <LogIn className="w-5 h-5 mr-3" />
+                    Sign in with ESPN
+                  </Button>
+                </div>
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowManualEntry(true)}
+                    data-testid="button-manual-entry"
+                  >
+                    Enter cookies manually
+                  </Button>
+                </div>
+
+                <div className="bg-muted rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Info className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-foreground">Automated Sign-In Benefits</span>
+                  </div>
+                  <ul className="text-xs text-muted-foreground space-y-1 ml-6">
+                    <li>• No need to manually find cookies</li>
+                    <li>• Automatic league discovery</li>
+                    <li>• Secure credential handling</li>
+                    <li>• Works with Disney SSO</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          // Existing user - show manual form and current status
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Manual Cookie Configuration - only show if requested or user has existing credentials */}
+          {(showManualEntry || credentials) && (
           <Card data-testid="card-cookie-configuration">
             <CardHeader>
               <CardTitle>ESPN Authentication Cookies</CardTitle>
@@ -223,6 +297,63 @@ export default function Authentication() {
               </Form>
             </CardContent>
           </Card>
+          )}
+
+          {/* Status and current credentials info */}
+          {credentials && (
+          <Card data-testid="card-credential-status">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Connected Account
+              </CardTitle>
+              <CardDescription>
+                Your ESPN Fantasy account is connected and ready to use
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm font-medium">Connection Status:</span>
+                  <Badge variant={credentials.isValid ? "default" : "destructive"}>
+                    {credentials.isValid ? "Active" : "Invalid"}
+                  </Badge>
+                </div>
+                
+                {credentials.lastValidated && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium">Last Validated:</span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(credentials.lastValidated).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setShowLoginModal(true)}
+                    variant="outline"
+                    className="flex-1"
+                    data-testid="button-reconnect"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Reconnect Account
+                  </Button>
+                  {!showManualEntry && (
+                    <Button
+                      onClick={() => setShowManualEntry(true)}
+                      variant="outline"
+                      className="flex-1"
+                      data-testid="button-show-manual"
+                    >
+                      Manual Setup
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          )}
 
           {/* Cookie Instructions */}
           <Card data-testid="card-instructions">
@@ -275,8 +406,21 @@ export default function Authentication() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        )}
       </main>
+
+      {/* ESPN Login Modal */}
+      <EspnLoginModal
+        open={showLoginModal}
+        onOpenChange={setShowLoginModal}
+        onSuccess={() => {
+          toast({
+            title: "Success",
+            description: "ESPN account connected successfully!",
+          });
+        }}
+      />
     </>
   );
 }

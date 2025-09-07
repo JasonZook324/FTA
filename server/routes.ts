@@ -8,6 +8,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { geminiService } from './geminiService';
+import { espnAuthService } from './espnAuth';
 
 // ESPN API service
 class EspnApiService {
@@ -268,6 +269,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
       }
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ESPN Automated Authentication Routes
+  app.post("/api/auth/espn/email", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email is required" 
+        });
+      }
+
+      const result = await espnAuthService.validateEmail(email);
+      res.json(result);
+    } catch (error: any) {
+      console.error('ESPN email validation error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Internal server error" 
+      });
+    }
+  });
+
+  app.post("/api/auth/espn/password", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email and password are required" 
+        });
+      }
+
+      const result = await espnAuthService.authenticateWithPassword(email, password);
+      res.json(result);
+    } catch (error: any) {
+      console.error('ESPN password authentication error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Authentication failed" 
+      });
+    }
+  });
+
+  app.post("/api/auth/espn/complete", async (req, res) => {
+    try {
+      const { email, password, leagueId } = req.body;
+      
+      if (!email || !password || !leagueId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email, password, and league ID are required" 
+        });
+      }
+
+      const result = await espnAuthService.completeLogin(email, password, leagueId);
+      
+      if (result.success && result.cookies) {
+        // Store the extracted cookies using existing credential system
+        const credentials = {
+          userId: "default-user", // In production, this would come from actual user auth
+          espnS2: result.cookies.espnS2,
+          swid: result.cookies.swid,
+        };
+
+        // Validate the extracted credentials
+        const testCredentials = {
+          ...credentials,
+          id: '',
+          isValid: true,
+          createdAt: new Date(),
+          lastValidated: null
+        };
+
+        const isValid = await espnApiService.validateCredentials(testCredentials);
+        
+        if (isValid) {
+          await storage.createEspnCredentials(credentials);
+          res.json({ success: true, message: "Login completed successfully" });
+        } else {
+          res.status(400).json({ 
+            success: false, 
+            message: "Failed to validate extracted credentials" 
+          });
+        }
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: result.message || "Failed to complete login" 
+        });
+      }
+    } catch (error: any) {
+      console.error('ESPN login completion error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Failed to complete login" 
+      });
     }
   });
 
