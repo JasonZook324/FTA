@@ -1,4 +1,4 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page, ElementHandle, Frame } from 'puppeteer';
 
 interface EspnLoginResult {
   success: boolean;
@@ -61,6 +61,72 @@ export class HeadlessBrowserService {
       this.browser = null;
       console.log('Headless browser closed');
     }
+  }
+
+  private async checkInputsForEmail(page: Page, inputs: ElementHandle[]): Promise<ElementHandle | null> {
+    for (const input of inputs) {
+      const inputType = await page.evaluate(el => (el as HTMLInputElement).type, input);
+      const inputName = await page.evaluate(el => (el as HTMLInputElement).name, input);
+      const inputPlaceholder = await page.evaluate(el => (el as HTMLInputElement).placeholder, input);
+      
+      console.log(`Found input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
+      
+      // Filter out search boxes and other non-login inputs
+      const isSearchBox = inputPlaceholder?.toLowerCase().includes('search') ||
+                        inputName?.toLowerCase().includes('search') ||
+                        inputPlaceholder?.toLowerCase().includes('sports') ||
+                        inputPlaceholder?.toLowerCase().includes('team');
+      
+      if (isSearchBox) {
+        console.log('Skipping search box input');
+        continue;
+      }
+      
+      // This input looks like it could be for email/username
+      if (inputType === 'email' || 
+          inputName?.toLowerCase().includes('email') || 
+          inputName?.toLowerCase().includes('username') ||
+          inputPlaceholder?.toLowerCase().includes('email') ||
+          inputPlaceholder?.toLowerCase().includes('username') ||
+          (inputType === 'text' && (
+            inputName?.toLowerCase().includes('login') ||
+            inputPlaceholder?.toLowerCase().includes('login')
+          ))) {
+        console.log('Selected email input with:', { inputType, inputName, inputPlaceholder });
+        return input;
+      }
+    }
+    return null;
+  }
+
+  private async checkInputsForEmailInFrame(frame: Frame, inputs: ElementHandle[]): Promise<ElementHandle | null> {
+    for (const input of inputs) {
+      const inputType = await frame.evaluate(el => (el as HTMLInputElement).type, input);
+      const inputName = await frame.evaluate(el => (el as HTMLInputElement).name, input);
+      const inputPlaceholder = await frame.evaluate(el => (el as HTMLInputElement).placeholder, input);
+      
+      console.log(`Found iframe input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
+      
+      // Filter out search boxes
+      const isSearchBox = inputPlaceholder?.toLowerCase().includes('search') ||
+                        inputName?.toLowerCase().includes('search');
+      
+      if (isSearchBox) {
+        console.log('Skipping iframe search box input');
+        continue;
+      }
+      
+      // Check if this looks like an email/username input
+      if (inputType === 'email' || 
+          inputName?.toLowerCase().includes('email') || 
+          inputName?.toLowerCase().includes('username') ||
+          inputPlaceholder?.toLowerCase().includes('email') ||
+          inputPlaceholder?.toLowerCase().includes('username')) {
+        console.log('Selected iframe email input with:', { inputType, inputName, inputPlaceholder });
+        return input;
+      }
+    }
+    return null;
   }
 
   /**
@@ -153,36 +219,63 @@ export class HeadlessBrowserService {
         });
       }
 
-      // Wait for login modal/overlay to appear after clicking login button
-      console.log('Waiting for login modal/overlay to appear...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for login modal/overlay and dynamic content to load
+      console.log('Waiting for login modal/overlay and dynamic content...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
       currentUrl = page.url();
       console.log('URL after login button click:', currentUrl);
 
-      // Look specifically for login modals/overlays that may have appeared
-      const loginModalSelectors = [
-        '[data-module="LoginModal"]',
-        '.login-modal',
-        '.auth-modal',
-        '#loginModal',
-        '.modal[id*="login"]',
-        '.overlay[id*="login"]'
-      ];
+      // Check for iframes that might contain the login form
+      console.log('Checking for iframes...');
+      const iframes = await page.$$('iframe');
+      console.log(`Found ${iframes.length} iframes`);
+      
+      // Look for Disney/OneID specific elements
+      console.log('Looking for Disney OneID elements...');
+      const disneyElements = await page.evaluate(() => {
+        const elements = Array.from(document.querySelectorAll('*'));
+        return elements.filter(el => 
+          el.id?.includes('disney') || 
+          el.className?.includes('disney') ||
+          el.id?.includes('oneid') ||
+          el.className?.includes('oneid')
+        ).map(el => ({
+          tagName: el.tagName,
+          id: el.id,
+          className: el.className
+        }));
+      });
+      console.log('Disney/OneID elements found:', disneyElements);
 
-      let loginModal = null;
-      for (const modalSelector of loginModalSelectors) {
-        try {
-          loginModal = await page.$(modalSelector);
-          if (loginModal) {
-            console.log('Found login modal with selector:', modalSelector);
-            break;
+      // Try to execute JavaScript to manually trigger login form
+      console.log('Attempting to trigger login form via JavaScript...');
+      await page.evaluate(() => {
+        // Try to trigger any Disney OneID initialization
+        if (typeof (window as any).DISNEY !== 'undefined' && (window as any).DISNEY.Login) {
+          try {
+            (window as any).DISNEY.Login.show();
+          } catch (e) {
+            console.log('Disney login trigger failed:', e);
           }
-        } catch (e) {
-          continue;
         }
-      }
+        
+        // Try to find and trigger any login-related functions
+        const possibleFunctions = ['showLogin', 'openLogin', 'initLogin', 'displayLogin'];
+        for (const funcName of possibleFunctions) {
+          if (typeof (window as any)[funcName] === 'function') {
+            try {
+              (window as any)[funcName]();
+            } catch (e) {
+              console.log(`Failed to call ${funcName}:`, e);
+            }
+          }
+        }
+      });
 
-      // Wait and look for login form with multiple strategies
+      // Wait longer for dynamic content after JavaScript execution
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      // Wait and look for login form with multiple strategies including iframes
       console.log('Looking for login form...');
       const emailSelectors = [
         'input[type="email"]',
@@ -202,50 +295,53 @@ export class HeadlessBrowserService {
         attempts++;
         console.log(`Attempt ${attempts} to find email input...`);
         
+        // First try the main page
         for (const selector of emailSelectors) {
           try {
-            await page.waitForSelector(selector, { timeout: 5000 });
+            await page.waitForSelector(selector, { timeout: 3000 });
             const inputs = await page.$$(selector);
             
             if (inputs.length > 0) {
-              // Check each input to see if it's suitable for email
-              for (const input of inputs) {
-                const inputType = await page.evaluate(el => (el as HTMLInputElement).type, input);
-                const inputName = await page.evaluate(el => (el as HTMLInputElement).name, input);
-                const inputPlaceholder = await page.evaluate(el => (el as HTMLInputElement).placeholder, input);
-                
-                console.log(`Found input: type=${inputType}, name=${inputName}, placeholder=${inputPlaceholder}`);
-                
-                // Filter out search boxes and other non-login inputs
-                const isSearchBox = inputPlaceholder?.toLowerCase().includes('search') ||
-                                  inputName?.toLowerCase().includes('search') ||
-                                  inputPlaceholder?.toLowerCase().includes('sports') ||
-                                  inputPlaceholder?.toLowerCase().includes('team');
-                
-                if (isSearchBox) {
-                  console.log('Skipping search box input');
-                  continue;
-                }
-                
-                // This input looks like it could be for email/username
-                if (inputType === 'email' || 
-                    inputName?.toLowerCase().includes('email') || 
-                    inputName?.toLowerCase().includes('username') ||
-                    inputPlaceholder?.toLowerCase().includes('email') ||
-                    inputPlaceholder?.toLowerCase().includes('username') ||
-                    (inputType === 'text' && (
-                      inputName?.toLowerCase().includes('login') ||
-                      inputPlaceholder?.toLowerCase().includes('login')
-                    ))) {
-                  emailInput = input;
-                  console.log('Selected email input with:', { inputType, inputName, inputPlaceholder });
-                  break;
-                }
-              }
+              emailInput = await this.checkInputsForEmail(page, inputs);
               if (emailInput) break;
             }
           } catch (e) {
             continue;
+          }
+        }
+        
+        // If not found on main page, check iframes
+        if (!emailInput && iframes.length > 0) {
+          console.log('Checking iframes for login form...');
+          for (let i = 0; i < iframes.length; i++) {
+            try {
+              const frame = await iframes[i].contentFrame();
+              if (frame) {
+                console.log(`Checking iframe ${i + 1}...`);
+                
+                // Look for inputs within the iframe
+                for (const selector of emailSelectors) {
+                  try {
+                    await frame.waitForSelector(selector, { timeout: 2000 });
+                    const frameInputs = await frame.$$(selector);
+                    
+                    if (frameInputs.length > 0) {
+                      emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
+                      if (emailInput) {
+                        console.log(`Found email input in iframe ${i + 1}`);
+                        break;
+                      }
+                    }
+                  } catch (e) {
+                    continue;
+                  }
+                }
+                if (emailInput) break;
+              }
+            } catch (e) {
+              console.log(`Failed to access iframe ${i + 1}:`, (e as Error).message);
+              continue;
+            }
           }
         }
         
