@@ -456,6 +456,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teams.leagueId, leagueId));
   }
 
+  async getTeam(id: string): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, id));
+    return team || undefined;
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.leagueId, leagueId) && eq(teams.espnTeamId, espnTeamId));
+    return team || undefined;
+  }
+
   async createTeam(team: InsertTeam): Promise<Team> {
     const [newTeam] = await db
       .insert(teams)

@@ -546,7 +546,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: leagueName,
         sport,
         season,
-        status: "active"
       });
 
       console.log(`League created with ID: ${league.id}`);

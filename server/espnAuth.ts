@@ -73,16 +73,11 @@ export class EspnAuthService {
       } else {
         console.error('Headless browser authentication failed:', result.message);
         
-        // Fallback to test cookies for development if headless browser fails
-        console.log('Falling back to development test cookies...');
-        const fallbackCookies = {
-          espnS2: this.generateRealisticEspnS2(email),
-          swid: this.generateRealisticSwid(email),
-        };
-        
+        // No fallback to fake cookies - require real authentication
         return {
-          success: true,
-          cookies: fallbackCookies,
+          success: false,
+          cookies: undefined,
+          message: `Authentication failed: ${result.message}. Real ESPN authentication is required.`
         };
       }
 
