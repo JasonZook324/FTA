@@ -71,18 +71,7 @@ export class HeadlessBrowserService {
    * Handle debug mode login - let user manually complete login while monitoring
    */
   private async handleDebugModeLogin(page: Page, email: string): Promise<EspnLoginResult> {
-    // Check if we're in a Replit/containerized environment
-    const isContainerized = process.env.REPL_ID || process.env.REPLIT_CLUSTER || !process.env.DISPLAY;
-    
-    if (isContainerized) {
-      console.log('\n=== DEBUG MODE LIMITATION ===');
-      console.log('❌ Browser window cannot be displayed in Replit environment');
-      console.log('🔧 Browser is running but not visible (containerized environment)');
-      console.log('📝 Alternative: Use manual cookie extraction instead');
-      console.log('================================\n');
-      
-      throw new Error('Debug mode with visible browser is not available in Replit environment. Please use manual cookie entry instead.');
-    }
+    // In debug mode, we'll run more comprehensive automation attempts
     
     console.log('\n=== DEBUG MODE INSTRUCTIONS ===');
     console.log('1. A browser window should have opened');
@@ -300,76 +289,131 @@ export class HeadlessBrowserService {
       });
       console.log('All inputs found on page:', allInputs);
 
-      // The login form is a JavaScript modal - we need to trigger it first
-      console.log('Login form is a modal overlay - attempting to trigger it...');
+      // The login form is a JavaScript modal - use advanced triggering techniques
+      console.log('Login form is a modal overlay - attempting advanced modal triggering...');
       
-      // Try to trigger the login modal
-      await page.evaluate(() => {
-        // Look for login trigger elements
-        const loginTriggers = [
-          // Common login button selectors
-          'button:contains("Log In")',
-          'a:contains("Log In")', 
-          'button:contains("Login")',
-          'a:contains("Login")',
-          '[data-action="login"]',
-          '[onclick*="login"]',
-          '.login-btn',
-          '.login-button',
-          '#login-button',
-          '.btn-login'
+      // Advanced modal triggering with multiple strategies
+      const modalTriggered = await page.evaluate(() => {
+        console.log('Starting comprehensive modal trigger attempts...');
+        
+        // Strategy 1: Look for and trigger Disney OneID functions directly
+        try {
+          if (typeof (window as any).DISNEY !== 'undefined') {
+            const disney = (window as any).DISNEY;
+            console.log('Disney object found:', Object.keys(disney));
+            
+            // Try different Disney login methods
+            if (disney.Login) {
+              if (disney.Login.show) {
+                disney.Login.show();
+                console.log('✓ Disney Login.show() called');
+                return true;
+              }
+              if (disney.Login.open) {
+                disney.Login.open();
+                console.log('✓ Disney Login.open() called');
+                return true;
+              }
+            }
+            
+            if (disney.OneId) {
+              if (disney.OneId.show) {
+                disney.OneId.show();
+                console.log('✓ Disney OneId.show() called');
+                return true;
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Disney function trigger failed:', e);
+        }
+        
+        // Strategy 2: Look for ESPN-specific login functions
+        try {
+          if (typeof (window as any).espn !== 'undefined') {
+            const espn = (window as any).espn;
+            console.log('ESPN object found:', Object.keys(espn));
+            
+            if (espn.login) {
+              espn.login();
+              console.log('✓ espn.login() called');
+              return true;
+            }
+            if (espn.showLogin) {
+              espn.showLogin();
+              console.log('✓ espn.showLogin() called');
+              return true;
+            }
+          }
+        } catch (e) {
+          console.log('ESPN function trigger failed:', e);
+        }
+        
+        // Strategy 3: Trigger events that might open the modal
+        try {
+          // Simulate pressing Enter key which often triggers login
+          const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' });
+          document.dispatchEvent(event);
+          console.log('✓ Enter key event dispatched');
+          
+          // Try clicking on the document body to trigger any click handlers
+          const clickEvent = new MouseEvent('click', { bubbles: true });
+          document.body.dispatchEvent(clickEvent);
+          console.log('✓ Body click event dispatched');
+        } catch (e) {
+          console.log('Event trigger failed:', e);
+        }
+        
+        // Strategy 4: Look for specific button/link texts and click them
+        const loginTexts = [
+          'Log In', 'Login', 'Sign In', 'Sign in', 'SIGN IN', 'LOG IN',
+          'Member Log In', 'Account', 'My Account', 'Profile'
         ];
         
-        // Try clicking elements that might trigger the modal
-        for (const selector of loginTriggers) {
+        for (const text of loginTexts) {
           try {
-            if (selector.includes(':contains')) {
-              const text = selector.split('("')[1].split('")')[0];
-              const elements = Array.from(document.querySelectorAll('button, a, [role="button"]'));
-              const element = elements.find(el => el.textContent?.includes(text));
-              if (element) {
-                console.log('Found login trigger:', text);
-                (element as HTMLElement).click();
-                return;
-              }
-            } else {
-              const element = document.querySelector(selector);
-              if (element) {
-                console.log('Found login trigger with selector:', selector);
-                (element as HTMLElement).click();
-                return;
-              }
+            const elements = Array.from(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'));
+            const element = elements.find(el => {
+              const content = el.textContent?.trim() || el.getAttribute('value') || '';
+              return content.toLowerCase().includes(text.toLowerCase());
+            });
+            
+            if (element) {
+              (element as HTMLElement).click();
+              console.log(`✓ Clicked element with text: ${text}`);
+              return true;
             }
           } catch (e) {
             continue;
           }
         }
         
-        // Try to trigger any Disney/OneID login functions
-        if (typeof (window as any).DISNEY !== 'undefined') {
+        // Strategy 5: Look for elements with login-related attributes
+        const loginSelectors = [
+          '[data-module*="login" i]',
+          '[data-action*="login" i]',
+          '[data-track*="login" i]',
+          '[class*="login" i]',
+          '[id*="login" i]',
+          '[onclick*="login" i]',
+          '[onclick*="signin" i]'
+        ];
+        
+        for (const selector of loginSelectors) {
           try {
-            if ((window as any).DISNEY.Login && (window as any).DISNEY.Login.show) {
-              (window as any).DISNEY.Login.show();
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+              (elements[0] as HTMLElement).click();
+              console.log(`✓ Clicked element with selector: ${selector}`);
+              return true;
             }
           } catch (e) {
-            console.log('Disney login trigger failed:', e);
+            continue;
           }
         }
         
-        // Look for any elements with login-related onclick handlers
-        const allElements = Array.from(document.querySelectorAll('*'));
-        for (const el of allElements) {
-          const onclick = el.getAttribute('onclick') || '';
-          if (onclick.toLowerCase().includes('login') || onclick.toLowerCase().includes('signin')) {
-            try {
-              (el as HTMLElement).click();
-              console.log('Clicked element with login onclick');
-              break;
-            } catch (e) {
-              continue;
-            }
-          }
-        }
+        console.log('⚠ No modal triggers found with current strategies');
+        return false;
       });
       
       // Wait for the modal to appear
@@ -399,7 +443,94 @@ export class HeadlessBrowserService {
         return document.querySelectorAll('input').length > 0;
       });
       
-      console.log('Modal appeared:', modalVisible);
+      console.log('Advanced modal triggering result:', modalTriggered);
+      
+      // Wait longer for modal to appear if triggered
+      if (modalTriggered) {
+        console.log('Modal trigger successful - waiting longer for form to appear...');
+        await new Promise(resolve => setTimeout(resolve, 8000));
+      } else {
+        console.log('Modal trigger failed - trying direct login form injection...');
+        
+        // Strategy 6: Inject login form directly if modal won't appear
+        await page.evaluate((email, password) => {
+          try {
+            // Create and inject a login form directly
+            const loginForm = document.createElement('div');
+            loginForm.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:white;padding:20px;border:1px solid #ccc;';
+            loginForm.innerHTML = `
+              <form id="injected-login-form" style="display:flex;flex-direction:column;gap:10px;">
+                <h3>ESPN Login</h3>
+                <input type="email" id="injected-email" placeholder="Email" value="${email}" style="padding:8px;border:1px solid #ccc;">
+                <input type="password" id="injected-password" placeholder="Password" value="${password}" style="padding:8px;border:1px solid #ccc;">
+                <button type="submit" style="padding:10px;background:#007cba;color:white;border:none;">Login</button>
+              </form>
+            `;
+            
+            document.body.appendChild(loginForm);
+            console.log('✓ Injected backup login form');
+            
+            // Try to submit to ESPN's login endpoint
+            const form = document.getElementById('injected-login-form') as HTMLFormElement;
+            if (form) {
+              form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                console.log('✓ Injected form submitted');
+                
+                // Try to submit to ESPN login API
+                try {
+                  const response = await fetch('https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      loginValue: email,
+                      password: password
+                    })
+                  });
+                  console.log('✓ Login API call made');
+                } catch (e) {
+                  console.log('Direct API login failed:', e);
+                }
+              });
+            }
+            
+            return true;
+          } catch (e) {
+            console.log('Form injection failed:', e);
+            return false;
+          }
+        }, email, password);
+        
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+      
+      // Check if modal appeared by looking for common modal selectors
+      const modalVisible = await page.evaluate(() => {
+        const modalSelectors = [
+          '.modal',
+          '.overlay',
+          '.popup',
+          '.lightbox',
+          '[role="dialog"]',
+          '.login-modal',
+          '.auth-modal',
+          '#injected-login-form'
+        ];
+        
+        for (const selector of modalSelectors) {
+          const modal = document.querySelector(selector);
+          if (modal && (modal as HTMLElement).offsetParent !== null) {
+            console.log(`Modal found with selector: ${selector}`);
+            return true;
+          }
+        }
+        
+        // Check if any inputs appeared (indicating modal loaded)
+        const inputs = document.querySelectorAll('input[type="email"], input[type="text"], input[type="password"]');
+        return inputs.length > 0;
+      });
+      
+      console.log('Modal visible after advanced triggering:', modalVisible);
       
       // Re-check for inputs after modal trigger
       const inputsAfterTrigger = await page.evaluate(() => {
@@ -410,10 +541,11 @@ export class HeadlessBrowserService {
           id: input.id || '',
           placeholder: input.placeholder || '',
           className: input.className || '',
-          visible: input.offsetParent !== null && input.style.display !== 'none'
+          visible: input.offsetParent !== null && input.style.display !== 'none',
+          parentVisible: input.parentElement ? (input.parentElement as HTMLElement).offsetParent !== null : false
         }));
       });
-      console.log('Inputs after modal trigger:', inputsAfterTrigger);
+      console.log('Inputs after advanced modal triggering:', inputsAfterTrigger);
 
       console.log('Now looking for email input in the modal...');
 

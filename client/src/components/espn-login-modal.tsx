@@ -304,17 +304,26 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
               <Button
                 type="button"
                 variant="outline"
-                className="w-full opacity-50"
-                disabled={true}
+                className="w-full"
+                disabled={loginMutation.isPending || debugLoginMutation.isPending}
+                onClick={() => debugLoginMutation.mutate(loginForm.getValues())}
                 data-testid="button-debug-login"
               >
-                🐛 Debug Mode (Not Available)
-                <Eye className="ml-2 h-4 w-4" />
+                {debugLoginMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Advanced Authentication...
+                  </>
+                ) : (
+                  <>
+                    🚀 Advanced Login Mode
+                    <Eye className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
               
               <p className="text-xs text-muted-foreground text-center">
-                ⚠️ Debug mode not available in Replit environment.<br/>
-                Use "Manual Cookie Entry" in Authentication page instead.
+                Advanced mode uses multiple automation strategies for complex login systems
               </p>
             </div>
           </form>
