@@ -8,9 +8,6 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Development mode: SSL certificate validation disabled for ESPN API calls');
 }
 
-// Set Chromium path for Playwright
-process.env.CHROMIUM_PATH = '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
-
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
