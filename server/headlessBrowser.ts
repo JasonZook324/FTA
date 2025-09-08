@@ -147,10 +147,10 @@ export class HeadlessBrowserService {
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       await page.setViewport({ width: 1280, height: 720 });
 
-      console.log('Navigating to ESPN Fantasy homepage...');
+      console.log('Navigating directly to ESPN login page...');
       
-      // Start from ESPN Fantasy homepage (where real users would go)
-      await page.goto('https://fantasy.espn.com/', { 
+      // Navigate directly to the ESPN login page
+      await page.goto('https://secure.web.plus.espn.com/identity/login?locale=en', { 
         waitUntil: 'networkidle2',
         timeout: 30000
       });
@@ -159,123 +159,10 @@ export class HeadlessBrowserService {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       let currentUrl = page.url();
-      console.log('Current URL after fantasy page load:', currentUrl);
+      console.log('Current URL after login page load:', currentUrl);
 
-      // Look for and click the actual "Log In" button that users click
-      console.log('Looking for login button...');
-      let loginClicked = false;
-      
-      // Try multiple login button selectors
-      const loginSelectors = [
-        'a:contains("Log In")',
-        'button:contains("Log In")', 
-        'a[href*="login"]',
-        '.login-link',
-        '#login-button'
-      ];
-      
-      for (const selector of loginSelectors) {
-        try {
-          if (selector.includes('contains')) {
-            const text = selector.split('("')[1].split('")')[0];
-            const loginButton = await page.evaluateHandle((text) => {
-              const elements = Array.from(document.querySelectorAll('a, button'));
-              return elements.find(el => el.textContent?.trim().includes(text)) || null;
-            }, text);
-            
-            if (loginButton && await loginButton.asElement()) {
-              console.log('Found login button with text:', text);
-              await (loginButton as any).click();
-              loginClicked = true;
-              break;
-            }
-          } else {
-            const loginButton = await page.$(selector);
-            if (loginButton) {
-              console.log('Found login button with selector:', selector);
-              await loginButton.click();
-              loginClicked = true;
-              break;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (!loginClicked) {
-        console.log('No login button found, trying to trigger login via script...');
-        // Try to trigger any login-related JavaScript
-        await page.evaluate(() => {
-          // Look for login-related functions or events
-          const loginElements = document.querySelectorAll('a, button');
-          const elementsArray = Array.from(loginElements);
-          for (const el of elementsArray) {
-            if (el.textContent?.toLowerCase().includes('log')) {
-              (el as HTMLElement).click();
-              break;
-            }
-          }
-        });
-      }
-
-      // Wait for login modal/overlay and dynamic content to load
-      console.log('Waiting for login modal/overlay and dynamic content...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      currentUrl = page.url();
-      console.log('URL after login button click:', currentUrl);
-
-      // Check for iframes that might contain the login form
-      console.log('Checking for iframes...');
-      const iframes = await page.$$('iframe');
-      console.log(`Found ${iframes.length} iframes`);
-      
-      // Look for Disney/OneID specific elements
-      console.log('Looking for Disney OneID elements...');
-      const disneyElements = await page.evaluate(() => {
-        const elements = Array.from(document.querySelectorAll('*'));
-        return elements.filter(el => {
-          const idStr = el.id || '';
-          const classStr = el.className?.toString() || '';
-          return idStr.includes('disney') || 
-                 classStr.includes('disney') ||
-                 idStr.includes('oneid') ||
-                 classStr.includes('oneid');
-        }).map(el => ({
-          tagName: el.tagName,
-          id: el.id || '',
-          className: el.className?.toString() || ''
-        }));
-      });
-      console.log('Disney/OneID elements found:', disneyElements);
-
-      // Try to execute JavaScript to manually trigger login form
-      console.log('Attempting to trigger login form via JavaScript...');
-      await page.evaluate(() => {
-        // Try to trigger any Disney OneID initialization
-        if (typeof (window as any).DISNEY !== 'undefined' && (window as any).DISNEY.Login) {
-          try {
-            (window as any).DISNEY.Login.show();
-          } catch (e) {
-            console.log('Disney login trigger failed:', e);
-          }
-        }
-        
-        // Try to find and trigger any login-related functions
-        const possibleFunctions = ['showLogin', 'openLogin', 'initLogin', 'displayLogin'];
-        for (const funcName of possibleFunctions) {
-          if (typeof (window as any)[funcName] === 'function') {
-            try {
-              (window as any)[funcName]();
-            } catch (e) {
-              console.log(`Failed to call ${funcName}:`, e);
-            }
-          }
-        }
-      });
-
-      // Wait longer for dynamic content after JavaScript execution
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // We're now directly on the login page
+      console.log('Now on the login page, looking for email input...');
 
       // Wait and look for login form with multiple strategies including iframes
       console.log('Looking for login form...');
@@ -323,149 +210,37 @@ export class HeadlessBrowserService {
           }
         }
         
-        // If not found on main page, focus on OneID iframe specifically
+        // Check for iframes only if needed (shouldn't be necessary on direct login page)
+        const iframes = await page.$$('iframe');
         if (!emailInput && iframes.length > 0) {
-          console.log('Looking for OneID iframe specifically...');
-          
-          // First, try to find the OneID iframe
-          let oneidIframe = null;
-          try {
-            oneidIframe = await page.$('#oneid-iframe');
-            if (oneidIframe) {
-              console.log('Found OneID iframe, waiting for content to load...');
-              
-              // Wait longer for OneID iframe to fully load
-              await new Promise(resolve => setTimeout(resolve, 10000));
-              
-              const frame = await oneidIframe.contentFrame();
+          console.log('Checking iframes for login form...');
+          for (let i = 0; i < iframes.length && i < 3; i++) { // Limit to first 3 iframes
+            try {
+              const frame = await iframes[i].contentFrame();
               if (frame) {
-                console.log('Accessing OneID iframe content...');
+                console.log(`Checking iframe ${i + 1}...`);
                 
-                // Wait for the iframe to be ready
-                try {
-                  await frame.waitForSelector('body', { timeout: 5000 });
-                  
-                  // Check what's inside the OneID iframe
-                  const frameContent = await frame.content();
-                  console.log('OneID iframe content preview:', frameContent.substring(0, 500));
-                  
-                  // Look for all inputs in the iframe
-                  const allFrameInputs = await frame.evaluate(() => {
-                    const inputs = Array.from(document.querySelectorAll('input'));
-                    return inputs.map(input => ({
-                      type: input.type,
-                      name: input.name || '',
-                      id: input.id || '',
-                      placeholder: input.placeholder || '',
-                      className: input.className || '',
-                      visible: input.offsetParent !== null
-                    }));
-                  });
-                  console.log('OneID iframe inputs:', allFrameInputs);
-                  
-                  // Check if we found session-id input (indicates OneID is loading)
-                  const hasSessionId = allFrameInputs.some(input => input.id === 'session-id');
-                  if (hasSessionId) {
-                    console.log('Found session-id input, waiting for login form to appear...');
+                // Look for inputs within the iframe
+                for (const selector of emailSelectors) {
+                  try {
+                    const frameInputs = await frame.$$(selector);
                     
-                    // Try to trigger the login form by clicking or focusing elements
-                    try {
-                      await frame.evaluate(() => {
-                        // Try to trigger login form appearance
-                        const buttons = Array.from(document.querySelectorAll('button, [role="button"], .btn, .button'));
-                        const links = Array.from(document.querySelectorAll('a'));
-                        
-                        // Look for login-related buttons/links
-                        const loginTriggers = [...buttons, ...links].filter(el => {
-                          const text = el.textContent?.toLowerCase() || '';
-                          const attrs = (el.getAttribute('class') || '') + ' ' + (el.getAttribute('id') || '');
-                          return text.includes('log') || text.includes('sign') || attrs.includes('login') || attrs.includes('signin');
-                        });
-                        
-                        if (loginTriggers.length > 0) {
-                          console.log('Clicking login trigger...');
-                          (loginTriggers[0] as HTMLElement).click();
-                        }
-                      });
-                      
-                      // Wait for login form to appear
-                      await new Promise(resolve => setTimeout(resolve, 5000));
-                      
-                      // Check for inputs again
-                      const updatedInputs = await frame.evaluate(() => {
-                        const inputs = Array.from(document.querySelectorAll('input'));
-                        return inputs.map(input => ({
-                          type: input.type,
-                          name: input.name || '',
-                          id: input.id || '',
-                          placeholder: input.placeholder || '',
-                          className: input.className || '',
-                          visible: input.offsetParent !== null
-                        }));
-                      });
-                      console.log('Updated OneID iframe inputs after trigger:', updatedInputs);
-                      
-                    } catch (e) {
-                      console.log('Error triggering login form:', (e as Error).message);
-                    }
-                  }
-                  
-                  // Look for email inputs in OneID iframe
-                  for (const selector of emailSelectors) {
-                    try {
-                      const frameInputs = await frame.$$(selector);
-                      if (frameInputs.length > 0) {
-                        emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
-                        if (emailInput) {
-                          console.log('Found email input in OneID iframe');
-                          break;
-                        }
+                    if (frameInputs.length > 0) {
+                      emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
+                      if (emailInput) {
+                        console.log(`Found email input in iframe ${i + 1}`);
+                        break;
                       }
-                    } catch (e) {
-                      continue;
                     }
+                  } catch (e) {
+                    continue;
                   }
-                } catch (e) {
-                  console.log('OneID iframe not ready or accessible:', (e as Error).message);
                 }
+                if (emailInput) break;
               }
-            }
-          } catch (e) {
-            console.log('Could not access OneID iframe:', (e as Error).message);
-          }
-          
-          // If OneID iframe didn't work, check other iframes
-          if (!emailInput) {
-            console.log('Checking other iframes for login form...');
-            for (let i = 0; i < iframes.length; i++) {
-              try {
-                const frame = await iframes[i].contentFrame();
-                if (frame) {
-                  console.log(`Checking iframe ${i + 1}...`);
-                  
-                  // Look for inputs within the iframe
-                  for (const selector of emailSelectors) {
-                    try {
-                      await frame.waitForSelector(selector, { timeout: 2000 });
-                      const frameInputs = await frame.$$(selector);
-                      
-                      if (frameInputs.length > 0) {
-                        emailInput = await this.checkInputsForEmailInFrame(frame, frameInputs);
-                        if (emailInput) {
-                          console.log(`Found email input in iframe ${i + 1}`);
-                          break;
-                        }
-                      }
-                    } catch (e) {
-                      continue;
-                    }
-                  }
-                  if (emailInput) break;
-                }
-              } catch (e) {
-                console.log(`Failed to access iframe ${i + 1}:`, (e as Error).message);
-                continue;
-              }
+            } catch (e) {
+              console.log(`Failed to access iframe ${i + 1}:`, (e as Error).message);
+              continue;
             }
           }
         }
