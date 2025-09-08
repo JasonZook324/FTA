@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, BarChart3 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
@@ -9,17 +8,19 @@ import StandingsTable from "@/components/standings-table";
 
 export default function Standings() {
   const [userId] = useState("default-user");
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
 
   // Query user leagues
   const { data: leagues } = useQuery({
     queryKey: ["/api/leagues", userId],
   });
 
-  // Query standings data
+  // Get the current league (first one in the list)
+  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 ? leagues[0] : null;
+
+  // Query standings data for current league
   const { data: standingsData, isLoading: standingsLoading } = useQuery({
-    queryKey: ["/api/leagues", selectedLeagueId, "standings"],
-    enabled: !!selectedLeagueId,
+    queryKey: ["/api/leagues", currentLeague?.id, "standings"],
+    enabled: !!currentLeague?.id,
   });
 
   return (
@@ -32,22 +33,10 @@ export default function Standings() {
             <p className="text-muted-foreground">View team rankings and records</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-              <SelectTrigger className="w-48" data-testid="select-league">
-                <SelectValue placeholder="Select a league" />
-              </SelectTrigger>
-              <SelectContent>
-                {leagues?.map((league: any) => (
-                  <SelectItem key={league.id} value={league.id}>
-                    {league.name} ({league.season})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button
               variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", selectedLeagueId, "standings"] })}
-              disabled={!selectedLeagueId}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", currentLeague?.id, "standings"] })}
+              disabled={!currentLeague}
               data-testid="button-refresh"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -59,12 +48,15 @@ export default function Standings() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-6">
-        {!selectedLeagueId ? (
+        {!currentLeague ? (
           <Card className="h-96">
             <CardContent className="flex items-center justify-center h-full">
               <div className="text-center">
                 <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Select a league to view standings</p>
+                <p className="text-muted-foreground">No league loaded</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Please configure your ESPN credentials to view standings
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -72,7 +64,7 @@ export default function Standings() {
           <StandingsTable 
             data={standingsData} 
             isLoading={standingsLoading}
-            leagueId={selectedLeagueId}
+            leagueId={currentLeague.id}
           />
         )}
       </main>
