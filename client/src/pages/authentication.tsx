@@ -32,8 +32,8 @@ export default function Authentication() {
   }>({
     isActive: false,
     step: "idle", 
-    email: "",
-    password: "",
+    email: "jasonazook@gmail.com",
+    password: "J@50nZ00k0324!",
     verificationCode: ""
   }); // In a real app, this would come from auth context
 
