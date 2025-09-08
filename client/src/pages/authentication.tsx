@@ -25,6 +25,7 @@ type CredentialsFormData = z.infer<typeof credentialsFormSchema>;
 export default function Authentication() {
   const { toast } = useToast();
   const [userId] = useState("default-user"); // In a real app, this would come from auth context
+  const [showCredentialsForm, setShowCredentialsForm] = useState(false);
 
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
@@ -57,6 +58,11 @@ export default function Authentication() {
         testLeagueId: credentials.testLeagueId || "",
         testSeason: credentials.testSeason || 2024,
       });
+      // Hide form if credentials are valid, show if invalid or don't exist
+      setShowCredentialsForm(!credentials.isValid);
+    } else {
+      // No credentials exist, show form
+      setShowCredentialsForm(true);
     }
   }, [credentials, userId, form]);
 
@@ -72,6 +78,7 @@ export default function Authentication() {
         description: "ESPN credentials saved successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      setShowCredentialsForm(false);
     },
     onError: (error: Error) => {
       toast({
@@ -209,56 +216,65 @@ export default function Authentication() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {credentials && (
-                <div className="mb-4 space-y-3">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Status:</span>
-                      <Badge variant={credentials.isValid ? "default" : "destructive"}>
-                        {credentials.isValid ? "Valid" : "Invalid"}
+              {credentials && !showCredentialsForm ? (
+                <div className="mb-6 space-y-4">
+                  {/* Authentication Status Card */}
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <span className="font-semibold text-green-800 dark:text-green-200">Connected to ESPN</span>
+                      </div>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                        {credentials.isValid ? "Authenticated" : "Needs Validation"}
                       </Badge>
                     </div>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Your ESPN credentials are configured and working properly
+                    </p>
                     {credentials.lastValidated && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Last validated: {new Date(credentials.lastValidated).toLocaleString()}
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        Last verified: {new Date(credentials.lastValidated).toLocaleString()}
                       </p>
                     )}
                   </div>
-                  
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <h4 className="text-sm font-medium mb-2">Currently Stored Values:</h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium">ESPN S2 Cookie:</span>
-                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs break-all">
-                          {credentials.espnS2 ? `${credentials.espnS2.substring(0, 50)}...` : "Not set"}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium">SWID:</span>
-                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
-                          {credentials.swid || "Not set"}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium">Test League ID:</span>
-                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
-                          {credentials.testLeagueId || "Not set"}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium">Test Season:</span>
-                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
-                          {credentials.testSeason || "Not set"}
+
+                  {/* League Connection Info */}
+                  {credentials.testLeagueId && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium">Connected League:</span>
+                          <p className="text-xs text-muted-foreground">League ID {credentials.testLeagueId} • Season {credentials.testSeason}</p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {/* Edit Credentials Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCredentialsForm(true)}
+                    className="w-full"
+                    data-testid="button-edit-credentials"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Modify Credentials
+                  </Button>
+                </div>
+              ) : null}
+
+              {showCredentialsForm && (
+                <>
+                  {credentials && !credentials.isValid && (
+                    <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <p className="text-sm text-destructive">
+                        Your current credentials are invalid. Please update them below.
+                      </p>
+                    </div>
+                  )}
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="espnS2"
@@ -370,8 +386,22 @@ export default function Authentication() {
                       {validateCredentialsMutation.isPending ? "Validating..." : "Validate"}
                     </Button>
                   </div>
-                </form>
-              </Form>
+                    </form>
+                  </Form>
+                  
+                  {!credentials && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowCredentialsForm(false)}
+                      className="w-full mt-4"
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -460,9 +490,9 @@ export default function Authentication() {
                         </div>
                       ))}
                     </div>
-                  ) : leagues && leagues.length > 0 ? (
+                  ) : leagues && Array.isArray(leagues) && leagues.length > 0 ? (
                     <div className="space-y-4">
-                      {leagues.map((league: any) => (
+                      {(leagues as any[]).map((league: any) => (
                         <Card key={league.id} className="p-4">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold text-foreground">{league.name}</h4>
