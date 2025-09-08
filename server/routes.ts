@@ -23,81 +23,89 @@ class EspnApiService {
 
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
-      console.log('ESPN API validation - testing credentials by accessing user-specific endpoints...');
+      console.log('ESPN API validation - testing credentials by fetching user leagues...');
       
-      // Test endpoints that require actual user authentication and will return 401/403 for invalid cookies
-      // These endpoints try to access user-specific data that requires valid authentication
-      const testEndpoints = [
-        // Try user's private league access endpoints - these will fail with 401/403 for invalid cookies
-        { url: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/1/2024?view=mTeam`, season: 2024 },
-        { url: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1/2025?view=mTeam`, season: 2025 },
-        // Try accessing protected user profile endpoints
-        { url: `https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/profile`, season: 'profile' },
-      ];
+      // Test by attempting to access a known league endpoint that requires authentication
+      // We'll try to access a league that requires valid credentials - invalid creds get 401/403
+      const testSeasons = [2024, 2025];
       
-      let authenticationWorked = false;
-      
-      for (const endpoint of testEndpoints) {
-        console.log(`ESPN API test URL (${endpoint.season}):`, endpoint.url);
+      for (const season of testSeasons) {
+        // Use a common test league ID that ESPN uses for validation
+        const testLeagueId = 123456; // This should return 401/403 for invalid credentials
+        const testUrl = `${this.baseUrl}/ffl/seasons/${season}/segments/0/leagues/${testLeagueId}?view=mTeam`;
+        console.log(`ESPN API test URL (season ${season}):`, testUrl);
         
         try {
-          const response = await fetch(endpoint.url, { 
+          const response = await fetch(testUrl, { 
             method: 'GET',
             headers: this.getHeaders(credentials)
           });
           
-          console.log(`ESPN API response status (${endpoint.season}):`, response.status);
+          console.log(`ESPN API response status (season ${season}):`, response.status);
           
-          // Invalid credentials should return 401/403 - this is what we expect for bad cookies
-          if (response.status === 401 || response.status === 403) {
-            console.log(`ESPN API validation - authentication failed (${response.status}) - cookies are invalid`);
-            continue; // Try next endpoint, but this suggests invalid credentials
+          // Invalid credentials return 401 Unauthorized - this is definitive proof credentials are bad
+          if (response.status === 401) {
+            console.log(`ESPN API validation - FAILED: Got 401 Unauthorized, credentials are invalid`);
+            return false;
           }
           
-          // Valid authentication should return 200 or other success codes
-          if (response.status === 200 || response.status === 404) {
-            console.log(`ESPN API validation - received ${response.status} status - credentials can authenticate`);
-            authenticationWorked = true;
-            
+          // Forbidden usually means authenticated but no access - still means auth worked
+          if (response.status === 403) {
+            console.log(`ESPN API validation - Got 403 Forbidden - credentials are valid but no access to this league`);
+            return true;
+          }
+          
+          // 200 means credentials are valid and have access
+          if (response.status === 200) {
+            console.log(`ESPN API validation - SUCCESS: Got 200, credentials are valid`);
+            return true;
+          }
+          
+          // 404 is ambiguous - could be invalid creds OR league doesn't exist
+          // Let's check the response content to distinguish
+          if (response.status === 404) {
             try {
-              const data = await response.json();
-              console.log(`ESPN API validation - received response with keys:`, Object.keys(data));
+              const errorData = await response.json();
+              console.log(`ESPN API validation - Got 404, checking response:`, errorData);
               
-              // If we can parse the response, authentication worked
-              if (data && typeof data === 'object') {
-                console.log(`ESPN API validation - SUCCESS: Valid authentication confirmed`);
-                return true;
+              // Check if the error message indicates authentication issues
+              if (errorData.messages && errorData.messages.some((msg: any) => 
+                  msg.message && (
+                    msg.message.toLowerCase().includes('unauthorized') ||
+                    msg.message.toLowerCase().includes('authentication') ||
+                    msg.message.toLowerCase().includes('login')
+                  )
+                )) {
+                console.log(`ESPN API validation - FAILED: 404 with auth-related error, credentials are invalid`);
+                return false;
               }
+              
+              // If it's just "not found" without auth errors, credentials might be valid
+              console.log(`ESPN API validation - Got 404 but no auth errors - trying next season...`);
+              continue;
+              
             } catch (parseError) {
-              // Even if JSON parsing fails, a 200 status means authentication worked
-              console.log(`ESPN API validation - Authentication worked (got ${response.status}) but JSON parse failed:`, parseError);
-              if (response.status === 200) {
-                return true;
-              }
+              console.log(`ESPN API validation - Failed to parse 404 response, trying next season...`);
+              continue;
             }
           }
           
-          // Handle other status codes
-          if (!response.ok && response.status !== 401 && response.status !== 403 && response.status !== 404) {
+          // Other error codes
+          if (!response.ok) {
             const errorText = await response.text();
-            console.log(`ESPN API response (${endpoint.season}): Status ${response.status} - ${errorText}`);
-            // Continue trying other endpoints
+            console.log(`ESPN API error (season ${season}): ${response.status} - ${errorText}`);
+            continue;
           }
           
         } catch (requestError) {
-          console.log(`ESPN API validation - request error for ${endpoint.season}:`, requestError);
-          continue; // Try next endpoint
+          console.log(`ESPN API validation - request error for season ${season}:`, requestError);
+          continue;
         }
       }
       
-      // Final determination - if we never got successful authentication, credentials are invalid
-      if (!authenticationWorked) {
-        console.log('ESPN API validation - FAILED: No successful authentication found, credentials are invalid');
-        return false;
-      }
-      
-      console.log('ESPN API validation - SUCCESS: Authentication validated');
-      return true;
+      // If we get here, we never got a definitive answer - assume invalid for security
+      console.log('ESPN API validation - FAILED: Could not validate credentials definitively, assuming invalid');
+      return false;
       
     } catch (error) {
       console.log('ESPN API validation error:', error);
