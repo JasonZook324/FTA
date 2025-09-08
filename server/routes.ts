@@ -352,18 +352,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/espn-credentials/:userId/validate", async (req, res) => {
     try {
-      const credentials = await storage.getEspnCredentials(req.params.userId);
+      const userId = req.params.userId;
+      const credentials = await storage.getEspnCredentials(userId);
       if (!credentials) {
         return res.status(404).json({ message: "ESPN credentials not found" });
       }
 
       const isValid = await espnApiService.validateCredentials(credentials);
-      await storage.updateEspnCredentials(req.params.userId, {
+      await storage.updateEspnCredentials(userId, {
         isValid,
         lastValidated: new Date()
       });
 
-      res.json({ isValid, lastValidated: new Date() });
+      if (isValid && credentials.testLeagueId && credentials.testSeason) {
+        try {
+          console.log(`Auto-loading league: ${credentials.testLeagueId} for season ${credentials.testSeason}`);
+          
+          // Fetch league data from ESPN
+          const leagueData = await espnApiService.getLeagueData(
+            credentials,
+            'ffl', // Default to football
+            credentials.testSeason,
+            credentials.testLeagueId,
+            ['mTeam', 'mSettings']
+          );
+          
+          // Parse and store league information
+          const leagueInfo = {
+            userId,
+            espnLeagueId: credentials.testLeagueId,
+            name: leagueData.settings?.name || `League ${credentials.testLeagueId}`,
+            sport: 'ffl',
+            season: credentials.testSeason,
+            teamCount: leagueData.teams?.length || 0,
+            currentWeek: leagueData.scoringPeriodId || 1,
+            playoffTeams: leagueData.settings?.playoffTeamCount || 6,
+            scoringType: leagueData.settings?.scoringType || "Head-to-Head Points",
+            tradeDeadline: leagueData.settings?.tradeDeadline || null,
+            settings: leagueData.settings || {}
+          };
+
+          const league = await storage.createLeague(leagueInfo);
+          console.log(`Auto-loaded league: ${league.name}`);
+
+          // Store teams
+          if (leagueData.teams) {
+            for (const team of leagueData.teams) {
+              await storage.createTeam({
+                espnTeamId: team.id,
+                leagueId: league.id,
+                name: team.location + ' ' + team.nickname || `Team ${team.id}`,
+                owner: team.owners?.[0]?.displayName || team.owners?.[0]?.firstName + ' ' + team.owners?.[0]?.lastName,
+                abbreviation: team.abbrev,
+                logoUrl: team.logo,
+                wins: team.record?.overall?.wins || 0,
+                losses: team.record?.overall?.losses || 0,
+                ties: team.record?.overall?.ties || 0,
+                pointsFor: team.record?.overall?.pointsFor?.toString() || "0",
+                pointsAgainst: team.record?.overall?.pointsAgainst?.toString() || "0",
+                streak: `${team.record?.overall?.streakType || 'W'} ${team.record?.overall?.streakLength || 0}`,
+                rank: team.playoffSeed || team.rank || 0
+              });
+            }
+          }
+
+          res.json({ 
+            isValid, 
+            lastValidated: new Date(),
+            autoLoaded: true,
+            league: {
+              id: league.id,
+              name: league.name,
+              teamCount: leagueData.teams?.length || 0
+            }
+          });
+        } catch (autoLoadError: any) {
+          console.error('Auto-load league error:', autoLoadError);
+          // Still return success for validation, but indicate auto-load failed
+          res.json({ 
+            isValid, 
+            lastValidated: new Date(),
+            autoLoaded: false,
+            autoLoadError: autoLoadError.message
+          });
+        }
+      } else {
+        res.json({ isValid, lastValidated: new Date(), autoLoaded: false });
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

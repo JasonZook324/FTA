@@ -83,9 +83,17 @@ export default function Authentication() {
     },
     onSuccess: (data) => {
       if (data.isValid) {
+        let description = "ESPN credentials are valid";
+        
+        if (data.autoLoaded && data.league) {
+          description = `ESPN credentials are valid and league "${data.league.name}" has been automatically loaded with ${data.league.teamCount} teams`;
+        } else if (data.autoLoaded === false && data.autoLoadError) {
+          description = `ESPN credentials are valid but league auto-load failed: ${data.autoLoadError}`;
+        }
+        
         toast({
           title: "Success",
-          description: "ESPN credentials are valid",
+          description: description,
         });
       } else {
         toast({
@@ -95,6 +103,7 @@ export default function Authentication() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
     },
     onError: (error: Error) => {
       toast({
