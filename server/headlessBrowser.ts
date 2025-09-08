@@ -285,7 +285,18 @@ export class HeadlessBrowserService {
         'input[name*="email"]',
         'input[id*="email"]',
         'input[name="loginValue"]',
-        'input[name="username"]'
+        'input[name="username"]',
+        'input[name="EmailAddress"]',
+        'input[placeholder*="Email" i]',
+        'input[placeholder*="username" i]',
+        'input[id*="Email" i]',
+        'input[id*="login" i]',
+        'input[class*="email" i]',
+        'input[class*="username" i]',
+        'input[class*="Email" i]',
+        'input[class*="login" i]',
+        'input[data-testid*="email" i]',
+        'input[data-testid*="username" i]'
       ];
 
       let emailInput = null;
@@ -346,10 +357,58 @@ export class HeadlessBrowserService {
                       name: input.name || '',
                       id: input.id || '',
                       placeholder: input.placeholder || '',
-                      className: input.className || ''
+                      className: input.className || '',
+                      visible: input.offsetParent !== null
                     }));
                   });
                   console.log('OneID iframe inputs:', allFrameInputs);
+                  
+                  // Check if we found session-id input (indicates OneID is loading)
+                  const hasSessionId = allFrameInputs.some(input => input.id === 'session-id');
+                  if (hasSessionId) {
+                    console.log('Found session-id input, waiting for login form to appear...');
+                    
+                    // Try to trigger the login form by clicking or focusing elements
+                    try {
+                      await frame.evaluate(() => {
+                        // Try to trigger login form appearance
+                        const buttons = Array.from(document.querySelectorAll('button, [role="button"], .btn, .button'));
+                        const links = Array.from(document.querySelectorAll('a'));
+                        
+                        // Look for login-related buttons/links
+                        const loginTriggers = [...buttons, ...links].filter(el => {
+                          const text = el.textContent?.toLowerCase() || '';
+                          const attrs = (el.getAttribute('class') || '') + ' ' + (el.getAttribute('id') || '');
+                          return text.includes('log') || text.includes('sign') || attrs.includes('login') || attrs.includes('signin');
+                        });
+                        
+                        if (loginTriggers.length > 0) {
+                          console.log('Clicking login trigger...');
+                          (loginTriggers[0] as HTMLElement).click();
+                        }
+                      });
+                      
+                      // Wait for login form to appear
+                      await new Promise(resolve => setTimeout(resolve, 5000));
+                      
+                      // Check for inputs again
+                      const updatedInputs = await frame.evaluate(() => {
+                        const inputs = Array.from(document.querySelectorAll('input'));
+                        return inputs.map(input => ({
+                          type: input.type,
+                          name: input.name || '',
+                          id: input.id || '',
+                          placeholder: input.placeholder || '',
+                          className: input.className || '',
+                          visible: input.offsetParent !== null
+                        }));
+                      });
+                      console.log('Updated OneID iframe inputs after trigger:', updatedInputs);
+                      
+                    } catch (e) {
+                      console.log('Error triggering login form:', (e as Error).message);
+                    }
+                  }
                   
                   // Look for email inputs in OneID iframe
                   for (const selector of emailSelectors) {
