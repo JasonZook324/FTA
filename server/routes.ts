@@ -371,16 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the automation module dynamically to avoid issues
       const { espnLoginAutomation } = await import('./espnLoginAutomation');
       
-      // Try headless first, fallback to non-headless if needed
-      let headless = true;
-      try {
-        await espnLoginAutomation.initialize(headless);
-      } catch (error) {
-        console.log('Headless mode failed, trying with display mode:', error);
-        headless = false;
-        await espnLoginAutomation.initialize(headless);
-      }
-      
+      await espnLoginAutomation.initialize(false); // Run in non-headless mode for user interaction
       const result = await espnLoginAutomation.startLogin(email);
       
       if (result.success && result.waitingForMFA) {
