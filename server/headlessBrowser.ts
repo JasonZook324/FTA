@@ -155,11 +155,30 @@ export class HeadlessBrowserService {
         timeout: 30000
       });
 
-      // Wait for page to fully load
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for page to fully load and any dynamic content
+      console.log('Waiting for login form to fully load...');
+      await new Promise(resolve => setTimeout(resolve, 8000)); // Increased wait time
       
       let currentUrl = page.url();
       console.log('Current URL after login page load:', currentUrl);
+
+      // Log what's actually on the page for debugging
+      const pageTitle = await page.title();
+      console.log('Page title:', pageTitle);
+      
+      // Check for all inputs on the page to debug
+      const allInputs = await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        return inputs.map(input => ({
+          type: input.type,
+          name: input.name || '',
+          id: input.id || '',
+          placeholder: input.placeholder || '',
+          className: input.className || '',
+          visible: input.offsetParent !== null && input.style.display !== 'none'
+        }));
+      });
+      console.log('All inputs found on page:', allInputs);
 
       // We're now directly on the login page
       console.log('Now on the login page, looking for email input...');
@@ -167,23 +186,37 @@ export class HeadlessBrowserService {
       // Wait and look for login form with multiple strategies including iframes
       console.log('Looking for login form...');
       const emailSelectors = [
+        // Specific type and name patterns
         'input[type="email"]',
-        'input[placeholder*="email"]', 
-        'input[name*="email"]',
-        'input[id*="email"]',
-        'input[name="loginValue"]',
+        'input[type="text"]', // Generic text input - often used for email/username
         'input[name="username"]',
+        'input[name="email"]',
+        'input[name="loginValue"]',
         'input[name="EmailAddress"]',
-        'input[placeholder*="Email" i]',
+        
+        // Placeholder text patterns (case insensitive)
+        'input[placeholder*="email" i]',
         'input[placeholder*="username" i]',
-        'input[id*="Email" i]',
+        'input[placeholder*="Email Address" i]',
+        'input[placeholder*="Username or Email" i]',
+        'input[placeholder*="Username or Email Address" i]',
+        
+        // ID patterns (case insensitive)
+        'input[id*="email" i]',
+        'input[id*="username" i]',
         'input[id*="login" i]',
+        'input[id*="user" i]',
+        
+        // Class patterns (case insensitive)
         'input[class*="email" i]',
         'input[class*="username" i]',
-        'input[class*="Email" i]',
         'input[class*="login" i]',
+        'input[class*="user" i]',
+        
+        // Data attributes
         'input[data-testid*="email" i]',
-        'input[data-testid*="username" i]'
+        'input[data-testid*="username" i]',
+        'input[data-testid*="user" i]'
       ];
 
       let emailInput = null;
