@@ -24,53 +24,72 @@ class EspnApiService {
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
       console.log('ESPN API validation - testing credentials...');
-      // Test by checking user's active leagues - this requires valid authentication
-      const testUrl = `${this.baseUrl}/ffl/seasons/2024/segments/0/leagues?view=mTeam`;
-      console.log('ESPN API test URL:', testUrl);
+      // Test with multiple known working endpoints to validate credentials
+      const testEndpoints = [
+        // Try user's fantasy profile endpoint - requires authentication
+        `${this.baseUrl}/ffl/seasons/2024`,
+        // Fallback to a league endpoint that requires auth
+        `${this.baseUrl}/ffl/seasons/2024/segments/0/leaguedefaults/3?view=mTeam`
+      ];
       
-      const response = await fetch(testUrl, { 
-        method: 'GET',
-        headers: this.getHeaders(credentials)
-      });
-      
-      console.log('ESPN API response status:', response.status);
-      
-      // Check for authentication errors
-      if (response.status === 401 || response.status === 403) {
-        console.log('ESPN API validation - authentication failed (401/403)');
-        return false;
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('ESPN API error response:', errorText);
-        return false;
-      }
-      
-      // Parse response and check for leagues
-      try {
-        const data = await response.json();
-        console.log('ESPN API validation - received response with keys:', Object.keys(data));
+      for (const testUrl of testEndpoints) {
+        console.log('ESPN API test URL:', testUrl);
         
-        // Valid credentials should return an array of leagues or an object with leagues
-        // Invalid credentials return empty arrays or error objects
-        let hasActiveLeagues = false;
-        
-        if (Array.isArray(data) && data.length > 0) {
-          hasActiveLeagues = true;
-          console.log(`ESPN API validation - found ${data.length} leagues`);
-        } else if (data && typeof data === 'object' && data.leagues && Array.isArray(data.leagues) && data.leagues.length > 0) {
-          hasActiveLeagues = true;
-          console.log(`ESPN API validation - found ${data.leagues.length} leagues`);
-        } else {
-          console.log('ESPN API validation - no active leagues found, credentials likely invalid');
+        try {
+          const response = await fetch(testUrl, { 
+            method: 'GET',
+            headers: this.getHeaders(credentials)
+          });
+          
+          console.log('ESPN API response status:', response.status);
+          
+          // Check for authentication errors
+          if (response.status === 401 || response.status === 403) {
+            console.log('ESPN API validation - authentication failed (401/403)');
+            continue; // Try next endpoint
+          }
+          
+          if (response.status === 404) {
+            console.log('ESPN API validation - endpoint not found (404), trying next...');
+            continue; // Try next endpoint
+          }
+          
+          if (response.status === 405) {
+            console.log('ESPN API validation - method not supported (405), trying next...');
+            continue; // Try next endpoint
+          }
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.log('ESPN API error response:', errorText);
+            continue; // Try next endpoint
+          }
+          
+          // Parse response to validate it's proper JSON
+          try {
+            const data = await response.json();
+            console.log('ESPN API validation - received valid response with keys:', Object.keys(data));
+            
+            // If we get valid JSON response from an authenticated endpoint, credentials are valid
+            // We don't need to check for leagues specifically, just that we can access authenticated content
+            if (data && typeof data === 'object') {
+              console.log('ESPN API validation - credentials are valid (received authenticated response)');
+              return true;
+            }
+          } catch (parseError) {
+            console.log('ESPN API validation - failed to parse response as JSON:', parseError);
+            continue; // Try next endpoint
+          }
+        } catch (requestError) {
+          console.log('ESPN API validation - request error:', requestError);
+          continue; // Try next endpoint
         }
-        
-        return hasActiveLeagues;
-      } catch (parseError) {
-        console.log('ESPN API validation - failed to parse response as JSON:', parseError);
-        return false;
       }
+      
+      // If we get here, all endpoints failed
+      console.log('ESPN API validation - all test endpoints failed, credentials likely invalid');
+      return false;
+      
     } catch (error) {
       console.log('ESPN API validation error:', error);
       return false;
