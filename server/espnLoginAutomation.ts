@@ -120,10 +120,12 @@ export class ESPNLoginAutomation {
             await this.page.waitForTimeout(3000);
             
             const formCheck = await this.page.evaluate(() => {
-              const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[name*="username"]');
+              // Look for the specific Disney SSO email input
+              const disneyEmailInput = document.querySelector('#InputIdentityFlowValue, input[data-testid="InputIdentityFlowValue"], input.input-InputIdentityFlowValue');
+              const genericEmailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[name*="username"]');
               const sessionIdOnly = document.querySelectorAll('input[id="session-id"]');
-              const hasRealLoginForm = emailInputs.length > 0;
-              const onlySessionId = sessionIdOnly.length > 0 && emailInputs.length === 0;
+              const hasRealLoginForm = disneyEmailInput !== null || genericEmailInputs.length > 0;
+              const onlySessionId = sessionIdOnly.length > 0 && !hasRealLoginForm;
               
               return {
                 hasRealLoginForm,
@@ -399,37 +401,44 @@ export class ESPNLoginAutomation {
       // Try multiple strategies to find login elements
       let emailInput: any = null;
       
-      // Strategy 1: Direct email input
+      // Strategy 1: Look for the specific Disney SSO email input first
       try {
-        await this.page.waitForSelector('input[type="email"]', { timeout: 3000 });
-        emailInput = await this.page.locator('input[type="email"]').first();
-        console.log('Found email input (type=email)');
+        await this.page.waitForSelector('#InputIdentityFlowValue, input[data-testid="InputIdentityFlowValue"], input.input-InputIdentityFlowValue', { timeout: 3000 });
+        emailInput = await this.page.locator('#InputIdentityFlowValue, input[data-testid="InputIdentityFlowValue"], input.input-InputIdentityFlowValue').first();
+        console.log('Found Disney SSO email input');
       } catch {
-        // Strategy 2: Input with email-related names/ids
+        // Strategy 2: Direct email input
         try {
-          await this.page.waitForSelector('input[name*="email"], input[id*="email"], input[placeholder*="email"]', { timeout: 3000 });
-          emailInput = await this.page.locator('input[name*="email"], input[id*="email"], input[placeholder*="email"]').first();
-          console.log('Found email input (by name/id/placeholder)');
+          await this.page.waitForSelector('input[type="email"]', { timeout: 3000 });
+          emailInput = await this.page.locator('input[type="email"]').first();
+          console.log('Found email input (type=email)');
         } catch {
-          // Strategy 3: Look for text inputs that might be email fields
+          // Strategy 3: Input with email-related names/ids
           try {
-            await this.page.waitForSelector('input[type="text"]', { timeout: 3000 });
-            emailInput = await this.page.locator('input[type="text"]').first();
-            console.log('Found text input (assuming email)');
+            await this.page.waitForSelector('input[name*="email"], input[id*="email"], input[placeholder*="email"]', { timeout: 3000 });
+            emailInput = await this.page.locator('input[name*="email"], input[id*="email"], input[placeholder*="email"]').first();
+            console.log('Found email input (by name/id/placeholder)');
           } catch {
-            // Strategy 4: Check if we need to click a login button first
+            // Strategy 4: Look for text inputs that might be email fields
             try {
-              const loginLink = await this.page.locator('a:has-text("Log In"), a:has-text("Sign In"), button:has-text("Log In")').first();
-              await loginLink.click();
-              console.log('Clicked login link/button');
-              await this.page.waitForTimeout(2000);
-              
-              // Now try to find email input again
-              await this.page.waitForSelector('input[type="email"], input[name*="email"], input[type="text"]', { timeout: 5000 });
-              emailInput = await this.page.locator('input[type="email"], input[name*="email"], input[type="text"]').first();
-              console.log('Found email input after clicking login');
+              await this.page.waitForSelector('input[type="text"]', { timeout: 3000 });
+              emailInput = await this.page.locator('input[type="text"]').first();
+              console.log('Found text input (assuming email)');
             } catch {
-              throw new Error('Could not find email input field on login page');
+              // Strategy 5: Check if we need to click a login button first
+              try {
+                const loginLink = await this.page.locator('a:has-text("Log In"), a:has-text("Sign In"), button:has-text("Log In")').first();
+                await loginLink.click();
+                console.log('Clicked login link/button');
+                await this.page.waitForTimeout(2000);
+                
+                // Now try to find email input again, prioritizing Disney SSO
+                await this.page.waitForSelector('#InputIdentityFlowValue, input[data-testid="InputIdentityFlowValue"], input[type="email"], input[name*="email"], input[type="text"]', { timeout: 5000 });
+                emailInput = await this.page.locator('#InputIdentityFlowValue, input[data-testid="InputIdentityFlowValue"], input[type="email"], input[name*="email"], input[type="text"]').first();
+                console.log('Found email input after clicking login');
+              } catch {
+                throw new Error('Could not find email input field on login page');
+              }
             }
           }
         }
