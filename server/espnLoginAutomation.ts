@@ -19,7 +19,8 @@ export class ESPNLoginAutomation {
   async initialize(headless: boolean = true): Promise<void> {
     this.browser = await chromium.launch({ 
       headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      executablePath: process.env.CHROMIUM_PATH || undefined
     });
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 720 },
