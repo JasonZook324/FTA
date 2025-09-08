@@ -29,7 +29,7 @@ export class ESPNLoginAutomation {
     this.page = await this.context.newPage();
   }
 
-  async startLogin(email: string): Promise<{ success: boolean; waitingForMFA: boolean; error?: string }> {
+  async startLogin(email: string, password: string): Promise<{ success: boolean; waitingForMFA: boolean; error?: string }> {
     if (!this.page) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -263,11 +263,45 @@ export class ESPNLoginAutomation {
       
       // Determine what happened based on page state
       if (currentState.hasPasswordField) {
-        return { 
-          success: false, 
-          waitingForMFA: false, 
-          error: 'Password required. Please use manual login or ensure your ESPN account is configured for passwordless login.' 
-        };
+        console.log('Password field detected, entering password...');
+        try {
+          const passwordInput = await this.page.locator('input[type="password"]').first();
+          await passwordInput.fill(password);
+          
+          // Click submit button
+          const submitButton = this.page.locator('button[type="submit"], button:has-text("Sign In"), button:has-text("Log In")').first();
+          await submitButton.click();
+          
+          // Wait for next step
+          await this.page.waitForTimeout(3000);
+          
+          // Check for MFA field after password entry
+          const mfaCheck = await this.page.evaluate(() => {
+            const inputs = Array.from(document.querySelectorAll('input'));
+            return inputs.some(input => 
+              input.placeholder?.toLowerCase().includes('code') ||
+              input.placeholder?.toLowerCase().includes('verification') ||
+              input.id?.toLowerCase().includes('code')
+            );
+          });
+          
+          if (mfaCheck) {
+            console.log('MFA field detected after password entry');
+            return { success: true, waitingForMFA: true };
+          } else {
+            return { 
+              success: false, 
+              waitingForMFA: false, 
+              error: 'Password entered but MFA step not reached. Please try manual login.' 
+            };
+          }
+        } catch (passwordError) {
+          return { 
+            success: false, 
+            waitingForMFA: false, 
+            error: 'Failed to enter password. Please try manual login.' 
+          };
+        }
       }
       
       if (currentState.hasMFAField) {

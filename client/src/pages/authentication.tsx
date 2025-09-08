@@ -27,11 +27,13 @@ export default function Authentication() {
     isActive: boolean;
     step: "idle" | "email" | "waiting" | "mfa" | "completing";
     email: string;
+    password: string;
     verificationCode: string;
   }>({
     isActive: false,
     step: "idle", 
     email: "",
+    password: "",
     verificationCode: ""
   }); // In a real app, this would come from auth context
 
@@ -165,7 +167,7 @@ export default function Authentication() {
     },
     onSuccess: (data) => {
       if (data.success) {
-        setAutomationState({ isActive: false, step: "idle", email: "", verificationCode: "" });
+        setAutomationState({ isActive: false, step: "idle", email: "", password: "", verificationCode: "" });
         toast({
           title: "Login Successful",
           description: "ESPN credentials have been automatically captured and saved!",
@@ -189,7 +191,7 @@ export default function Authentication() {
       return response.json();
     },
     onSuccess: () => {
-      setAutomationState({ isActive: false, step: "idle", email: "", verificationCode: "" });
+      setAutomationState({ isActive: false, step: "idle", email: "", password: "", verificationCode: "" });
       toast({
         title: "Login Cancelled",
         description: "Automated login process has been cancelled.",
@@ -198,16 +200,16 @@ export default function Authentication() {
   });
 
   const handleStartAutomatedLogin = () => {
-    if (!automationState.email) {
+    if (!automationState.email || !automationState.password) {
       toast({
-        title: "Email Required",
-        description: "Please enter your ESPN email address.",
+        title: "Credentials Required",
+        description: "Please enter both your ESPN email address and password.",
         variant: "destructive",
       });
       return;
     }
-    setAutomationState(prev => ({ ...prev, isActive: true, step: "email" }));
-    startLoginMutation.mutate(automationState.email);
+    setAutomationState(prev => ({ ...prev, isActive: true, step: "waiting" }));
+    startLoginMutation.mutate({ email: automationState.email, password: automationState.password });
   };
 
   const handleCompleteMFA = () => {
@@ -300,9 +302,20 @@ export default function Authentication() {
                       data-testid="input-automation-email"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="automation-password">ESPN Password</Label>
+                    <Input
+                      id="automation-password"
+                      type="password"
+                      placeholder="Enter your ESPN password"
+                      value={automationState.password || ''}
+                      onChange={(e) => setAutomationState(prev => ({ ...prev, password: e.target.value }))}
+                      data-testid="input-automation-password"
+                    />
+                  </div>
                   <Button 
                     onClick={handleStartAutomatedLogin}
-                    disabled={!automationState.email || startLoginMutation.isPending}
+                    disabled={!automationState.email || !automationState.password || startLoginMutation.isPending}
                     className="w-full"
                     data-testid="button-start-automation"
                   >

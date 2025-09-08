@@ -363,16 +363,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ESPN Login Automation routes
   app.post("/api/espn-login/start", async (req, res) => {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
       }
 
       // Import the automation module dynamically to avoid issues
       const { espnLoginAutomation } = await import('./espnLoginAutomation');
       
       await espnLoginAutomation.initialize(false); // Run in non-headless mode for user interaction
-      const result = await espnLoginAutomation.startLogin(email);
+      const result = await espnLoginAutomation.startLogin(email, password);
       
       if (result.success && result.waitingForMFA) {
         res.json({ 
