@@ -480,17 +480,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Find owner from members array using team.owners GUID
+          // Find owner from members array - use same logic as rosters page
           let ownerName = `Owner ${team.id}`;
-          if (team.owners && team.owners[0]) {
-            const ownerGuid = team.owners[0].replace(/[{}]/g, ''); // Remove braces from GUID
-            const member = leagueData.members?.find((m: any) => m.id.includes(ownerGuid));
-            if (member?.displayName) {
-              ownerName = member.displayName;
-            } else if (team.owners[0].displayName) {
-              ownerName = team.owners[0].displayName;
-            } else if (team.owners[0].firstName && team.owners[0].lastName) {
-              ownerName = `${team.owners[0].firstName} ${team.owners[0].lastName}`;
+          if (team.owners && team.owners[0] && leagueData.members) {
+            // Use same owner ID extraction as rosters page
+            const ownerId = team.owners[0]?.id || team.owners[0];
+            const member = leagueData.members.find((m: any) => m.id === ownerId);
+            
+            if (member) {
+              // Prefer real name (firstName + lastName) over displayName - same as rosters page
+              if (member.firstName && member.lastName) {
+                ownerName = `${member.firstName} ${member.lastName}`;
+              } else {
+                // Fall back to displayName only if no real name available
+                ownerName = member.displayName || `Owner ${team.id}`;
+              }
+              
+              console.log(`Found member for team ${team.id}:`, {
+                memberId: member.id,
+                firstName: member.firstName,
+                lastName: member.lastName,
+                displayName: member.displayName,
+                finalOwnerName: ownerName
+              });
+            } else {
+              console.log(`No member found for team ${team.id} with ownerId:`, ownerId);
             }
           }
 
