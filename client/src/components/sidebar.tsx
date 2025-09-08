@@ -4,8 +4,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const navigation = [
-  { name: "Authentication", href: "/authentication", icon: Key },
-  { name: "My Leagues", href: "/leagues", icon: Trophy },
+  { name: "Fantasy Manager", href: "/authentication", icon: Key },
   { name: "Standings", href: "/standings", icon: BarChart3 },
   { name: "Team Rosters", href: "/rosters", icon: Users },
   { name: "Matchups", href: "/matchups", icon: Calendar },

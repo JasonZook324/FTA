@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertEspnCredentialsSchema, type EspnCredentials } from "@shared/schema";
+import { insertEspnCredentialsSchema, insertLeagueSchema, type EspnCredentials, type League } from "@shared/schema";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -11,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut, Plus, Users, Calendar, Trophy, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const credentialsFormSchema = insertEspnCredentialsSchema.extend({
   userId: z.string().min(1, "User ID is required"),
@@ -38,6 +40,11 @@ export default function Authentication() {
   // Query existing credentials
   const { data: credentials, isLoading } = useQuery<EspnCredentials>({
     queryKey: ["/api/espn-credentials", userId],
+  });
+
+  // Query user leagues
+  const { data: leagues, isLoading: leaguesLoading } = useQuery({
+    queryKey: ["/api/leagues", userId],
   });
 
   // Update form when credentials are loaded
@@ -155,8 +162,8 @@ export default function Authentication() {
       <header className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Authentication & Setup</h2>
-            <p className="text-muted-foreground">Configure ESPN cookies for private league access</p>
+            <h2 className="text-2xl font-bold text-foreground">ESPN Fantasy Manager</h2>
+            <p className="text-muted-foreground">Configure authentication and manage your ESPN fantasy leagues</p>
           </div>
           <div className="flex items-center space-x-3">
             <Button
@@ -420,6 +427,84 @@ export default function Authentication() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Leagues Section - Only show if authenticated */}
+        {credentials?.isValid && (
+          <>
+            <Separator className="my-8" />
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Your Leagues</h3>
+                <p className="text-muted-foreground">Manage and view your ESPN fantasy leagues</p>
+              </div>
+
+              {/* Leagues List */}
+              <Card data-testid="card-leagues-list">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Trophy className="w-5 h-5" />
+                    <span>Loaded Leagues</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Leagues you have loaded from ESPN Fantasy
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {leaguesLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-muted rounded w-1/2"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : leagues && leagues.length > 0 ? (
+                    <div className="space-y-4">
+                      {leagues.map((league: any) => (
+                        <Card key={league.id} className="p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-foreground">{league.name}</h4>
+                            <Badge variant="outline">{league.sport.toUpperCase()}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Season:</span>
+                              <div className="font-medium">{league.season}</div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Teams:</span>
+                              <div className="font-medium">{league.teamCount}</div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Week:</span>
+                              <div className="font-medium">{league.currentWeek}</div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Updated:</span>
+                              <div className="font-medium">
+                                {league.lastUpdated ? new Date(league.lastUpdated).toLocaleDateString() : "Never"}
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No leagues loaded yet</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Successfully validate your credentials above to automatically load your league
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
       </main>
     </>
   );

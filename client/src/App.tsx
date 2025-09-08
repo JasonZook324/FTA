@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Authentication from "@/pages/authentication";
-import Leagues from "@/pages/leagues";
 import Standings from "@/pages/standings";
 import Rosters from "@/pages/rosters";
 import Matchups from "@/pages/matchups";
@@ -22,7 +21,6 @@ function Router() {
         <Switch>
           <Route path="/" component={Authentication} />
           <Route path="/authentication" component={Authentication} />
-          <Route path="/leagues" component={Leagues} />
           <Route path="/standings" component={Standings} />
           <Route path="/rosters" component={Rosters} />
           <Route path="/matchups" component={Matchups} />
