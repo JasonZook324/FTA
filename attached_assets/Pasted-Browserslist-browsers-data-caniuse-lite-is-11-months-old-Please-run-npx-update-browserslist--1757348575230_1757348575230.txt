@@ -1,0 +1,37 @@
+Browserslist: browsers data (caniuse-lite) is 11 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:18340) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+4:22:05 PM [express] GET /api/espn-credentials/default-user 404 in 2734ms :: {"message":"ESPN creden…
+Trying direct Disney SSO login approach...
+Trying login URL: https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US
+Failed to load https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US: page.goto: net::ERR_NAME_NOT_RESOLVED at https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US
+Call log:
+  - navigating to "https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US", waiting until "networkidle"
+
+Trying login URL: https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US
+Failed to load https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US: page.goto: Navigation to "https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US" is interrupted by another navigation to "chrome-error://chromewebdata/"
+Call log:
+  - navigating to "https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US", waiting until "networkidle"
+
+Trying login URL: https://secure.espn.com/login
+Failed to load https://secure.espn.com/login: page.goto: Navigation to "https://secure.espn.com/login" is interrupted by another navigation to "https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US"
+Call log:
+  - navigating to "https://secure.espn.com/login", waiting until "networkidle"
+
+Trying login URL: https://www.espn.com/login
+Failed to load https://www.espn.com/login: page.goto: Navigation to "https://www.espn.com/login" is interrupted by another navigation to "https://secure.espn.com/login"
+Call log:
+  - navigating to "https://www.espn.com/login", waiting until "networkidle"
+
+Direct login URLs failed, trying iframe approach...
+Error during login automation: page.goto: Navigation to "https://www.espn.com/login" is interrupted by another navigation to "https://www.espn.com/login"
+Call log:
+  - navigating to "https://www.espn.com/login", waiting until "networkidle"
+
+    at ESPNLoginAutomation.startLogin (/home/runner/workspace/server/espnLoginAutomation.ts:92:25)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:375:22) {
+  name: 'Error'
+}
+4:22:31 PM [express] POST /api/espn-login/start 400 in 2657ms :: {"success":false,"message":"page.go…

@@ -50,10 +50,11 @@ export class ESPNLoginAutomation {
       for (const loginUrl of disneyLoginUrls) {
         try {
           console.log(`Trying login URL: ${loginUrl}`);
-          await this.page.goto(loginUrl, { waitUntil: 'networkidle', timeout: 15000 });
+          // Use 'load' instead of 'networkidle' to handle redirects better
+          await this.page.goto(loginUrl, { waitUntil: 'load', timeout: 20000 });
           
-          // Wait for page to load
-          await this.page.waitForTimeout(3000);
+          // Wait for any redirects to complete
+          await this.page.waitForTimeout(5000);
           
           // Check if we have proper login elements
           const loginCheck = await this.page.evaluate(() => {
@@ -86,10 +87,16 @@ export class ESPNLoginAutomation {
         }
       }
       
-      // Strategy 2: If direct URLs failed, try the iframe approach
+      // Strategy 2: If direct URLs failed, try following the redirect chain
       if (!foundLoginForm) {
-        console.log('Direct login URLs failed, trying iframe approach...');
-        await this.page.goto('https://www.espn.com/login', { waitUntil: 'networkidle' });
+        console.log('Direct login URLs failed, trying redirect chain approach...');
+        // Start with ESPN login and let it redirect naturally
+        await this.page.goto('https://www.espn.com/login', { waitUntil: 'load', timeout: 20000 });
+        
+        // Wait for redirects to complete
+        await this.page.waitForTimeout(5000);
+        
+        console.log('Current URL after redirects:', this.page.url());
         
         // Wait for dynamic content to load
         console.log('Waiting for dynamic content...');
@@ -118,7 +125,7 @@ export class ESPNLoginAutomation {
           const disneyIframe = iframes.find(iframe => iframe.src.includes('registerdisney.go.com'));
           if (disneyIframe) {
             console.log('Navigating to Disney SSO iframe directly...');
-          await this.page.goto(disneyIframe.src, { waitUntil: 'networkidle' });
+            await this.page.goto(disneyIframe.src, { waitUntil: 'load', timeout: 20000 });
           
           // Wait for Disney SSO content to load
           console.log('Waiting for Disney SSO content...');
