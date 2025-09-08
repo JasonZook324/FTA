@@ -359,6 +359,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ESPN Login Automation routes
+  app.post("/api/espn-login/start", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Import the automation module dynamically to avoid issues
+      const { espnLoginAutomation } = await import('./espnLoginAutomation');
+      
+      await espnLoginAutomation.initialize(false); // Run in non-headless mode for user interaction
+      const result = await espnLoginAutomation.startLogin(email);
+      
+      if (result.success && result.waitingForMFA) {
+        res.json({ 
+          success: true, 
+          waitingForMFA: true, 
+          message: "Login started. Please check your email for the verification code." 
+        });
+      } else {
+        await espnLoginAutomation.cleanup();
+        res.status(400).json({ 
+          success: false, 
+          message: result.error || "Failed to start login process" 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error starting ESPN login:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/espn-login/complete", async (req, res) => {
+    try {
+      const { verificationCode, userId } = req.body;
+      if (!verificationCode || !userId) {
+        return res.status(400).json({ message: "Verification code and user ID are required" });
+      }
+
+      // Import the automation module dynamically
+      const { espnLoginAutomation } = await import('./espnLoginAutomation');
+      
+      const result = await espnLoginAutomation.completeMFA(verificationCode);
+      
+      if (result.success && result.credentials) {
+        // Save the credentials to storage
+        const credentials = await storage.createEspnCredentials({
+          userId,
+          espnS2: result.credentials.espnS2,
+          swid: result.credentials.swid,
+          isValid: true,
+          createdAt: new Date(),
+          lastValidated: new Date()
+        });
+
+        await espnLoginAutomation.cleanup();
+        
+        res.json({ 
+          success: true, 
+          message: "Login completed successfully!", 
+          credentials: {
+            id: credentials.id,
+            userId: credentials.userId,
+            isValid: credentials.isValid,
+            createdAt: credentials.createdAt,
+            lastValidated: credentials.lastValidated
+          }
+        });
+      } else {
+        await espnLoginAutomation.cleanup();
+        res.status(400).json({ 
+          success: false, 
+          message: result.error || "Failed to complete login" 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error completing ESPN login:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/espn-login/cancel", async (req, res) => {
+    try {
+      const { espnLoginAutomation } = await import('./espnLoginAutomation');
+      await espnLoginAutomation.cleanup();
+      res.json({ success: true, message: "Login process cancelled" });
+    } catch (error: any) {
+      console.error('Error cancelling ESPN login:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // League routes
   app.get("/api/leagues/:userId", async (req, res) => {
     try {
