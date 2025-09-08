@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Settings, AlertTriangle } from "lucide-react";
+import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function LeagueHeader() {
   const { toast } = useToast();
@@ -19,6 +19,29 @@ export default function LeagueHeader() {
   // Query authentication status
   const { data: credentials } = useQuery({
     queryKey: ["/api/espn-credentials", userId],
+  });
+
+  // Reload league data mutation
+  const reloadLeagueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/espn-credentials/${userId}/reload-league`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: `League data refreshed! "${data.league.name}" now has ${data.league.teamCount} teams with updated information.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Refresh Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Disconnect mutation
@@ -104,17 +127,30 @@ export default function LeagueHeader() {
             </div>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => disconnectMutation.mutate()}
-          disabled={disconnectMutation.isPending}
-          className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
-          data-testid="button-disconnect-header"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => reloadLeagueMutation.mutate()}
+            disabled={reloadLeagueMutation.isPending}
+            className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
+            data-testid="button-refresh-header"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {reloadLeagueMutation.isPending ? "Refreshing..." : "Refresh Data"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+            className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
+            data-testid="button-disconnect-header"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
+          </Button>
+        </div>
       </div>
     </div>
   );

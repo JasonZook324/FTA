@@ -163,14 +163,6 @@ export default function Authentication() {
           </div>
           <div className="flex items-center space-x-3">
             <Button
-              variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] })}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh Data
-            </Button>
-            <Button
               onClick={() => validateCredentialsMutation.mutate()}
               disabled={validateCredentialsMutation.isPending || !credentials}
               data-testid="button-test-connection"
@@ -178,15 +170,6 @@ export default function Authentication() {
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Test Connection
-            </Button>
-            
-            <Button
-              onClick={() => reloadLeagueMutation.mutate()}
-              disabled={reloadLeagueMutation.isPending || !credentials || !credentials.isValid}
-              data-testid="button-reload-league"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {reloadLeagueMutation.isPending ? "Reloading..." : "Reload League Data"}
             </Button>
           </div>
         </div>
