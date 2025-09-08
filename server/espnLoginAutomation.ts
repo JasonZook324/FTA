@@ -117,7 +117,7 @@ export class ESPNLoginAutomation {
           // Find the Disney ID iframe URL
           const disneyIframe = iframes.find(iframe => iframe.src.includes('registerdisney.go.com'));
           if (disneyIframe) {
-          console.log('Navigating to Disney SSO iframe directly...');
+            console.log('Navigating to Disney SSO iframe directly...');
           await this.page.goto(disneyIframe.src, { waitUntil: 'networkidle' });
           
           // Wait for Disney SSO content to load
@@ -214,6 +214,7 @@ export class ESPNLoginAutomation {
             } catch {
               console.log('No login trigger found');
             }
+          }
           }
         }
       }
