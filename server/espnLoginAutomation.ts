@@ -36,35 +36,87 @@ export class ESPNLoginAutomation {
     }
 
     try {
-      console.log('Navigating to ESPN login page...');
-      await this.page.goto('https://www.espn.com/login', { waitUntil: 'networkidle' });
-
-      // Wait for dynamic content to load
-      console.log('Waiting for dynamic content...');
-      await this.page.waitForTimeout(5000);
+      // Strategy 1: Try direct Disney SSO login URLs
+      console.log('Trying direct Disney SSO login approach...');
+      const disneyLoginUrls = [
+        'https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US',
+        'https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US',
+        'https://secure.espn.com/login',
+        'https://www.espn.com/login'
+      ];
       
-      console.log('Page loaded, debugging available elements...');
-      const pageTitle = await this.page.title();
-      console.log('Page title:', pageTitle);
+      let foundLoginForm = false;
       
-      // Check for iframes that might contain the login form
-      const iframes = await this.page.evaluate(() => {
-        const frames = Array.from(document.querySelectorAll('iframe'));
-        return frames.map(frame => ({
-          src: frame.src,
-          id: frame.id,
-          className: frame.className
-        }));
-      });
-      console.log('Found iframes:', JSON.stringify(iframes, null, 2));
-
-      // If there are iframes, try to switch to them and wait for content
-      if (iframes.length > 0) {
-        console.log('Disney SSO iframe detected, navigating directly...');
+      for (const loginUrl of disneyLoginUrls) {
+        try {
+          console.log(`Trying login URL: ${loginUrl}`);
+          await this.page.goto(loginUrl, { waitUntil: 'networkidle', timeout: 15000 });
+          
+          // Wait for page to load
+          await this.page.waitForTimeout(3000);
+          
+          // Check if we have proper login elements
+          const loginCheck = await this.page.evaluate(() => {
+            const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[id*="email"]');
+            const textInputs = document.querySelectorAll('input[type="text"]');
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            const forms = document.querySelectorAll('form');
+            
+            return {
+              hasEmailField: emailInputs.length > 0,
+              hasTextInput: textInputs.length > 0,
+              hasPasswordField: passwordInputs.length > 0,
+              hasForm: forms.length > 0,
+              title: document.title,
+              bodyContent: document.body?.textContent?.substring(0, 200) || ''
+            };
+          });
+          
+          console.log(`URL ${loginUrl} check:`, JSON.stringify(loginCheck, null, 2));
+          
+          if (loginCheck.hasEmailField || (loginCheck.hasTextInput && loginCheck.hasForm)) {
+            console.log(`Found proper login form at ${loginUrl}`);
+            foundLoginForm = true;
+            break;
+          }
+          
+        } catch (error) {
+          console.log(`Failed to load ${loginUrl}:`, error.message);
+          continue;
+        }
+      }
+      
+      // Strategy 2: If direct URLs failed, try the iframe approach
+      if (!foundLoginForm) {
+        console.log('Direct login URLs failed, trying iframe approach...');
+        await this.page.goto('https://www.espn.com/login', { waitUntil: 'networkidle' });
         
-        // Find the Disney ID iframe URL
-        const disneyIframe = iframes.find(iframe => iframe.src.includes('registerdisney.go.com'));
-        if (disneyIframe) {
+        // Wait for dynamic content to load
+        console.log('Waiting for dynamic content...');
+        await this.page.waitForTimeout(5000);
+        
+        console.log('Page loaded, debugging available elements...');
+        const pageTitle = await this.page.title();
+        console.log('Page title:', pageTitle);
+        
+        // Check for iframes that might contain the login form
+        const iframes = await this.page.evaluate(() => {
+          const frames = Array.from(document.querySelectorAll('iframe'));
+          return frames.map(frame => ({
+            src: frame.src,
+            id: frame.id,
+            className: frame.className
+          }));
+        });
+        console.log('Found iframes:', JSON.stringify(iframes, null, 2));
+
+        // If there are iframes, try to switch to them and wait for content
+        if (iframes.length > 0) {
+          console.log('Disney SSO iframe detected, trying iframe approach...');
+          
+          // Find the Disney ID iframe URL
+          const disneyIframe = iframes.find(iframe => iframe.src.includes('registerdisney.go.com'));
+          if (disneyIframe) {
           console.log('Navigating to Disney SSO iframe directly...');
           await this.page.goto(disneyIframe.src, { waitUntil: 'networkidle' });
           
@@ -72,11 +124,32 @@ export class ESPNLoginAutomation {
           console.log('Waiting for Disney SSO content...');
           await this.page.waitForTimeout(8000);
           
+          // The Disney SSO page loads dynamically, let's try to trigger the login form
+          console.log('Triggering Disney login form...');
+          try {
+            // Try to click anywhere on the page to trigger form loading
+            await this.page.click('body');
+            await this.page.waitForTimeout(2000);
+            
+            // Try to press Tab to navigate to form elements
+            await this.page.keyboard.press('Tab');
+            await this.page.waitForTimeout(1000);
+            
+            // Try to scroll to ensure all content loads
+            await this.page.keyboard.press('PageDown');
+            await this.page.waitForTimeout(2000);
+            
+          } catch {
+            console.log('Could not trigger form loading');
+          }
+          
           // Check what's loaded in Disney SSO
           const disneyElements = await this.page.evaluate(() => {
             const inputs = Array.from(document.querySelectorAll('input'));
             const buttons = Array.from(document.querySelectorAll('button'));
             const forms = Array.from(document.querySelectorAll('form'));
+            const links = Array.from(document.querySelectorAll('a'));
+            
             return {
               url: window.location.href,
               title: document.title,
@@ -85,27 +158,59 @@ export class ESPNLoginAutomation {
                 name: input.name,
                 id: input.id,
                 placeholder: input.placeholder,
-                className: input.className
+                className: input.className,
+                value: input.value
               })),
               buttons: buttons.map(button => ({
                 text: button.textContent?.trim(),
                 className: button.className,
                 type: button.type
               })),
+              links: links.map(link => ({
+                text: link.textContent?.trim(),
+                href: link.href
+              })).filter(link => link.text && (
+                link.text.toLowerCase().includes('sign') || 
+                link.text.toLowerCase().includes('log') ||
+                link.text.toLowerCase().includes('create') ||
+                link.text.toLowerCase().includes('account')
+              )),
               forms: forms.length,
-              bodyText: document.body?.textContent?.substring(0, 200)
+              bodyText: document.body?.textContent?.substring(0, 500)
             };
           });
           
           console.log('Disney SSO page elements:', JSON.stringify(disneyElements, null, 2));
           
-          // If still no inputs, try clicking any "Sign In" or "Log In" buttons
-          if (disneyElements.inputs.length === 0) {
-            console.log('No inputs found, looking for login triggers...');
+          // Look for login triggers or form activators
+          if (disneyElements.inputs.length === 0 || disneyElements.inputs.every(input => input.id === 'session-id')) {
+            console.log('No proper form inputs found, looking for login triggers...');
             try {
-              await this.page.click('button:has-text("Sign In"), button:has-text("Log In"), a:has-text("Sign In"), a:has-text("Log In")');
-              await this.page.waitForTimeout(3000);
-              console.log('Clicked login trigger, checking for inputs again...');
+              // Try clicking any relevant links or buttons
+              const triggers = ['Sign In', 'Log In', 'Create Account', 'Account', 'Login', 'Continue'];
+              let triggered = false;
+              
+              for (const trigger of triggers) {
+                try {
+                  await this.page.click(`button:has-text("${trigger}"), a:has-text("${trigger}")`, { timeout: 2000 });
+                  console.log(`Clicked ${trigger} trigger`);
+                  await this.page.waitForTimeout(3000);
+                  triggered = true;
+                  break;
+                } catch {
+                  // Try next trigger
+                }
+              }
+              
+              if (!triggered) {
+                // Try to interact with the session-id field to see if it triggers something
+                console.log('Trying to interact with session-id field...');
+                await this.page.click('#session-id');
+                await this.page.fill('#session-id', 'trigger');
+                await this.page.keyboard.press('Tab');
+                await this.page.waitForTimeout(3000);
+              }
+              
             } catch {
               console.log('No login trigger found');
             }
