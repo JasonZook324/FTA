@@ -70,7 +70,7 @@ export default function Sidebar() {
                       "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
                       isActive 
                         ? "bg-primary text-primary-foreground" 
-                        : "text-foreground hover:bg-secondary"
+                          : "text-foreground hover:bg-muted hover:text-foreground"
                     )}
                     data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                     onClick={() => setIsOpen(false)}

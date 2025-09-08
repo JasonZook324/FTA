@@ -9,13 +9,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useSelectedLeague } from "@/hooks/useSelectedLeague";
 
 export default function Players() {
   const [userId] = useState("default-user");
-  const [selectedSport, setSelectedSport] = useState<string>("ffl");
-  const [selectedSeason, setSelectedSeason] = useState<string>("2025");
+  const selectedSport = "ffl";
+  const { selectedLeagueId, leagues } = useSelectedLeague(userId);
+
+  // Automatically use the current season from the selected league
+  const selectedSeason = (() => {
+    if (selectedLeagueId && Array.isArray(leagues)) {
+      const league = leagues.find((l: any) => l.id === selectedLeagueId);
+      return league?.season?.toString() || "2025";
+    }
+    return "2025";
+  })();
+
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"all" | "waiver">("all");
   const [selectedPosition, setSelectedPosition] = useState<string>("all");
 
@@ -30,12 +40,7 @@ export default function Players() {
       }
       return response.json();
     },
-    enabled: !!selectedSport && !!selectedSeason && viewMode === "all",
-  });
-
-  // Query user leagues
-  const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    enabled: !!selectedSeason && viewMode === "all",
   });
 
   // Query waiver wire data
@@ -184,17 +189,14 @@ export default function Players() {
         return false;
       }
     }
-    
     // Search filter
     if (searchTerm) {
       const name = getPlayerName(playerData);
       const teamId = getProTeamId(playerData) ? getProTeamId(playerData).toString() : '';
-      
       if (!name.toLowerCase().includes(searchTerm.toLowerCase()) && !teamId.includes(searchTerm)) {
         return false;
       }
     }
-    
     return true;
   }) || [];
 
@@ -208,54 +210,10 @@ export default function Players() {
             <p className="text-muted-foreground">Browse player statistics and information</p>
           </div>
           <div className="flex items-center space-x-3">
-            {viewMode === "waiver" && (
-              <>
-                <div className="text-sm text-muted-foreground">League:</div>
-                <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-                  <SelectTrigger className="w-48" data-testid="select-league">
-                    <SelectValue placeholder="Select a league" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.isArray(leagues) && leagues.length > 0 ? leagues.map((league: any) => (
-                      <SelectItem key={league.id} value={league.id}>
-                        {league.name} ({league.season})
-                      </SelectItem>
-                    )) : (
-                      <SelectItem value="no-leagues" disabled>No leagues found - load a league first</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-            
-            <Select value={selectedSport} onValueChange={setSelectedSport}>
-              <SelectTrigger className="w-40" data-testid="select-sport">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ffl">Football (NFL)</SelectItem>
-                <SelectItem value="fba">Basketball (NBA)</SelectItem>
-                <SelectItem value="fhk">Hockey (NHL)</SelectItem>
-                <SelectItem value="flb">Baseball (MLB)</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedSeason} onValueChange={setSelectedSeason}>
-              <SelectTrigger className="w-24" data-testid="select-season">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
-              </SelectContent>
-            </Select>
-            
             {viewMode === "waiver" && selectedLeagueId && (
               <Button
                 variant="outline"
                 onClick={() => {
-                  // Add timestamp to prevent caching
                   const url = `/api/leagues/${selectedLeagueId}/waiver-wire/export?t=${Date.now()}`;
                   window.open(url, '_blank');
                 }}
@@ -265,12 +223,10 @@ export default function Players() {
                 Export Waiver Wire
               </Button>
             )}
-            
             {selectedLeagueId && (
               <Button
                 variant="outline"
                 onClick={() => {
-                  // Add timestamp to prevent caching
                   const url = `/api/leagues/${selectedLeagueId}/roster-export?t=${Date.now()}`;
                   window.open(url, '_blank');
                 }}
@@ -280,17 +236,17 @@ export default function Players() {
                 Export Team Rosters
               </Button>
             )}
-            
+            {/* Year dropdown removed. Season is set from league data. */}
             <Button
               variant="secondary"
               onClick={() => {
                 if (viewMode === "waiver" && selectedLeagueId) {
-                  queryClient.invalidateQueries({ 
-                    queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"] 
+                  queryClient.invalidateQueries({
+                    queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"]
                   });
                 } else {
-                  queryClient.invalidateQueries({ 
-                    queryKey: ["/api/players", selectedSport, selectedSeason] 
+                  queryClient.invalidateQueries({
+                    queryKey: ["/api/players", selectedSport, selectedSeason]
                   });
                 }
               }}
@@ -354,12 +310,11 @@ export default function Players() {
               </div>
             </div>
           </CardHeader>
-          
           <CardContent>
             {viewMode === "waiver" && !selectedLeagueId ? (
               <div className="text-center py-8">
                 <UsersRound className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Select a league to view waiver wire players</p>
+                <p className="text-muted-foreground">No league loaded. Please load a league first.</p>
               </div>
             ) : currentLoading ? (
               <div className="space-y-3">

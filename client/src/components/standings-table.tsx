@@ -46,7 +46,7 @@ export default function StandingsTable({ data, isLoading, leagueId }: StandingsT
       </Card>
     );
   }
-
+    console.log("Data: " +data);
   const teams = data.teams.sort((a: any, b: any) => {
     const aWinPct = a.record?.overall ? a.record.overall.wins / (a.record.overall.wins + a.record.overall.losses + a.record.overall.ties) : 0;
     const bWinPct = b.record?.overall ? b.record.overall.wins / (b.record.overall.wins + b.record.overall.losses + b.record.overall.ties) : 0;

@@ -32,17 +32,17 @@ export default function Standings() {
             <h2 className="text-2xl font-bold text-foreground">League Standings</h2>
             <p className="text-muted-foreground">View team rankings and records</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", currentLeague?.id, "standings"] })}
-              disabled={!currentLeague}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          {/*<div className="flex items-center space-x-3">*/}
+          {/*  <Button*/}
+          {/*    variant="secondary"*/}
+          {/*    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", currentLeague?.id, "standings"] })}*/}
+          {/*    disabled={!currentLeague}*/}
+          {/*    data-testid="button-refresh"*/}
+          {/*  >*/}
+          {/*    <RefreshCw className="w-4 h-4 mr-2" />*/}
+          {/*    Refresh*/}
+          {/*  </Button>*/}
+          {/*</div>*/}
         </div>
       </header>
 

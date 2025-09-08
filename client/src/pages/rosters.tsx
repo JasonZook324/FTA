@@ -34,17 +34,17 @@ export default function Rosters() {
               {leagues?.[0] ? `${leagues[0].name} (${leagues[0].season}) - View team lineups and player details` : "View team lineups and player details"}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", selectedLeagueId, "rosters"] })}
-              disabled={!selectedLeagueId}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          {/*<div className="flex items-center space-x-3">*/}
+          {/*  <Button*/}
+          {/*    variant="secondary"*/}
+          {/*    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", selectedLeagueId, "rosters"] })}*/}
+          {/*    disabled={!selectedLeagueId}*/}
+          {/*    data-testid="button-refresh"*/}
+          {/*  >*/}
+          {/*    <RefreshCw className="w-4 h-4 mr-2" />*/}
+          {/*    Refresh*/}
+          {/*  </Button>*/}
+          {/*</div>*/}
         </div>
       </header>
 
