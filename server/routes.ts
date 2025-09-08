@@ -609,6 +609,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Store teams
       if (leagueData.teams) {
+        console.log('ESPN API response during league loading:');
+        console.log('leagueData.teams.length:', leagueData.teams.length);
+        console.log('leagueData.members.length:', leagueData.members?.length);
+        console.log('First team from ESPN:', JSON.stringify(leagueData.teams[0], null, 2));
+        if (leagueData.members && leagueData.members.length > 0) {
+          console.log('First member from ESPN:', JSON.stringify(leagueData.members[0], null, 2));
+        }
+        
         for (const team of leagueData.teams) {
           // Build team name properly handling undefined values
           let teamName = `Team ${team.id}`;
@@ -626,15 +634,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let ownerName = `Owner ${team.id}`;
           if (team.owners && team.owners[0]) {
             const ownerGuid = team.owners[0].replace(/[{}]/g, ''); // Remove braces from GUID
+            console.log(`Team ${team.id} owner GUID: ${team.owners[0]} -> cleaned: ${ownerGuid}`);
             const member = leagueData.members?.find((m: any) => m.id.includes(ownerGuid));
             if (member?.displayName) {
               ownerName = member.displayName;
+              console.log(`Found member: ${ownerName}`);
             } else if (team.owners[0].displayName) {
               ownerName = team.owners[0].displayName;
+              console.log(`Using team owner displayName: ${ownerName}`);
             } else if (team.owners[0].firstName && team.owners[0].lastName) {
               ownerName = `${team.owners[0].firstName} ${team.owners[0].lastName}`;
+              console.log(`Using team owner first+last: ${ownerName}`);
+            } else {
+              console.log(`No owner name found for team ${team.id}, using fallback`);
             }
           }
+
+          console.log(`Creating team: ID=${team.id}, Name="${teamName}", Owner="${ownerName}"`);
 
           await storage.createTeam({
             espnTeamId: team.id,
