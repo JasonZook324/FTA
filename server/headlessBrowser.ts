@@ -180,8 +180,122 @@ export class HeadlessBrowserService {
       });
       console.log('All inputs found on page:', allInputs);
 
-      // We're now directly on the login page
-      console.log('Now on the login page, looking for email input...');
+      // The login form is a JavaScript modal - we need to trigger it first
+      console.log('Login form is a modal overlay - attempting to trigger it...');
+      
+      // Try to trigger the login modal
+      await page.evaluate(() => {
+        // Look for login trigger elements
+        const loginTriggers = [
+          // Common login button selectors
+          'button:contains("Log In")',
+          'a:contains("Log In")', 
+          'button:contains("Login")',
+          'a:contains("Login")',
+          '[data-action="login"]',
+          '[onclick*="login"]',
+          '.login-btn',
+          '.login-button',
+          '#login-button',
+          '.btn-login'
+        ];
+        
+        // Try clicking elements that might trigger the modal
+        for (const selector of loginTriggers) {
+          try {
+            if (selector.includes(':contains')) {
+              const text = selector.split('("')[1].split('")')[0];
+              const elements = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+              const element = elements.find(el => el.textContent?.includes(text));
+              if (element) {
+                console.log('Found login trigger:', text);
+                (element as HTMLElement).click();
+                return;
+              }
+            } else {
+              const element = document.querySelector(selector);
+              if (element) {
+                console.log('Found login trigger with selector:', selector);
+                (element as HTMLElement).click();
+                return;
+              }
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        // Try to trigger any Disney/OneID login functions
+        if (typeof (window as any).DISNEY !== 'undefined') {
+          try {
+            if ((window as any).DISNEY.Login && (window as any).DISNEY.Login.show) {
+              (window as any).DISNEY.Login.show();
+            }
+          } catch (e) {
+            console.log('Disney login trigger failed:', e);
+          }
+        }
+        
+        // Look for any elements with login-related onclick handlers
+        const allElements = Array.from(document.querySelectorAll('*'));
+        for (const el of allElements) {
+          const onclick = el.getAttribute('onclick') || '';
+          if (onclick.toLowerCase().includes('login') || onclick.toLowerCase().includes('signin')) {
+            try {
+              (el as HTMLElement).click();
+              console.log('Clicked element with login onclick');
+              break;
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      });
+      
+      // Wait for the modal to appear
+      console.log('Waiting for login modal to appear...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Check if modal appeared by looking for common modal selectors
+      const modalVisible = await page.evaluate(() => {
+        const modalSelectors = [
+          '.modal',
+          '.overlay',
+          '.popup',
+          '.lightbox',
+          '[role="dialog"]',
+          '.login-modal',
+          '.auth-modal'
+        ];
+        
+        for (const selector of modalSelectors) {
+          const modal = document.querySelector(selector);
+          if (modal && (modal as HTMLElement).offsetParent !== null) {
+            return true;
+          }
+        }
+        
+        // Check if any inputs appeared (indicating modal loaded)
+        return document.querySelectorAll('input').length > 0;
+      });
+      
+      console.log('Modal appeared:', modalVisible);
+      
+      // Re-check for inputs after modal trigger
+      const inputsAfterTrigger = await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        return inputs.map(input => ({
+          type: input.type,
+          name: input.name || '',
+          id: input.id || '',
+          placeholder: input.placeholder || '',
+          className: input.className || '',
+          visible: input.offsetParent !== null && input.style.display !== 'none'
+        }));
+      });
+      console.log('Inputs after modal trigger:', inputsAfterTrigger);
+
+      console.log('Now looking for email input in the modal...');
 
       // Wait and look for login form with multiple strategies including iframes
       console.log('Looking for login form...');
