@@ -433,6 +433,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ESPN Debug Mode Authentication Route
+  app.post("/api/auth/espn/debug-login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Email and password are required for debug mode" 
+        });
+      }
+
+      console.log('🐛 Starting DEBUG MODE ESPN authentication for user:', email);
+      console.log('⚠️  A browser window will open - complete the login manually');
+      
+      const result = await espnAuthService.authenticateWithCredentials(email, password, true); // Enable debug mode
+      
+      if (result.success && result.cookies) {
+        // Store the extracted cookies using existing credential system
+        const credentials = {
+          userId: "default-user", // In production, this would come from actual user auth
+          espnS2: result.cookies.espnS2,
+          swid: result.cookies.swid,
+        };
+
+        // Validate the extracted credentials
+        const testCredentials = {
+          ...credentials,
+          id: '',
+          isValid: true,
+          createdAt: new Date(),
+          lastValidated: null
+        };
+
+        const isValid = await espnApiService.validateCredentials(testCredentials);
+        
+        if (isValid) {
+          await storage.createEspnCredentials(credentials);
+          
+          // Get available leagues
+          const leagues = await espnAuthService.getAvailableLeagues(result.cookies.espnS2, result.cookies.swid);
+          
+          res.json({ 
+            success: true, 
+            message: "Debug mode login completed successfully! Real ESPN cookies captured.",
+            leagues,
+            credentials: {
+              espnS2: credentials.espnS2,
+              swid: credentials.swid
+            }
+          });
+        } else {
+          res.status(400).json({ 
+            success: false, 
+            message: "Failed to validate captured credentials from debug mode" 
+          });
+        }
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: result.message || "Debug mode authentication failed" 
+        });
+      }
+    } catch (error: any) {
+      console.error('ESPN debug mode authentication error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Debug mode authentication failed" 
+      });
+    }
+  });
+
   app.get("/api/espn-credentials/:userId", async (req, res) => {
     try {
       const credentials = await storage.getEspnCredentials(req.params.userId);

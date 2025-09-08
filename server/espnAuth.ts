@@ -38,9 +38,9 @@ export class EspnAuthService {
   /**
    * Authenticate with ESPN using headless browser automation to get real cookies
    */
-  async authenticateWithCredentials(email: string, password: string): Promise<CookieExtractionResponse> {
+  async authenticateWithCredentials(email: string, password: string, debugMode: boolean = false): Promise<CookieExtractionResponse> {
     try {
-      console.log('Starting real ESPN authentication for:', email);
+      console.log(`Starting ${debugMode ? 'DEBUG MODE' : 'real'} ESPN authentication for:`, email);
 
       // Validate basic email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -59,10 +59,10 @@ export class EspnAuthService {
         };
       }
 
-      console.log('Using headless browser to authenticate with ESPN...');
+      console.log(`Using ${debugMode ? 'visible debug browser' : 'headless browser'} to authenticate with ESPN...`);
       
-      // Use headless browser to get real cookies
-      const result = await headlessBrowserService.authenticateWithESPN(email, password);
+      // Use browser to get real cookies
+      const result = await headlessBrowserService.authenticateWithESPN(email, password, debugMode);
       
       if (result.success && result.cookies) {
         console.log('Successfully obtained real ESPN cookies via headless browser');

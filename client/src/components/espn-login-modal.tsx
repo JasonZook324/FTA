@@ -109,6 +109,59 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
     },
   });
 
+  // Debug login mutation
+  const debugLoginMutation = useMutation({
+    mutationFn: async (data: LoginFormData) => {
+      const response = await apiRequest("POST", "/api/auth/espn/debug-login", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        if (data.leagues && data.leagues.length > 0) {
+          setAvailableLeagues(data.leagues);
+          
+          // Store captured credentials for display
+          if (data.credentials) {
+            setCapturedCredentials({
+              espnS2: data.credentials.espnS2 || '',
+              swid: data.credentials.swid || ''
+            });
+          }
+          
+          // If only one league, auto-select it
+          if (data.leagues.length === 1) {
+            selectLeagueMutation.mutate({ leagueId: data.leagues[0].id });
+          } else {
+            // Multiple leagues - show selection
+            setCurrentStep("leagues");
+          }
+        } else {
+          // No leagues found
+          setCurrentStep("success");
+          toast({
+            title: "Debug Login Successful!",
+            description: "Real ESPN cookies captured via visible browser",
+            duration: 5000,
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      } else {
+        toast({
+          title: "Debug Mode Failed",
+          description: data.message || "Debug authentication failed",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Debug Mode Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // League selection mutation
   const selectLeagueMutation = useMutation({
     mutationFn: async (data: LeagueSelectionData) => {
@@ -219,24 +272,51 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
                 </FormItem>
               )}
             />
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loginMutation.isPending}
-              data-testid="button-login"
-            >
-              {loginMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loginMutation.isPending || debugLoginMutation.isPending}
+                data-testid="button-login"
+              >
+                {loginMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={loginMutation.isPending || debugLoginMutation.isPending}
+                onClick={() => debugLoginMutation.mutate(loginForm.getValues())}
+                data-testid="button-debug-login"
+              >
+                {debugLoginMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Opening browser...
+                  </>
+                ) : (
+                  <>
+                    🐛 Debug Mode (Manual Login)
+                    <Eye className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                Debug mode opens a visible browser window for manual login
+              </p>
+            </div>
           </form>
         </Form>
       </CardContent>

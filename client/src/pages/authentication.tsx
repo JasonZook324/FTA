@@ -130,6 +130,38 @@ export default function Authentication() {
     },
   });
 
+  // Debug mode login mutation  
+  const debugLoginMutation = useMutation({
+    mutationFn: async (data: { email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/auth/espn/debug-login", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Debug Login Successful!",
+          description: "Real ESPN cookies captured successfully",
+          duration: 5000,
+        });
+        setShowLoginModal(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      } else {
+        toast({
+          title: "Debug Login Failed",
+          description: data.message || "Failed to authenticate in debug mode",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Debug Mode Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: CredentialsFormData) => {
     saveCredentialsMutation.mutate(data);
   };

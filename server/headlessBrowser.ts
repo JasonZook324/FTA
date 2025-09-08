@@ -19,16 +19,20 @@ export class HeadlessBrowserService {
   private browser: Browser | null = null;
 
   /**
-   * Initialize the headless browser
+   * Initialize the browser (headless or visible for debugging)
    */
-  async initBrowser(): Promise<void> {
+  async initBrowser(debugMode: boolean = false): Promise<void> {
     if (this.browser) return;
 
     try {
       this.browser = await puppeteer.launch({
-        headless: true,
+        headless: !debugMode, // Visible browser in debug mode
         executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-        args: [
+        args: debugMode ? [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage'
+        ] : [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -45,10 +49,10 @@ export class HeadlessBrowserService {
           '--disable-renderer-backgrounding'
         ]
       });
-      console.log('Headless browser initialized successfully');
+      console.log(`Browser initialized successfully in ${debugMode ? 'debug (visible)' : 'headless'} mode`);
     } catch (error) {
       console.error('Failed to initialize browser:', error);
-      throw new Error('Could not start headless browser');
+      throw new Error('Could not start browser');
     }
   }
 
@@ -59,8 +63,96 @@ export class HeadlessBrowserService {
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
-      console.log('Headless browser closed');
+      console.log('Browser closed');
     }
+  }
+
+  /**
+   * Handle debug mode login - let user manually complete login while monitoring
+   */
+  private async handleDebugModeLogin(page: Page, email: string): Promise<EspnLoginResult> {
+    console.log('\n=== DEBUG MODE INSTRUCTIONS ===');
+    console.log('1. A browser window should have opened');
+    console.log('2. Manually trigger the login modal and enter your credentials:');
+    console.log(`   - Email: ${email}`);
+    console.log('   - Password: [your password]');
+    console.log('3. Complete the login process');
+    console.log('4. Wait for the page to redirect or show successful login');
+    console.log('5. The system will automatically detect when login is complete');
+    console.log('================================\n');
+
+    // Monitor for successful login by watching for cookies or URL changes
+    console.log('Monitoring login process...');
+    
+    let attempts = 0;
+    const maxAttempts = 120; // 2 minutes
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+      
+      // Check for ESPN cookies that indicate successful login
+      const cookies = await page.cookies();
+      const espnS2 = cookies.find(c => c.name === 'espn_s2');
+      const swid = cookies.find(c => c.name === 'SWID');
+      
+      if (espnS2 && swid) {
+        console.log('✅ Login detected! ESPN cookies found.');
+        
+        // Extract ESPN credentials
+        const credentials = {
+          espnS2: espnS2.value,
+          swid: swid.value
+        };
+        
+        console.log('Successfully captured ESPN credentials');
+        
+        return {
+          success: true,
+          cookies: credentials,
+          message: 'Debug mode login completed successfully'
+        };
+      }
+      
+      // Check current URL for login success indicators
+      const currentUrl = page.url();
+      if (currentUrl.includes('espn.com') && !currentUrl.includes('login') && !currentUrl.includes('identity')) {
+        console.log('✅ Login detected! Redirected away from login page.');
+        
+        // Try to get cookies even if we're not sure about the names
+        const allCookies = cookies
+          .filter(c => c.domain.includes('espn.com'))
+          .reduce((acc, cookie) => ({ ...acc, [cookie.name]: cookie.value }), {});
+        
+        console.log('Available ESPN cookies:', Object.keys(allCookies));
+        
+        // Try to find the S2 and SWID cookies with different names
+        const possibleS2 = cookies.find(c => c.name.toLowerCase().includes('s2')) || 
+                          cookies.find(c => c.name.includes('session'));
+        const possibleSWID = cookies.find(c => c.name.toLowerCase().includes('swid')) ||
+                           cookies.find(c => c.name.toLowerCase().includes('id'));
+        
+        if (possibleS2 && possibleSWID) {
+          return {
+            success: true,
+            cookies: {
+              espnS2: possibleS2.value,
+              swid: possibleSWID.value
+            },
+            message: 'Debug mode login completed successfully'
+          };
+        }
+      }
+      
+      // Show progress every 10 seconds
+      if (attempts % 10 === 0) {
+        console.log(`Still waiting for login... (${attempts}/120 seconds)`);
+        console.log(`Current URL: ${currentUrl}`);
+        console.log(`Cookies found: ${cookies.filter(c => c.domain.includes('espn.com')).length}`);
+      }
+    }
+    
+    throw new Error('Debug mode timeout: Please complete the login within 2 minutes');
   }
 
   private async checkInputsForEmail(page: Page, inputs: ElementHandle[]): Promise<ElementHandle | null> {
@@ -132,16 +224,31 @@ export class HeadlessBrowserService {
   /**
    * Authenticate with ESPN using headless browser automation
    */
-  async authenticateWithESPN(email: string, password: string): Promise<EspnLoginResult> {
+  async authenticateWithESPN(email: string, password: string, debugMode: boolean = false): Promise<EspnLoginResult> {
     let page: Page | null = null;
 
     try {
-      await this.initBrowser();
+      await this.initBrowser(debugMode);
       if (!this.browser) {
         throw new Error('Browser not initialized');
       }
 
       page = await this.browser.newPage();
+      
+      if (debugMode) {
+        console.log('🐛 DEBUG MODE: Browser is now visible for manual login');
+        console.log('Please manually complete the ESPN login process');
+        
+        // Navigate to ESPN login page
+        console.log('Navigating to ESPN login page...');
+        await page.goto('https://secure.web.plus.espn.com/identity/login?locale=en', {
+          waitUntil: 'networkidle2',
+          timeout: 30000
+        });
+        
+        // In debug mode, let user manually login and monitor the process
+        return await this.handleDebugModeLogin(page, email);
+      }
       
       // Set user agent and viewport
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
