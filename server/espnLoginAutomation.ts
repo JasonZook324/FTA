@@ -51,14 +51,31 @@ export class ESPNLoginAutomation {
       await this.page.waitForTimeout(2000);
       console.log('ESPN homepage loaded');
       
-      // Step 2: Look for login link and click it
-      try {
-        await this.page.click('a[href*="login"], a:has-text("Log In"), a:has-text("Sign In")', { timeout: 5000 });
-        console.log('Clicked login link');
-        await this.page.waitForTimeout(3000);
-      } catch {
+      // Step 2: Look for login link and click it (try multiple selectors)
+      let clickedLogin = false;
+      const loginSelectors = [
+        'a:has-text("Log In"):not([href="#"])',
+        'a[href*="login"]:not([href="#"])',
+        'a:has-text("Sign In"):not([href="#"])',
+        'button:has-text("Log In")',
+        'button:has-text("Sign In")'
+      ];
+      
+      for (const selector of loginSelectors) {
+        try {
+          await this.page.click(selector, { timeout: 3000 });
+          console.log(`Clicked login with selector: ${selector}`);
+          await this.page.waitForTimeout(3000);
+          clickedLogin = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+      
+      if (!clickedLogin) {
         // If no login link found, navigate directly
-        console.log('No login link found, navigating directly...');
+        console.log('No working login link found, navigating directly...');
         await this.page.goto('https://www.espn.com/login', { waitUntil: 'domcontentloaded', timeout: 15000 });
         await this.page.waitForTimeout(3000);
       }
@@ -488,7 +505,18 @@ export class ESPNLoginAutomation {
         };
       }
       
-      // If we can't determine the state, assume success and wait for MFA
+      // Check if we're back on ESPN homepage (indicates login failed)
+      const currentUrl = this.page.url();
+      if (currentUrl === 'https://www.espn.com/' || currentUrl.includes('espn.com') && !currentUrl.includes('login') && !currentUrl.includes('registerdisney')) {
+        console.log('Ended up back on homepage, login submission failed');
+        return { 
+          success: false, 
+          waitingForMFA: false, 
+          error: 'Login form submission failed. Please check your credentials and try again.' 
+        };
+      }
+      
+      // If we can't determine the state but we're not on homepage, assume success and wait for MFA
       console.log('Could not determine page state, assuming MFA step...');
       return { success: true, waitingForMFA: true };
 
