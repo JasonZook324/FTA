@@ -68,13 +68,18 @@ export default function Authentication() {
       const response = await apiRequest("POST", "/api/espn-credentials", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Success",
-        description: "ESPN credentials saved successfully",
+        description: "ESPN credentials saved successfully. Validating connection and loading league data...",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
       setShowCredentialsForm(false);
+      
+      // Automatically trigger validation and league loading
+      setTimeout(() => {
+        validateCredentialsMutation.mutate();
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
