@@ -189,17 +189,6 @@ export default function Authentication() {
               <CheckCircle className="w-4 h-4 mr-2" />
               Test Connection
             </Button>
-            {credentials && (
-              <Button
-                variant="destructive"
-                onClick={() => disconnectMutation.mutate()}
-                disabled={disconnectMutation.isPending}
-                data-testid="button-disconnect"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
-              </Button>
-            )}
           </div>
         </div>
       </header>

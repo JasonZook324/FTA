@@ -12,12 +12,14 @@ import Players from "@/pages/players";
 import AIRecommendations from "@/pages/ai-recommendations";
 import TradeAnalyzer from "@/pages/trade-analyzer";
 import Sidebar from "@/components/sidebar";
+import LeagueHeader from "@/components/league-header";
 
 function Router() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+        <LeagueHeader />
         <Switch>
           <Route path="/" component={Authentication} />
           <Route path="/authentication" component={Authentication} />
