@@ -128,36 +128,6 @@ export default function Authentication() {
     },
   });
 
-  // Disconnect/logout mutation
-  const disconnectMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("DELETE", `/api/espn-credentials/${userId}`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Disconnected",
-        description: "Successfully disconnected from ESPN account and cleared all data",
-      });
-      // Clear all cached data
-      queryClient.clear();
-      // Reset the form
-      form.reset({
-        userId: userId,
-        espnS2: "",
-        swid: "",
-        testLeagueId: "",
-        testSeason: 2024,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Disconnect Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const onSubmit = (data: CredentialsFormData) => {
     saveCredentialsMutation.mutate(data);
