@@ -71,15 +71,15 @@ export default function Authentication() {
     },
     onSuccess: async () => {
       toast({
-        title: "Success",
-        description: "ESPN credentials saved successfully. Validating connection and loading league data...",
+        title: "Success", 
+        description: "ESPN credentials saved successfully. Testing connection and reloading league data...",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
       setShowCredentialsForm(false);
       
-      // Automatically trigger validation and league loading
+      // Automatically trigger league reload with fixed logic
       setTimeout(() => {
-        validateCredentialsMutation.mutate();
+        reloadLeagueMutation.mutate();
       }, 500);
     },
     onError: (error: Error) => {
