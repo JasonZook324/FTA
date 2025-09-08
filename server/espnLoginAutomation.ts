@@ -7,6 +7,7 @@ export interface ESPNCredentials {
 
 export interface LoginAutomationOptions {
   email: string;
+  password?: string;
   headless?: boolean;
   timeout?: number;
 }
@@ -443,7 +444,7 @@ export class ESPNLoginAutomation {
     try {
       await this.initialize(options.headless ?? true);
       
-      const loginResult = await this.startLogin(options.email);
+      const loginResult = await this.startLogin(options.email, options.password || '');
       if (!loginResult.success || !loginResult.waitingForMFA) {
         return { success: false, error: loginResult.error || 'Failed to start login process' };
       }

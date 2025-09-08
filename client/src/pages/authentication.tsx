@@ -134,8 +134,8 @@ export default function Authentication() {
 
   // Automated login mutations
   const startLoginMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/espn-login/start", { email });
+    mutationFn: async (credentials: { email: string; password: string }) => {
+      const response = await apiRequest("POST", "/api/espn-login/start", credentials);
       return response.json();
     },
     onSuccess: (data) => {
