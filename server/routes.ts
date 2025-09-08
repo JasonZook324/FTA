@@ -661,17 +661,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get stored team data - this has the complete info we need
       const storedTeams = await storage.getTeams(req.params.leagueId);
       console.log(`Found ${storedTeams.length} stored teams`);
+      if (storedTeams.length > 0) {
+        console.log('First stored team structure:', JSON.stringify(storedTeams[0], null, 2));
+      }
 
       // Use stored teams as primary data source since ESPN API doesn't return complete team data
       const transformedData = {
         ...standingsData,
         teams: storedTeams.map((storedTeam) => {
           // Parse team name into location and nickname
-          const nameParts = storedTeam.name.split(' ');
+          const teamName = storedTeam.name || `Team ${storedTeam.espnTeamId}`;
+          const nameParts = teamName.split(' ');
           const location = nameParts[0] || 'Team';
           const nickname = nameParts.slice(1).join(' ') || storedTeam.espnTeamId?.toString() || 'Unknown';
           
-          return {
+          const transformedTeam = {
             id: storedTeam.espnTeamId,
             location,
             nickname,
@@ -694,6 +698,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           };
+          
+          console.log(`Stored team ${storedTeam.espnTeamId} transformed:`, {
+            originalName: storedTeam.name,
+            location: transformedTeam.location,
+            nickname: transformedTeam.nickname,
+            owner: transformedTeam.owners[0].displayName
+          });
+          
+          return transformedTeam;
         })
       };
 
