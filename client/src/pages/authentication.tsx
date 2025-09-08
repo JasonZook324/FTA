@@ -43,10 +43,6 @@ export default function Authentication() {
     queryKey: ["/api/espn-credentials", userId],
   });
 
-  // Query user leagues
-  const { data: leagues, isLoading: leaguesLoading } = useQuery({
-    queryKey: ["/api/leagues", userId],
-  });
 
   // Update form when credentials are loaded
   useEffect(() => {
@@ -417,83 +413,6 @@ export default function Authentication() {
           </Card>
         </div>
 
-        {/* Leagues Section - Only show if authenticated */}
-        {credentials?.isValid && (
-          <>
-            <Separator className="my-8" />
-            
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Your Leagues</h3>
-                <p className="text-muted-foreground">Manage and view your ESPN fantasy leagues</p>
-              </div>
-
-              {/* Leagues List */}
-              <Card data-testid="card-leagues-list">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Trophy className="w-5 h-5" />
-                    <span>Loaded Leagues</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Leagues you have loaded from ESPN Fantasy
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {leaguesLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="animate-pulse">
-                          <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-muted rounded w-1/2"></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : leagues && Array.isArray(leagues) && leagues.length > 0 ? (
-                    <div className="space-y-4">
-                      {(leagues as any[]).map((league: any) => (
-                        <Card key={league.id} className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-foreground">{league.name}</h4>
-                            <Badge variant="outline">{league.sport.toUpperCase()}</Badge>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="text-muted-foreground">Season:</span>
-                              <div className="font-medium">{league.season}</div>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Teams:</span>
-                              <div className="font-medium">{league.teamCount}</div>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Week:</span>
-                              <div className="font-medium">{league.currentWeek}</div>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Updated:</span>
-                              <div className="font-medium">
-                                {league.lastUpdated ? new Date(league.lastUpdated).toLocaleDateString() : "Never"}
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No leagues loaded yet</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Successfully validate your credentials above to automatically load your league
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        )}
       </main>
     </>
   );
