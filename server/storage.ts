@@ -22,14 +22,12 @@ export interface IStorage {
   getEspnCredentials(userId: string): Promise<EspnCredentials | undefined>;
   createEspnCredentials(credentials: InsertEspnCredentials): Promise<EspnCredentials>;
   updateEspnCredentials(userId: string, credentials: Partial<EspnCredentials>): Promise<EspnCredentials | undefined>;
-  deleteEspnCredentials(userId: string): Promise<boolean>;
 
   // League methods
   getLeagues(userId: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
   updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
-  deleteAllUserLeagues(userId: string): Promise<boolean>;
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
@@ -121,14 +119,6 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteEspnCredentials(userId: string): Promise<boolean> {
-    const existing = await this.getEspnCredentials(userId);
-    if (!existing) return false;
-    
-    this.espnCredentials.delete(existing.id);
-    return true;
-  }
-
   // League methods
   async getLeagues(userId: string): Promise<League[]> {
     return Array.from(this.leagues.values()).filter(
@@ -170,45 +160,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async deleteAllUserLeagues(userId: string): Promise<boolean> {
-    const userLeagues = await this.getLeagues(userId);
-    let deletedCount = 0;
-    
-    for (const league of userLeagues) {
-      // Delete teams for this league
-      const leagueTeams = await this.getTeams(league.id);
-      for (const team of leagueTeams) {
-        this.teams.delete(team.id);
-      }
-      
-      // Delete matchups for this league
-      const leagueMatchups = await this.getMatchups(league.id);
-      for (const matchup of leagueMatchups) {
-        this.matchups.delete(matchup.id);
-      }
-      
-      // Delete the league itself
-      this.leagues.delete(league.id);
-      deletedCount++;
-    }
-    
-    return deletedCount > 0;
-  }
-
   // Team methods
   async getTeams(leagueId: string): Promise<Team[]> {
     return Array.from(this.teams.values()).filter(
       (team) => team.leagueId === leagueId,
-    );
-  }
-
-  async getTeam(id: string): Promise<Team | undefined> {
-    return this.teams.get(id);
-  }
-
-  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
-    return Array.from(this.teams.values()).find(
-      team => team.leagueId === leagueId && team.espnTeamId === espnTeamId
     );
   }
 
@@ -378,13 +333,6 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async deleteEspnCredentials(userId: string): Promise<boolean> {
-    const deletedRows = await db
-      .delete(espnCredentials)
-      .where(eq(espnCredentials.userId, userId));
-    return (deletedRows.rowCount || 0) > 0;
-  }
-
   // League methods
   async getLeagues(userId: string): Promise<League[]> {
     return await db
@@ -421,55 +369,12 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async deleteAllUserLeagues(userId: string): Promise<boolean> {
-    try {
-      // Get all user leagues first
-      const userLeagues = await this.getLeagues(userId);
-      
-      if (userLeagues.length === 0) {
-        return false;
-      }
-      
-      // Delete teams for all user leagues
-      for (const league of userLeagues) {
-        await db.delete(teams).where(eq(teams.leagueId, league.id));
-        await db.delete(matchups).where(eq(matchups.leagueId, league.id));
-      }
-      
-      // Delete all user leagues
-      const deletedLeagues = await db
-        .delete(leagues)
-        .where(eq(leagues.userId, userId));
-      
-      return (deletedLeagues.rowCount || 0) > 0;
-    } catch (error) {
-      console.error('Error deleting user leagues:', error);
-      return false;
-    }
-  }
-
   // Team methods
   async getTeams(leagueId: string): Promise<Team[]> {
     return await db
       .select()
       .from(teams)
       .where(eq(teams.leagueId, leagueId));
-  }
-
-  async getTeam(id: string): Promise<Team | undefined> {
-    const [team] = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.id, id));
-    return team || undefined;
-  }
-
-  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
-    const [team] = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.leagueId, leagueId) && eq(teams.espnTeamId, espnTeamId));
-    return team || undefined;
   }
 
   async createTeam(team: InsertTeam): Promise<Team> {
