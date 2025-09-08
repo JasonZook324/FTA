@@ -314,18 +314,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if credentials already exist for this user
-      const existing = await storage.getEspnCredentials(validatedData.userId);
+      let existing;
+      try {
+        existing = await storage.getEspnCredentials(validatedData.userId);
+      } catch (dbError) {
+        console.error('Database error when checking existing credentials:', dbError);
+        return res.status(500).json({ 
+          message: "Database connection error. Please try again in a moment." 
+        });
+      }
       
       let credentials: EspnCredentials;
-      if (existing) {
-        credentials = await storage.updateEspnCredentials(validatedData.userId, {
-          ...validatedData,
-          isValid: true,
-          lastValidated: new Date()
-        }) as EspnCredentials;
-      } else {
-        credentials = await storage.createEspnCredentials({
-          ...validatedData
+      try {
+        if (existing) {
+          credentials = await storage.updateEspnCredentials(validatedData.userId, {
+            ...validatedData,
+            isValid: true,
+            lastValidated: new Date()
+          }) as EspnCredentials;
+        } else {
+          credentials = await storage.createEspnCredentials({
+            ...validatedData
+          });
+        }
+      } catch (dbError) {
+        console.error('Database error when saving credentials:', dbError);
+        return res.status(500).json({ 
+          message: "Failed to save credentials due to database error. Please try again." 
         });
       }
 
@@ -346,7 +361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(credentials);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error('Database error in GET credentials:', error);
+      res.status(500).json({ message: "Database connection error. Please refresh the page and try again." });
     }
   });
 
@@ -359,10 +375,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isValid = await espnApiService.validateCredentials(credentials);
-      await storage.updateEspnCredentials(userId, {
-        isValid,
-        lastValidated: new Date()
-      });
+      
+      try {
+        await storage.updateEspnCredentials(userId, {
+          isValid,
+          lastValidated: new Date()
+        });
+      } catch (dbError) {
+        console.error('Database error when updating validation status:', dbError);
+        // Continue with validation response even if update fails
+      }
 
       if (isValid && credentials.testLeagueId && credentials.testSeason) {
         try {
