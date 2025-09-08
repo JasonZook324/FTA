@@ -1,0 +1,116 @@
+Browserslist: browsers data (caniuse-lite) is 11 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:32488) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+5:50:57 PM [express] GET /api/espn-credentials/default-user 304 in 153ms :: {"id":"cf5349c8-3ee8-44e…
+5:50:58 PM [express] GET /api/leagues/default-user 304 in 34ms :: [{"id":"4202bc7f-d0da-42d5-b967-d5…
+5:50:58 PM [express] GET /api/espn-credentials/default-user 304 in 166ms :: {"id":"cf5349c8-3ee8-44e…
+5:51:29 PM [express] GET /api/espn-credentials/default-user 304 in 135ms :: {"id":"cf5349c8-3ee8-44e…
+5:51:29 PM [express] GET /api/leagues/default-user 304 in 145ms :: [{"id":"4202bc7f-d0da-42d5-b967-d…
+ESPN API standings response structure:
+Keys: [
+  'gameId',
+  'id',
+  'members',
+  'scoringPeriodId',
+  'seasonId',
+  'segmentId',
+  'settings',
+  'status',
+  'teams'
+]
+First team structure: {
+  "abbrev": "JAZ1",
+  "id": 1,
+  "owners": [
+    "{A2AD9186-6325-4D90-840D-C62AFEC99239}"
+  ]
+}
+Found 14 stored teams
+Processing 14 teams from ESPN API
+Team 1 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 2 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 3 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 4 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 5 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 6 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 7 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 8 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 9 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 10 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 11 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 12 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 13 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+Team 14 mapped: {
+  location: 'undefined',
+  nickname: 'undefined',
+  owner: undefined,
+  wins: 0
+}
+5:51:32 PM [express] GET /api/leagues/4202bc7f-d0da-42d5-b967-d5bd745f0453/standings 304 in 281ms ::…
