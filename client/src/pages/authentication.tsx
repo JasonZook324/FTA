@@ -91,6 +91,29 @@ export default function Authentication() {
     },
   });
 
+  // Reload league data mutation
+  const reloadLeagueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/espn-credentials/${userId}/reload-league`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: `League data reloaded! "${data.league.name}" now has ${data.league.teamCount} teams with proper names and owners.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Reload Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Validate credentials mutation
   const validateCredentialsMutation = useMutation({
     mutationFn: async () => {
@@ -99,18 +122,12 @@ export default function Authentication() {
     },
     onSuccess: (data) => {
       if (data.isValid) {
-        let description = "ESPN credentials are valid";
-        
-        if (data.autoLoaded && data.league) {
-          description = `ESPN credentials are valid and league "${data.league.name}" has been automatically loaded with ${data.league.teamCount} teams`;
-        } else if (data.autoLoaded === false && data.autoLoadError) {
-          description = `ESPN credentials are valid but league auto-load failed: ${data.autoLoadError}`;
-        }
-        
         toast({
-          title: "Success",
-          description: description,
+          title: "Valid Credentials",
+          description: "ESPN credentials are working! Now click 'Reload League Data' to refresh team information.",
         });
+        
+        // Don't auto-load here anymore, let user manually reload
       } else {
         toast({
           title: "Invalid Credentials",
@@ -157,9 +174,19 @@ export default function Authentication() {
               onClick={() => validateCredentialsMutation.mutate()}
               disabled={validateCredentialsMutation.isPending || !credentials}
               data-testid="button-test-connection"
+              variant="outline"
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Test Connection
+            </Button>
+            
+            <Button
+              onClick={() => reloadLeagueMutation.mutate()}
+              disabled={reloadLeagueMutation.isPending || !credentials || !credentials.isValid}
+              data-testid="button-reload-league"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {reloadLeagueMutation.isPending ? "Reloading..." : "Reload League Data"}
             </Button>
           </div>
         </div>

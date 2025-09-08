@@ -366,6 +366,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reload league data (delete existing and re-import)
+  app.post("/api/espn-credentials/:userId/reload-league", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const credentials = await storage.getEspnCredentials(userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      if (!credentials.testLeagueId || !credentials.testSeason) {
+        return res.status(400).json({ message: "League ID and season required" });
+      }
+
+      // Delete existing league and team data for this user
+      const existingLeagues = await storage.getLeagues(userId);
+      for (const league of existingLeagues) {
+        await storage.deleteLeague(league.id);
+      }
+
+      // Reload league data using the FIXED logic
+      const leagueData = await espnApiService.getLeagueData(
+        credentials,
+        'ffl',
+        credentials.testSeason,
+        credentials.testLeagueId,
+        ['mTeam', 'mSettings']
+      );
+      
+      // Parse and store league information
+      const leagueInfo = {
+        userId,
+        espnLeagueId: credentials.testLeagueId,
+        name: leagueData.settings?.name || `League ${credentials.testLeagueId}`,
+        sport: 'ffl',
+        season: credentials.testSeason,
+        teamCount: leagueData.teams?.length || 0,
+        currentWeek: leagueData.scoringPeriodId || 1,
+        playoffTeams: leagueData.settings?.playoffTeamCount || 6,
+        scoringType: leagueData.settings?.scoringType || "Head-to-Head Points",
+        tradeDeadline: leagueData.settings?.tradeDeadline || null,
+        settings: leagueData.settings || {}
+      };
+
+      const league = await storage.createLeague(leagueInfo);
+
+      // Store teams using the FIXED logic
+      if (leagueData.teams) {        
+        for (const team of leagueData.teams) {
+          // Build team name properly handling undefined values
+          let teamName = `Team ${team.id}`;
+          if (team.location && team.nickname) {
+            teamName = `${team.location} ${team.nickname}`;
+          } else if (team.location) {
+            teamName = team.location;
+          } else if (team.nickname) {
+            teamName = team.nickname;
+          } else if (team.abbrev) {
+            teamName = team.abbrev;
+          }
+
+          // Find owner from members array using team.owners GUID
+          let ownerName = `Owner ${team.id}`;
+          if (team.owners && team.owners[0]) {
+            const ownerGuid = team.owners[0].replace(/[{}]/g, ''); // Remove braces from GUID
+            const member = leagueData.members?.find((m: any) => m.id.includes(ownerGuid));
+            if (member?.displayName) {
+              ownerName = member.displayName;
+            } else if (team.owners[0].displayName) {
+              ownerName = team.owners[0].displayName;
+            } else if (team.owners[0].firstName && team.owners[0].lastName) {
+              ownerName = `${team.owners[0].firstName} ${team.owners[0].lastName}`;
+            }
+          }
+
+          await storage.createTeam({
+            espnTeamId: team.id,
+            leagueId: league.id,
+            name: teamName,
+            owner: ownerName,
+            abbreviation: team.abbrev || null,
+            logoUrl: team.logo || null,
+            wins: team.record?.overall?.wins || 0,
+            losses: team.record?.overall?.losses || 0,
+            ties: team.record?.overall?.ties || 0,
+            pointsFor: team.record?.overall?.pointsFor?.toString() || "0",
+            pointsAgainst: team.record?.overall?.pointsAgainst?.toString() || "0",
+            streak: team.record?.overall?.streakType && team.record?.overall?.streakLength ? 
+              `${team.record.overall.streakType}${team.record.overall.streakLength}` : null,
+            rank: team.playoffSeed || team.draftDayProjectedRank || null
+          });
+        }
+      }
+
+      // Set this league as the user's selected league
+      await storage.updateUser(userId, { selectedLeagueId: league.id });
+
+      res.json({ 
+        message: "League data reloaded successfully",
+        league: { 
+          name: league.name, 
+          teamCount: league.teamCount 
+        }
+      });
+    } catch (error: any) {
+      console.error('League reload error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/espn-credentials/:userId/validate", async (req, res) => {
     try {
       const userId = req.params.userId;
