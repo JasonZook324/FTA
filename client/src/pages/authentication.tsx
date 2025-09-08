@@ -326,27 +326,15 @@ export default function Authentication() {
                     )}
                   />
 
-                  <div className="flex space-x-3">
-                    <Button
-                      type="submit"
-                      className="flex-1"
-                      disabled={saveCredentialsMutation.isPending}
-                      data-testid="button-save-cookies"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {saveCredentialsMutation.isPending ? "Saving..." : "Save Cookies"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => validateCredentialsMutation.mutate()}
-                      disabled={validateCredentialsMutation.isPending || !credentials}
-                      data-testid="button-validate"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      {validateCredentialsMutation.isPending ? "Validating..." : "Validate"}
-                    </Button>
-                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={saveCredentialsMutation.isPending}
+                    data-testid="button-save-cookies"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {saveCredentialsMutation.isPending ? "Saving..." : "Save Cookies"}
+                  </Button>
                     </form>
                   </Form>
                   
