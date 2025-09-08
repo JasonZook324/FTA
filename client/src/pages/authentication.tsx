@@ -30,6 +30,8 @@ export default function Authentication() {
       userId: userId,
       espnS2: "",
       swid: "",
+      testLeagueId: "",
+      testSeason: 2024,
     },
   });
 
@@ -45,6 +47,8 @@ export default function Authentication() {
         userId: userId,
         espnS2: credentials.espnS2 || "",
         swid: credentials.swid || "",
+        testLeagueId: credentials.testLeagueId || "",
+        testSeason: credentials.testSeason || 2024,
       });
     }
   }, [credentials, userId, form]);
@@ -119,6 +123,8 @@ export default function Authentication() {
         userId: userId,
         espnS2: "",
         swid: "",
+        testLeagueId: "",
+        testSeason: 2024,
       });
     },
     onError: (error: Error) => {
@@ -218,6 +224,18 @@ export default function Authentication() {
                           {credentials.swid || "Not set"}
                         </div>
                       </div>
+                      <div>
+                        <span className="font-medium">Test League ID:</span>
+                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
+                          {credentials.testLeagueId || "Not set"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Test Season:</span>
+                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
+                          {credentials.testSeason || "Not set"}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -263,6 +281,52 @@ export default function Authentication() {
                         </FormControl>
                         <FormDescription>
                           User identifier cookie from ESPN
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="testLeagueId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Test League ID</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            placeholder="Enter a league ID you have access to"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-test-league-id"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          A fantasy league ID you're a member of (used to validate credentials)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="testSeason"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Test Season</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="2024"
+                            value={field.value?.toString() || "2024"}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 2024)}
+                            data-testid="input-test-season"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          The season year for the test league (e.g., 2024, 2025)
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

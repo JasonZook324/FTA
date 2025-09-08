@@ -23,88 +23,88 @@ class EspnApiService {
 
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
-      console.log('ESPN API validation - testing credentials by fetching user leagues...');
+      console.log('ESPN API validation - testing credentials with user-provided league...');
       
-      // Test by attempting to access a known league endpoint that requires authentication
-      // We'll try to access a league that requires valid credentials - invalid creds get 401/403
-      const testSeasons = [2024, 2025];
-      
-      for (const season of testSeasons) {
-        // Use a common test league ID that ESPN uses for validation
-        const testLeagueId = 123456; // This should return 401/403 for invalid credentials
-        const testUrl = `${this.baseUrl}/ffl/seasons/${season}/segments/0/leagues/${testLeagueId}?view=mTeam`;
-        console.log(`ESPN API test URL (season ${season}):`, testUrl);
-        
-        try {
-          const response = await fetch(testUrl, { 
-            method: 'GET',
-            headers: this.getHeaders(credentials)
-          });
-          
-          console.log(`ESPN API response status (season ${season}):`, response.status);
-          
-          // Invalid credentials return 401 Unauthorized - this is definitive proof credentials are bad
-          if (response.status === 401) {
-            console.log(`ESPN API validation - FAILED: Got 401 Unauthorized, credentials are invalid`);
-            return false;
-          }
-          
-          // Forbidden usually means authenticated but no access - still means auth worked
-          if (response.status === 403) {
-            console.log(`ESPN API validation - Got 403 Forbidden - credentials are valid but no access to this league`);
-            return true;
-          }
-          
-          // 200 means credentials are valid and have access
-          if (response.status === 200) {
-            console.log(`ESPN API validation - SUCCESS: Got 200, credentials are valid`);
-            return true;
-          }
-          
-          // 404 is ambiguous - could be invalid creds OR league doesn't exist
-          // Let's check the response content to distinguish
-          if (response.status === 404) {
-            try {
-              const errorData = await response.json();
-              console.log(`ESPN API validation - Got 404, checking response:`, errorData);
-              
-              // Check if the error message indicates authentication issues
-              if (errorData.messages && errorData.messages.some((msg: any) => 
-                  msg.message && (
-                    msg.message.toLowerCase().includes('unauthorized') ||
-                    msg.message.toLowerCase().includes('authentication') ||
-                    msg.message.toLowerCase().includes('login')
-                  )
-                )) {
-                console.log(`ESPN API validation - FAILED: 404 with auth-related error, credentials are invalid`);
-                return false;
-              }
-              
-              // If it's just "not found" without auth errors, credentials might be valid
-              console.log(`ESPN API validation - Got 404 but no auth errors - trying next season...`);
-              continue;
-              
-            } catch (parseError) {
-              console.log(`ESPN API validation - Failed to parse 404 response, trying next season...`);
-              continue;
-            }
-          }
-          
-          // Other error codes
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.log(`ESPN API error (season ${season}): ${response.status} - ${errorText}`);
-            continue;
-          }
-          
-        } catch (requestError) {
-          console.log(`ESPN API validation - request error for season ${season}:`, requestError);
-          continue;
-        }
+      // Use the specific league ID and season provided by the user for validation
+      if (!credentials.testLeagueId || !credentials.testSeason) {
+        console.log('ESPN API validation - FAILED: No test league ID or season provided');
+        return false;
       }
       
-      // If we get here, we never got a definitive answer - assume invalid for security
-      console.log('ESPN API validation - FAILED: Could not validate credentials definitively, assuming invalid');
+      const testUrl = `${this.baseUrl}/ffl/seasons/${credentials.testSeason}/segments/0/leagues/${credentials.testLeagueId}?view=mTeam`;
+      console.log(`ESPN API test URL:`, testUrl);
+      
+      try {
+        const response = await fetch(testUrl, { 
+          method: 'GET',
+          headers: this.getHeaders(credentials)
+        });
+        
+        console.log(`ESPN API response status:`, response.status);
+        
+        // Invalid credentials return 401 Unauthorized - definitive proof credentials are bad
+        if (response.status === 401) {
+          console.log(`ESPN API validation - FAILED: Got 401 Unauthorized, credentials are invalid`);
+          return false;
+        }
+        
+        // Forbidden usually means authenticated but no access to this specific league
+        if (response.status === 403) {
+          console.log(`ESPN API validation - Got 403 Forbidden - credentials are valid but no access to this league`);
+          return true;
+        }
+        
+        // 200 means credentials are valid and have access
+        if (response.status === 200) {
+          console.log(`ESPN API validation - SUCCESS: Got 200, credentials are valid and have league access`);
+          return true;
+        }
+        
+        // 404 could mean invalid creds or league doesn't exist - check response details
+        if (response.status === 404) {
+          try {
+            const errorData = await response.json();
+            console.log(`ESPN API validation - Got 404, checking response:`, errorData);
+            
+            // Check if the error message indicates authentication issues
+            if (errorData.messages && errorData.messages.some((msg: any) => 
+                msg.message && (
+                  msg.message.toLowerCase().includes('unauthorized') ||
+                  msg.message.toLowerCase().includes('authentication') ||
+                  msg.message.toLowerCase().includes('login') ||
+                  msg.message.toLowerCase().includes('access denied')
+                )
+              )) {
+              console.log(`ESPN API validation - FAILED: 404 with auth-related error, credentials are invalid`);
+              return false;
+            }
+            
+            // If it's just "not found" without auth errors, user may have provided wrong league/season
+            // But credentials might still be valid - this is ambiguous
+            console.log(`ESPN API validation - Got 404 but no clear auth error. League may not exist or user may not have access.`);
+            console.log(`ESPN API validation - Assuming INVALID for security - user should verify League ID and Season are correct`);
+            return false;
+            
+          } catch (parseError) {
+            console.log(`ESPN API validation - Failed to parse 404 response:`, parseError);
+            return false;
+          }
+        }
+        
+        // Other error codes
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log(`ESPN API error: ${response.status} - ${errorText}`);
+          return false;
+        }
+        
+      } catch (requestError) {
+        console.log(`ESPN API validation - request error:`, requestError);
+        return false;
+      }
+      
+      // Should not reach here, but assume invalid for safety
+      console.log('ESPN API validation - FAILED: Unexpected code path, assuming invalid');
       return false;
       
     } catch (error) {

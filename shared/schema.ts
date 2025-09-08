@@ -15,6 +15,8 @@ export const espnCredentials = pgTable("espn_credentials", {
   userId: varchar("user_id").notNull(),
   espnS2: text("espn_s2").notNull(),
   swid: text("swid").notNull(),
+  testLeagueId: text("test_league_id"),
+  testSeason: integer("test_season"),
   isValid: boolean("is_valid").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   lastValidated: timestamp("last_validated"),
