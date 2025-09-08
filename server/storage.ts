@@ -22,28 +22,33 @@ export interface IStorage {
   getEspnCredentials(userId: string): Promise<EspnCredentials | undefined>;
   createEspnCredentials(credentials: InsertEspnCredentials): Promise<EspnCredentials>;
   updateEspnCredentials(userId: string, credentials: Partial<EspnCredentials>): Promise<EspnCredentials | undefined>;
+  deleteEspnCredentials(userId: string): Promise<boolean>;
 
   // League methods
   getLeagues(userId: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
   updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
+  deleteLeague(id: string): Promise<boolean>;
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: string, team: Partial<Team>): Promise<Team | undefined>;
+  deleteTeam(id: string): Promise<boolean>;
 
   // Matchup methods
   getMatchups(leagueId: string, week?: number): Promise<Matchup[]>;
   createMatchup(matchup: InsertMatchup): Promise<Matchup>;
   updateMatchup(id: string, matchup: Partial<Matchup>): Promise<Matchup | undefined>;
+  deleteMatchup(id: string): Promise<boolean>;
 
   // Player methods
   getPlayers(): Promise<Player[]>;
   getPlayer(espnPlayerId: number): Promise<Player | undefined>;
   createPlayer(player: InsertPlayer): Promise<Player>;
   updatePlayer(id: string, player: Partial<Player>): Promise<Player | undefined>;
+  deletePlayer(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -119,6 +124,14 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteEspnCredentials(userId: string): Promise<boolean> {
+    const existing = await this.getEspnCredentials(userId);
+    if (!existing) return false;
+    
+    this.espnCredentials.delete(existing.id);
+    return true;
+  }
+
   // League methods
   async getLeagues(userId: string): Promise<League[]> {
     return Array.from(this.leagues.values()).filter(
@@ -160,6 +173,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteLeague(id: string): Promise<boolean> {
+    return this.leagues.delete(id);
+  }
+
   // Team methods
   async getTeams(leagueId: string): Promise<Team[]> {
     return Array.from(this.teams.values()).filter(
@@ -194,6 +211,10 @@ export class MemStorage implements IStorage {
     const updated: Team = { ...existing, ...updates };
     this.teams.set(id, updated);
     return updated;
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    return this.teams.delete(id);
   }
 
   // Matchup methods
@@ -232,6 +253,10 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteMatchup(id: string): Promise<boolean> {
+    return this.matchups.delete(id);
+  }
+
   // Player methods
   async getPlayers(): Promise<Player[]> {
     return Array.from(this.players.values());
@@ -264,6 +289,10 @@ export class MemStorage implements IStorage {
     const updated: Player = { ...existing, ...updates };
     this.players.set(id, updated);
     return updated;
+  }
+
+  async deletePlayer(id: string): Promise<boolean> {
+    return this.players.delete(id);
   }
 }
 
@@ -333,6 +362,13 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
+  async deleteEspnCredentials(userId: string): Promise<boolean> {
+    const result = await db
+      .delete(espnCredentials)
+      .where(eq(espnCredentials.userId, userId));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   // League methods
   async getLeagues(userId: string): Promise<League[]> {
     return await db
@@ -369,6 +405,13 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
+  async deleteLeague(id: string): Promise<boolean> {
+    const result = await db
+      .delete(leagues)
+      .where(eq(leagues.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   // Team methods
   async getTeams(leagueId: string): Promise<Team[]> {
     return await db
@@ -392,6 +435,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teams.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    const result = await db
+      .delete(teams)
+      .where(eq(teams.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Matchup methods
@@ -426,6 +476,13 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
+  async deleteMatchup(id: string): Promise<boolean> {
+    const result = await db
+      .delete(matchups)
+      .where(eq(matchups.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   // Player methods
   async getPlayers(): Promise<Player[]> {
     return await db.select().from(players);
@@ -454,6 +511,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(players.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async deletePlayer(id: string): Promise<boolean> {
+    const result = await db
+      .delete(players)
+      .where(eq(players.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

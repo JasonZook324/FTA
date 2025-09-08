@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const credentialsFormSchema = insertEspnCredentialsSchema.extend({
@@ -90,6 +90,35 @@ export default function Authentication() {
     },
   });
 
+  // Disconnect/logout mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/espn-credentials/${userId}`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Disconnected",
+        description: "Successfully disconnected from ESPN account and cleared all data",
+      });
+      // Clear all cached data
+      queryClient.clear();
+      // Reset the form
+      form.reset({
+        userId: userId,
+        espnS2: "",
+        swid: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Disconnect Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: CredentialsFormData) => {
     saveCredentialsMutation.mutate(data);
   };
@@ -120,6 +149,17 @@ export default function Authentication() {
               <CheckCircle className="w-4 h-4 mr-2" />
               Test Connection
             </Button>
+            {credentials && (
+              <Button
+                variant="destructive"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+                data-testid="button-disconnect"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
+              </Button>
+            )}
           </div>
         </div>
       </header>

@@ -302,6 +302,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disconnect/logout route - clears ESPN credentials and all associated data
+  app.delete("/api/espn-credentials/:userId", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      
+      // Check if credentials exist
+      const credentials = await storage.getEspnCredentials(userId);
+      if (!credentials) {
+        return res.status(404).json({ message: "No ESPN credentials found to disconnect" });
+      }
+
+      // Get all user's leagues to clean up associated data
+      const userLeagues = await storage.getLeagues(userId);
+      
+      // Delete all teams, matchups, and players for each league
+      for (const league of userLeagues) {
+        const teams = await storage.getTeams(league.id);
+        const matchups = await storage.getMatchups(league.id);
+        const allPlayers = await storage.getPlayers();
+        const leaguePlayers = allPlayers.filter(p => p.leagueId === league.id);
+        
+        // Delete teams, matchups, and players
+        for (const team of teams) {
+          await storage.deleteTeam(team.id);
+        }
+        for (const matchup of matchups) {
+          await storage.deleteMatchup(matchup.id);
+        }
+        for (const player of leaguePlayers) {
+          await storage.deletePlayer(player.id);
+        }
+        
+        // Delete the league itself
+        await storage.deleteLeague(league.id);
+      }
+
+      // Reset user's selected league
+      await storage.updateUser(userId, { selectedLeagueId: null });
+
+      // Delete ESPN credentials
+      await storage.deleteEspnCredentials(userId);
+
+      console.log(`Successfully disconnected user ${userId} and cleared all associated data`);
+      res.json({ 
+        message: "Successfully disconnected from ESPN account and cleared all data",
+        clearedItems: {
+          credentials: 1,
+          leagues: userLeagues.length,
+          totalItemsCleared: "All user data successfully removed"
+        }
+      });
+    } catch (error: any) {
+      console.error('Error during disconnect:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // League routes
   app.get("/api/leagues/:userId", async (req, res) => {
     try {
