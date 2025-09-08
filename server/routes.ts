@@ -658,20 +658,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.espnLeagueId
       );
 
+      // Debug logging to see actual data structure
+      console.log('ESPN API standings response structure:');
+      console.log('Keys:', Object.keys(standingsData));
+      if (standingsData.teams && standingsData.teams.length > 0) {
+        console.log('First team structure:', JSON.stringify(standingsData.teams[0], null, 2));
+      }
+
       // Also get stored team data for additional info
       const storedTeams = await storage.getTeams(req.params.leagueId);
+      console.log(`Found ${storedTeams.length} stored teams`);
+
+      // Try different possible team locations in ESPN response
+      let teams = standingsData.teams || standingsData.members || [];
+      if (!teams.length && standingsData.schedule) {
+        // Sometimes teams are nested in schedule data
+        teams = standingsData.schedule.reduce((acc: any[], week: any) => {
+          if (week.matchups) {
+            week.matchups.forEach((matchup: any) => {
+              if (matchup.away && !acc.find((t: any) => t.id === matchup.away.id)) {
+                acc.push(matchup.away);
+              }
+              if (matchup.home && !acc.find((t: any) => t.id === matchup.home.id)) {
+                acc.push(matchup.home);
+              }
+            });
+          }
+          return acc;
+        }, []);
+      }
+
+      console.log(`Processing ${teams.length} teams from ESPN API`);
 
       // Transform and merge the data to match what the component expects
       const transformedData = {
         ...standingsData,
-        teams: standingsData.teams?.map((espnTeam: any) => {
+        teams: teams.map((espnTeam: any) => {
           // Find corresponding stored team data
           const storedTeam = storedTeams.find(t => t.espnTeamId === espnTeam.id);
           
-          return {
+          const teamData = {
             id: espnTeam.id,
             location: espnTeam.location || storedTeam?.name?.split(' ')[0] || 'Team',
-            nickname: espnTeam.nickname || storedTeam?.name?.split(' ').slice(1).join(' ') || espnTeam.id.toString(),
+            nickname: espnTeam.nickname || storedTeam?.name?.split(' ').slice(1).join(' ') || espnTeam.id?.toString() || 'Unknown',
             owners: espnTeam.owners || [{
               displayName: storedTeam?.owner || 'Unknown Owner',
               firstName: storedTeam?.owner?.split(' ')[0] || 'Unknown',
@@ -688,7 +717,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           };
-        }) || []
+          
+          console.log(`Team ${espnTeam.id} mapped:`, {
+            location: teamData.location,
+            nickname: teamData.nickname,
+            owner: teamData.owners[0].displayName,
+            wins: teamData.record.overall.wins
+          });
+          
+          return teamData;
+        })
       };
 
       res.json(transformedData);
