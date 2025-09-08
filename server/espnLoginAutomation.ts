@@ -87,28 +87,70 @@ export class ESPNLoginAutomation {
       
       let foundLoginForm = false;
       
-      // Check if we have proper login elements on current page
-      const loginCheck = await this.page.evaluate(() => {
-        const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[id*="email"]');
-        const textInputs = document.querySelectorAll('input[type="text"]');
-        const passwordInputs = document.querySelectorAll('input[type="password"]');
-        const forms = document.querySelectorAll('form');
+      // Check current URL - if we're still on ESPN homepage, we need to find the actual login
+      const pageUrl = this.page.url();
+      if (pageUrl === 'https://www.espn.com/' || !pageUrl.includes('login') && !pageUrl.includes('registerdisney')) {
+        console.log('Still on homepage, looking for iframes or hidden login forms...');
         
-        return {
-          hasEmailField: emailInputs.length > 0,
-          hasTextInput: textInputs.length > 0,
-          hasPasswordField: passwordInputs.length > 0,
-          hasForm: forms.length > 0,
-          title: document.title,
-          url: window.location.href,
-          bodyContent: document.body?.textContent?.substring(0, 200) || ''
-        };
-      });
-      
-      console.log('Login page check:', JSON.stringify(loginCheck, null, 2));
-      
-      if (loginCheck.hasEmailField || (loginCheck.hasTextInput && loginCheck.hasForm)) {
-        console.log('Found proper login form');
+        // Look for Disney SSO iframes
+        const iframes = await this.page.evaluate(() => {
+          const frames = Array.from(document.querySelectorAll('iframe'));
+          return frames.map(frame => ({
+            src: frame.src,
+            id: frame.id,
+            className: frame.className,
+            style: frame.style.cssText
+          }));
+        });
+        
+        console.log('Found iframes on page:', JSON.stringify(iframes, null, 2));
+        
+        // Try to find and navigate to Disney SSO iframe
+        const disneyIframe = iframes.find(iframe => iframe.src.includes('registerdisney.go.com'));
+        if (disneyIframe) {
+          console.log('Found Disney SSO iframe, navigating to it...');
+          await this.page.goto(disneyIframe.src, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          await this.page.waitForTimeout(5000);
+          foundLoginForm = true;
+        } else {
+          console.log('No Disney iframe found, trying to trigger login modal...');
+          
+          // Try clicking account/profile related elements to trigger login
+          const accountTriggers = [
+            'button:has-text("Log In")',
+            'a:has-text("Account")',
+            '[data-module="account"]',
+            '.account-menu',
+            '.user-menu',
+            '[aria-label*="account"]',
+            '[aria-label*="login"]'
+          ];
+          
+          for (const trigger of accountTriggers) {
+            try {
+              await this.page.click(trigger, { timeout: 2000 });
+              console.log(`Clicked account trigger: ${trigger}`);
+              await this.page.waitForTimeout(3000);
+              
+              // Check if this triggered a login form or modal
+              const hasLogin = await this.page.evaluate(() => {
+                const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"]');
+                const iframes = document.querySelectorAll('iframe[src*="registerdisney"]');
+                return emailInputs.length > 0 || iframes.length > 0;
+              });
+              
+              if (hasLogin) {
+                console.log('Successfully triggered login form');
+                foundLoginForm = true;
+                break;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      } else {
+        console.log('Already on login-related page');
         foundLoginForm = true;
       }
       
