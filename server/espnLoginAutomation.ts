@@ -38,30 +38,52 @@ export class ESPNLoginAutomation {
       console.log('Navigating to ESPN login page...');
       await this.page.goto('https://www.espn.com/login', { waitUntil: 'networkidle' });
 
-      // Wait for and click "Need help logging in?" link
-      console.log('Looking for "Need help logging in?" link...');
-      await this.page.waitForSelector('text=Need help logging in?', { timeout: 10000 });
-      await this.page.click('text=Need help logging in?');
+      // Wait for the page to load and look for email input directly
+      console.log('Looking for email input field...');
+      await this.page.waitForSelector('input[type="email"], input[name="email"], #email', { timeout: 15000 });
 
-      // Wait for modal to appear
-      console.log('Waiting for modal to appear...');
-      await this.page.waitForSelector('[data-testid="email-input"], input[type="email"]', { timeout: 10000 });
-
-      // Enter email address
+      // Enter email address directly
       console.log('Entering email address...');
-      const emailInput = await this.page.locator('[data-testid="email-input"], input[type="email"]').first();
+      const emailInput = await this.page.locator('input[type="email"], input[name="email"], #email').first();
       await emailInput.fill(email);
 
-      // Click Continue button
-      console.log('Clicking Continue button...');
-      await this.page.click('button:has-text("Continue"), [data-testid="continue-button"]');
+      // Look for and click the login/continue button
+      console.log('Looking for login button...');
+      const loginButton = this.page.locator('button:has-text("Log In"), button:has-text("Continue"), button:has-text("Sign In"), button[type="submit"]').first();
+      await loginButton.click();
 
-      // Wait for MFA page to load
-      console.log('Waiting for MFA page...');
-      await this.page.waitForSelector('input[type="text"], input[placeholder*="code"], input[placeholder*="Code"]', { timeout: 15000 });
+      // Wait for either MFA page or potential error message
+      console.log('Waiting for next step...');
+      try {
+        // Wait for MFA input or password field
+        await this.page.waitForSelector('input[type="password"], input[placeholder*="code"], input[placeholder*="Code"], input[placeholder*="verification"]', { timeout: 15000 });
+        
+        // Check if we got a password field (means we need to handle password login flow)
+        const passwordField = await this.page.locator('input[type="password"]').first();
+        if (await passwordField.isVisible()) {
+          return { 
+            success: false, 
+            waitingForMFA: false, 
+            error: 'Password required. Please use manual login or ensure your ESPN account is configured for passwordless login.' 
+          };
+        }
 
-      console.log('MFA page loaded. Waiting for user to enter verification code...');
-      return { success: true, waitingForMFA: true };
+        // If we reach here, we should have MFA input
+        console.log('MFA page loaded. Waiting for user to enter verification code...');
+        return { success: true, waitingForMFA: true };
+
+      } catch (waitError) {
+        // Try to find any error messages on the page
+        const errorMessage = await this.page.locator('text*="error", text*="invalid", text*="incorrect"').first().textContent();
+        if (errorMessage) {
+          return { 
+            success: false, 
+            waitingForMFA: false, 
+            error: `Login failed: ${errorMessage}` 
+          };
+        }
+        throw waitError;
+      }
 
     } catch (error) {
       console.error('Error during login automation:', error);
@@ -80,27 +102,38 @@ export class ESPNLoginAutomation {
 
     try {
       console.log('Entering MFA verification code...');
-      const codeInput = await this.page.locator('input[type="text"], input[placeholder*="code"], input[placeholder*="Code"]').first();
+      const codeInput = await this.page.locator('input[type="text"], input[placeholder*="code"], input[placeholder*="Code"], input[placeholder*="verification"]').first();
       await codeInput.fill(verificationCode);
 
       // Click submit/continue button for MFA
       console.log('Submitting verification code...');
-      await this.page.click('button:has-text("Continue"), button:has-text("Submit"), button:has-text("Verify")');
+      const submitButton = this.page.locator('button:has-text("Continue"), button:has-text("Submit"), button:has-text("Verify"), button:has-text("Log In"), button[type="submit"]').first();
+      await submitButton.click();
 
-      // Wait for successful login - look for welcome message or profile elements
-      console.log('Waiting for successful login...');
-      await this.page.waitForSelector('text=Welcome back, button:has-text("Done"), [data-testid="success"]', { timeout: 30000 });
+      // Wait for navigation or success indication
+      console.log('Waiting for login completion...');
+      try {
+        // Wait for either success indicators or homepage
+        await this.page.waitForURL('**/homepage', { timeout: 30000 });
+      } catch {
+        // If URL doesn't change, look for success elements
+        await this.page.waitForSelector('text*="Welcome", [data-testid="user-menu"], .user-menu, text*="My Account"', { timeout: 30000 });
+      }
 
       // Click Done if present
       try {
-        await this.page.click('button:has-text("Done")', { timeout: 5000 });
-        console.log('Clicked Done button');
+        await this.page.click('button:has-text("Done"), button:has-text("Close")', { timeout: 3000 });
+        console.log('Clicked Done/Close button');
       } catch {
-        console.log('No Done button found, continuing...');
+        console.log('No Done/Close button found, continuing...');
       }
 
+      // Navigate to ESPN fantasy to ensure cookies are set properly
+      console.log('Navigating to ESPN fantasy to verify cookies...');
+      await this.page.goto('https://fantasy.espn.com', { waitUntil: 'networkidle' });
+      
       // Wait a moment for cookies to be set
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(3000);
 
       // Extract cookies
       console.log('Extracting authentication cookies...');
@@ -109,15 +142,16 @@ export class ESPNLoginAutomation {
       const espnS2Cookie = cookies.find(cookie => cookie.name === 'espn_s2');
       const swidCookie = cookies.find(cookie => cookie.name === 'SWID');
 
+      console.log('Found cookies:', { 
+        espnS2Found: !!espnS2Cookie, 
+        swidFound: !!swidCookie,
+        allCookieNames: cookies.map(c => c.name)
+      });
+
       if (!espnS2Cookie || !swidCookie) {
-        console.error('Required cookies not found:', { 
-          espnS2Found: !!espnS2Cookie, 
-          swidFound: !!swidCookie,
-          allCookies: cookies.map(c => c.name)
-        });
         return { 
           success: false, 
-          error: 'Authentication cookies not found. Login may have failed.' 
+          error: 'Authentication cookies not found. Login may have failed or cookies not set properly.' 
         };
       }
 
