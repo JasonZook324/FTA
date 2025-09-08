@@ -393,13 +393,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`Fetching fresh league data from ESPN API...`);
-      // Reload league data using the FIXED logic
+      // Reload league data using the FIXED logic - get both league and roster data for complete team info
       const leagueData = await espnApiService.getLeagueData(
         credentials,
         'ffl',
         credentials.testSeason,
         credentials.testLeagueId,
         ['mTeam', 'mSettings']
+      );
+
+      // Also fetch roster data to get complete team names
+      console.log(`Fetching roster data for complete team names...`);
+      const rosterData = await espnApiService.getRosters(
+        credentials,
+        'ffl', 
+        credentials.testSeason,
+        credentials.testLeagueId
       );
       
       console.log(`ESPN API returned league: ${leagueData.settings?.name}, teams: ${leagueData.teams?.length}, members: ${leagueData.members?.length}`);
@@ -422,25 +431,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Creating new league with ${leagueInfo.teamCount} teams`);
       const league = await storage.createLeague(leagueInfo);
 
-      // Store teams using the FIXED logic
+      // Store teams using the FIXED logic with roster data for full team names
       if (leagueData.teams) {    
         console.log(`Processing ${leagueData.teams.length} teams...`);
-        console.log('First team structure:', JSON.stringify(leagueData.teams[0], null, 2));
+        console.log('First team structure from league data:', JSON.stringify(leagueData.teams[0], null, 2));
+        if (rosterData.teams && rosterData.teams.length > 0) {
+          console.log('First team structure from roster data:', JSON.stringify(rosterData.teams[0], null, 2));
+        }
         if (leagueData.members && leagueData.members.length > 0) {
           console.log('First member structure:', JSON.stringify(leagueData.members[0], null, 2));
         }
         
         for (const team of leagueData.teams) {
-          // Build team name properly handling undefined values
+          // Try to get full team name from roster data first (which has complete team info)
           let teamName = `Team ${team.id}`;
-          if (team.location && team.nickname) {
-            teamName = `${team.location} ${team.nickname}`;
-          } else if (team.location) {
-            teamName = team.location;
-          } else if (team.nickname) {
-            teamName = team.nickname;
-          } else if (team.abbrev) {
-            teamName = team.abbrev;
+          let rosterTeam = rosterData.teams?.find((rt: any) => rt.id === team.id);
+          
+          if (rosterTeam) {
+            console.log(`Found roster team ${team.id}:`, { 
+              location: rosterTeam.location, 
+              nickname: rosterTeam.nickname, 
+              abbrev: rosterTeam.abbrev 
+            });
+            
+            // Use roster data for full team names
+            if (rosterTeam.location && rosterTeam.nickname) {
+              teamName = `${rosterTeam.location} ${rosterTeam.nickname}`;
+            } else if (rosterTeam.location) {
+              teamName = rosterTeam.location;
+            } else if (rosterTeam.nickname) {
+              teamName = rosterTeam.nickname;
+            } else if (rosterTeam.abbrev) {
+              teamName = rosterTeam.abbrev;
+            }
+          } else {
+            // Fall back to league data 
+            if (team.location && team.nickname) {
+              teamName = `${team.location} ${team.nickname}`;
+            } else if (team.location) {
+              teamName = team.location;
+            } else if (team.nickname) {
+              teamName = team.nickname;
+            } else if (team.abbrev) {
+              teamName = team.abbrev;
+            }
           }
 
           // Find owner from members array using team.owners GUID
