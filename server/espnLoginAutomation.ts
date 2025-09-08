@@ -38,19 +38,66 @@ export class ESPNLoginAutomation {
       console.log('Navigating to ESPN login page...');
       await this.page.goto('https://www.espn.com/login', { waitUntil: 'networkidle' });
 
-      // Wait for page load and debug what's available
-      await this.page.waitForTimeout(3000);
+      // Wait for dynamic content to load
+      console.log('Waiting for dynamic content...');
+      await this.page.waitForTimeout(5000);
       
       console.log('Page loaded, debugging available elements...');
       const pageTitle = await this.page.title();
       console.log('Page title:', pageTitle);
       
-      // Take screenshot for debugging
+      // Check for iframes that might contain the login form
+      const iframes = await this.page.evaluate(() => {
+        const frames = Array.from(document.querySelectorAll('iframe'));
+        return frames.map(frame => ({
+          src: frame.src,
+          id: frame.id,
+          className: frame.className
+        }));
+      });
+      console.log('Found iframes:', JSON.stringify(iframes, null, 2));
+
+      // If there are iframes, try to switch to them
+      if (iframes.length > 0) {
+        console.log('Trying to switch to iframe...');
+        try {
+          const frame = this.page.frame({ url: /login|auth|sso/ }) || this.page.frames()[1];
+          if (frame) {
+            console.log('Switched to frame, looking for elements...');
+            const frameElements = await frame.evaluate(() => {
+              const inputs = Array.from(document.querySelectorAll('input'));
+              const buttons = Array.from(document.querySelectorAll('button'));
+              return {
+                inputs: inputs.map(input => ({
+                  type: input.type,
+                  name: input.name,
+                  id: input.id,
+                  placeholder: input.placeholder
+                })),
+                buttons: buttons.map(button => ({
+                  text: button.textContent?.trim(),
+                  type: button.type
+                }))
+              };
+            });
+            console.log('Frame elements:', JSON.stringify(frameElements, null, 2));
+          }
+        } catch (frameError) {
+          console.log('Could not access iframe:', frameError);
+        }
+      }
+
+      // Wait for any form elements to appear
+      console.log('Waiting for form elements...');
       try {
-        const screenshot = await this.page.screenshot({ fullPage: false });
-        console.log('Screenshot taken, size:', screenshot.length);
-      } catch (screenshotError) {
-        console.log('Could not take screenshot:', screenshotError);
+        await this.page.waitForSelector('input, button, form', { timeout: 10000 });
+      } catch {
+        console.log('No form elements found, trying alternative approach...');
+        
+        // Try going directly to Disney SSO login
+        console.log('Trying Disney SSO login page...');
+        await this.page.goto('https://registerdisney.go.com/jgc/v6/client/ESPN-FANTASYLM-PROD/guest/login', { waitUntil: 'networkidle' });
+        await this.page.waitForTimeout(3000);
       }
 
       // Look for various login elements
