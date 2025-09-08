@@ -26,6 +26,7 @@ export default function Authentication() {
   const { toast } = useToast();
   const [userId] = useState("default-user"); // In a real app, this would come from auth context
   const [showCredentialsForm, setShowCredentialsForm] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
@@ -368,8 +369,20 @@ export default function Authentication() {
           {/* Cookie Instructions */}
           <Card data-testid="card-instructions">
             <CardHeader>
-              <CardTitle>How to Get ESPN Cookies</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>How to Get ESPN Cookies</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowInstructions(!showInstructions)}
+                  data-testid="button-toggle-instructions"
+                >
+                  <Info className="w-4 h-4 mr-2" />
+                  {showInstructions ? "Hide Instructions" : "Show Instructions"}
+                </Button>
+              </CardTitle>
             </CardHeader>
+            {showInstructions && (
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
@@ -415,6 +428,7 @@ export default function Authentication() {
                 </p>
               </div>
             </CardContent>
+            )}
           </Card>
         </div>
 
