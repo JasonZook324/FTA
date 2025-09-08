@@ -451,16 +451,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Found roster team ${team.id}:`, { 
               location: rosterTeam.location, 
               nickname: rosterTeam.nickname, 
-              abbrev: rosterTeam.abbrev 
+              abbrev: rosterTeam.abbrev,
+              name: rosterTeam.name  // Check if the full name is here!
             });
             
-            // Use roster data for full team names
+            // Use roster data for full team names - try the same logic as the frontend
             if (rosterTeam.location && rosterTeam.nickname) {
               teamName = `${rosterTeam.location} ${rosterTeam.nickname}`;
             } else if (rosterTeam.location) {
               teamName = rosterTeam.location;
             } else if (rosterTeam.nickname) {
               teamName = rosterTeam.nickname;
+            } else if (rosterTeam.name) {
+              teamName = rosterTeam.name; // This might be where the full name is!
             } else if (rosterTeam.abbrev) {
               teamName = rosterTeam.abbrev;
             }
