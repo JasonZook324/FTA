@@ -882,6 +882,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.espnLeagueId
       );
 
+      // Also get live member data for correct owner names (same as rosters page)
+      console.log("Fetching live member data for correct owner names...");
+      const rosterData = await espnApiService.getRosters(
+        credentials,
+        league.sport,
+        league.season,
+        league.espnLeagueId
+      );
+
       // Get stored team data - this has the complete info we need
       const storedTeams = await storage.getTeams(req.params.leagueId);
       console.log(`Found ${storedTeams.length} stored teams`);
@@ -916,14 +925,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nickname = '';
           }
           
+          // Get correct owner name from live API data (same logic as rosters page)
+          let correctOwnerName = storedTeam.owner || 'Unknown Owner';
+          if (rosterData.members && rosterData.teams) {
+            const liveTeam = rosterData.teams.find((t: any) => t.id === storedTeam.espnTeamId);
+            if (liveTeam && liveTeam.owners && liveTeam.owners[0]) {
+              const ownerId = liveTeam.owners[0]?.id || liveTeam.owners[0];
+              const member = rosterData.members.find((m: any) => m.id === ownerId);
+              
+              if (member) {
+                // Use same logic as rosters page - prefer firstName + lastName over displayName
+                if (member.firstName && member.lastName) {
+                  correctOwnerName = `${member.firstName} ${member.lastName}`;
+                } else {
+                  correctOwnerName = member.displayName || 'Unknown Owner';
+                }
+              }
+            }
+          }
+
           const transformedTeam = {
             id: storedTeam.espnTeamId,
             location,
             nickname,
             owners: [{
-              displayName: storedTeam.owner || 'Unknown Owner',
-              firstName: storedTeam.owner?.split(' ')[0] || 'Unknown',
-              lastName: storedTeam.owner?.split(' ').slice(1).join(' ') || 'Owner'
+              displayName: correctOwnerName,
+              firstName: correctOwnerName.split(' ')[0] || 'Unknown',
+              lastName: correctOwnerName.split(' ').slice(1).join(' ') || 'Owner'
             }],
             record: {
               overall: {
@@ -944,7 +972,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             originalName: storedTeam.name,
             location: transformedTeam.location,
             nickname: transformedTeam.nickname,
-            owner: transformedTeam.owners[0].displayName
+            storedOwner: storedTeam.owner,
+            correctedOwner: transformedTeam.owners[0].displayName
           });
           
           return transformedTeam;
