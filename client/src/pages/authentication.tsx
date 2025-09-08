@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut, Bot, Mail, Shield } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const credentialsFormSchema = insertEspnCredentialsSchema.extend({
@@ -22,18 +22,7 @@ type CredentialsFormData = z.infer<typeof credentialsFormSchema>;
 
 export default function Authentication() {
   const { toast } = useToast();
-  const [userId] = useState("default-user");
-  const [automationState, setAutomationState] = useState<{
-    isActive: boolean;
-    step: "idle" | "email" | "waiting" | "mfa" | "completing";
-    email: string;
-    verificationCode: string;
-  }>({
-    isActive: false,
-    step: "idle", 
-    email: "",
-    verificationCode: ""
-  }); // In a real app, this would come from auth context
+  const [userId] = useState("default-user"); // In a real app, this would come from auth context
 
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
@@ -130,103 +119,6 @@ export default function Authentication() {
     },
   });
 
-  // Automated login mutations
-  const startLoginMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/espn-login/start", { email });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success && data.waitingForMFA) {
-        setAutomationState(prev => ({ ...prev, step: "waiting" }));
-        toast({
-          title: "Check Your Email",
-          description: "Please check your email for the verification code and enter it below.",
-        });
-      }
-    },
-    onError: (error: Error) => {
-      setAutomationState(prev => ({ ...prev, isActive: false, step: "idle" }));
-      toast({
-        title: "Login Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const completeMFAMutation = useMutation({
-    mutationFn: async (verificationCode: string) => {
-      const response = await apiRequest("POST", "/api/espn-login/complete", {
-        verificationCode,
-        userId
-      });
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        setAutomationState({ isActive: false, step: "idle", email: "", verificationCode: "" });
-        toast({
-          title: "Login Successful",
-          description: "ESPN credentials have been automatically captured and saved!",
-        });
-        queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
-      }
-    },
-    onError: (error: Error) => {
-      setAutomationState(prev => ({ ...prev, step: "waiting" }));
-      toast({
-        title: "MFA Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const cancelLoginMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/espn-login/cancel");
-      return response.json();
-    },
-    onSuccess: () => {
-      setAutomationState({ isActive: false, step: "idle", email: "", verificationCode: "" });
-      toast({
-        title: "Login Cancelled",
-        description: "Automated login process has been cancelled.",
-      });
-    },
-  });
-
-  const handleStartAutomatedLogin = () => {
-    if (!automationState.email) {
-      toast({
-        title: "Email Required",
-        description: "Please enter your ESPN email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setAutomationState(prev => ({ ...prev, isActive: true, step: "email" }));
-    startLoginMutation.mutate(automationState.email);
-  };
-
-  const handleCompleteMFA = () => {
-    if (!automationState.verificationCode) {
-      toast({
-        title: "Verification Code Required",
-        description: "Please enter the verification code from your email.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setAutomationState(prev => ({ ...prev, step: "completing" }));
-    completeMFAMutation.mutate(automationState.verificationCode);
-  };
-
-  const handleCancelAutomation = () => {
-    cancelLoginMutation.mutate();
-  };
-
   const onSubmit = (data: CredentialsFormData) => {
     saveCredentialsMutation.mutate(data);
   };
@@ -274,110 +166,16 @@ export default function Authentication() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto p-6">
-        <div className="space-y-6">
-          {/* Automated Login Section */}
-          <Card data-testid="automated-login-card">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Cookie Configuration */}
+          <Card data-testid="card-cookie-configuration">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bot className="w-5 h-5" />
-                Automated Login
-              </CardTitle>
+              <CardTitle>ESPN Authentication Cookies</CardTitle>
               <CardDescription>
-                Automatically capture ESPN cookies through browser automation
+                Enter your ESPN cookies to access private leagues. These are required for authenticating with ESPN's Fantasy API v3.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {!automationState.isActive && automationState.step === "idle" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="automation-email">ESPN Email Address</Label>
-                    <Input
-                      id="automation-email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={automationState.email}
-                      onChange={(e) => setAutomationState(prev => ({ ...prev, email: e.target.value }))}
-                      data-testid="input-automation-email"
-                    />
-                  </div>
-                  <Button 
-                    onClick={handleStartAutomatedLogin}
-                    disabled={!automationState.email || startLoginMutation.isPending}
-                    className="w-full"
-                    data-testid="button-start-automation"
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    {startLoginMutation.isPending ? "Starting..." : "Start Automated Login"}
-                  </Button>
-                  <div className="text-sm text-muted-foreground">
-                    <p>This will open a browser window to complete ESPN login with MFA.</p>
-                  </div>
-                </>
-              )}
-
-              {automationState.step === "waiting" && (
-                <>
-                  <div className="text-center space-y-2">
-                    <Shield className="w-8 h-8 mx-auto text-blue-500" />
-                    <h3 className="font-medium">Check Your Email</h3>
-                    <p className="text-sm text-muted-foreground">
-                      A verification code has been sent to {automationState.email}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="verification-code">Verification Code</Label>
-                    <Input
-                      id="verification-code"
-                      type="text"
-                      placeholder="Enter 6-digit code"
-                      value={automationState.verificationCode}
-                      onChange={(e) => setAutomationState(prev => ({ ...prev, verificationCode: e.target.value }))}
-                      data-testid="input-verification-code"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleCompleteMFA}
-                      disabled={!automationState.verificationCode || completeMFAMutation.isPending}
-                      className="flex-1"
-                      data-testid="button-complete-mfa"
-                    >
-                      {completeMFAMutation.isPending ? "Verifying..." : "Complete Login"}
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={handleCancelAutomation}
-                      disabled={cancelLoginMutation.isPending}
-                      data-testid="button-cancel-automation"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {automationState.step === "completing" && (
-                <div className="text-center space-y-2">
-                  <RefreshCw className="w-8 h-8 mx-auto animate-spin text-blue-500" />
-                  <h3 className="font-medium">Completing Login</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Extracting authentication cookies...
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Manual Cookie Configuration */}
-            <Card data-testid="card-cookie-configuration">
-              <CardHeader>
-                <CardTitle>Manual Configuration</CardTitle>
-                <CardDescription>
-                  Enter your ESPN cookies manually if automated login doesn't work
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <CardContent>
               {credentials && (
                 <div className="mb-4 p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between">
@@ -516,8 +314,7 @@ export default function Authentication() {
                 </p>
               </div>
             </CardContent>
-            </Card>
-          </div>
+          </Card>
         </div>
       </main>
     </>
