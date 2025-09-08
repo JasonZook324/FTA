@@ -236,7 +236,8 @@ export class ESPNLoginAutomation {
       console.log('Current URL after submission:', newUrl);
       
       // If URL didn't change, try alternative submission methods
-      if (newUrl === disneyIframe.src) {
+      const originalUrl = 'https://cdn.registerdisney.go.com/v2/ESPN-ONESITE.WEB-PROD/en-US';
+      if (newUrl.includes(originalUrl)) {
         console.log('URL unchanged, trying alternative submission...');
         
         // Try form submission
