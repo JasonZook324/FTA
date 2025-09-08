@@ -28,6 +28,13 @@ export class ESPNLoginAutomation {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     });
     this.page = await this.context.newPage();
+    
+    // Set up route interception to handle redirects manually
+    await this.page.route('**/*', async (route) => {
+      const request = route.request();
+      // Allow all requests to proceed normally but with custom handling
+      await route.continue();
+    });
   }
 
   async startLogin(email: string, password: string): Promise<{ success: boolean; waitingForMFA: boolean; error?: string }> {
@@ -36,55 +43,56 @@ export class ESPNLoginAutomation {
     }
 
     try {
-      // Strategy 1: Try direct Disney SSO login URLs
-      console.log('Trying direct Disney SSO login approach...');
-      const disneyLoginUrls = [
-        'https://ha.registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US',
-        'https://registerdisney.go.com/jgc/v6/client/ESPN-ONESITE.WEB-PROD/guest/login?lang=en-US',
-        'https://secure.espn.com/login',
-        'https://www.espn.com/login'
-      ];
+      // New Strategy: Start with ESPN homepage and navigate to login more naturally
+      console.log('Starting with ESPN homepage and navigating to login...');
+      
+      // Step 1: Load ESPN homepage first
+      await this.page.goto('https://www.espn.com', { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await this.page.waitForTimeout(2000);
+      console.log('ESPN homepage loaded');
+      
+      // Step 2: Look for login link and click it
+      try {
+        await this.page.click('a[href*="login"], a:has-text("Log In"), a:has-text("Sign In")', { timeout: 5000 });
+        console.log('Clicked login link');
+        await this.page.waitForTimeout(3000);
+      } catch {
+        // If no login link found, navigate directly
+        console.log('No login link found, navigating directly...');
+        await this.page.goto('https://www.espn.com/login', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await this.page.waitForTimeout(3000);
+      }
+      
+      console.log('Current URL after login navigation:', this.page.url());
+      
+      // Wait for any additional redirects or dynamic loading
+      await this.page.waitForTimeout(5000);
       
       let foundLoginForm = false;
       
-      for (const loginUrl of disneyLoginUrls) {
-        try {
-          console.log(`Trying login URL: ${loginUrl}`);
-          // Use 'load' instead of 'networkidle' to handle redirects better
-          await this.page.goto(loginUrl, { waitUntil: 'load', timeout: 20000 });
-          
-          // Wait for any redirects to complete
-          await this.page.waitForTimeout(5000);
-          
-          // Check if we have proper login elements
-          const loginCheck = await this.page.evaluate(() => {
-            const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[id*="email"]');
-            const textInputs = document.querySelectorAll('input[type="text"]');
-            const passwordInputs = document.querySelectorAll('input[type="password"]');
-            const forms = document.querySelectorAll('form');
-            
-            return {
-              hasEmailField: emailInputs.length > 0,
-              hasTextInput: textInputs.length > 0,
-              hasPasswordField: passwordInputs.length > 0,
-              hasForm: forms.length > 0,
-              title: document.title,
-              bodyContent: document.body?.textContent?.substring(0, 200) || ''
-            };
-          });
-          
-          console.log(`URL ${loginUrl} check:`, JSON.stringify(loginCheck, null, 2));
-          
-          if (loginCheck.hasEmailField || (loginCheck.hasTextInput && loginCheck.hasForm)) {
-            console.log(`Found proper login form at ${loginUrl}`);
-            foundLoginForm = true;
-            break;
-          }
-          
-        } catch (error) {
-          console.log(`Failed to load ${loginUrl}:`, error.message);
-          continue;
-        }
+      // Check if we have proper login elements on current page
+      const loginCheck = await this.page.evaluate(() => {
+        const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[id*="email"]');
+        const textInputs = document.querySelectorAll('input[type="text"]');
+        const passwordInputs = document.querySelectorAll('input[type="password"]');
+        const forms = document.querySelectorAll('form');
+        
+        return {
+          hasEmailField: emailInputs.length > 0,
+          hasTextInput: textInputs.length > 0,
+          hasPasswordField: passwordInputs.length > 0,
+          hasForm: forms.length > 0,
+          title: document.title,
+          url: window.location.href,
+          bodyContent: document.body?.textContent?.substring(0, 200) || ''
+        };
+      });
+      
+      console.log('Login page check:', JSON.stringify(loginCheck, null, 2));
+      
+      if (loginCheck.hasEmailField || (loginCheck.hasTextInput && loginCheck.hasForm)) {
+        console.log('Found proper login form');
+        foundLoginForm = true;
       }
       
       // Strategy 2: If direct URLs failed, try following the redirect chain
