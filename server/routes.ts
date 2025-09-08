@@ -24,8 +24,9 @@ class EspnApiService {
   async validateCredentials(credentials: EspnCredentials): Promise<boolean> {
     try {
       console.log('ESPN API validation - testing credentials...');
-      // Test with a simple league endpoint
-      const testUrl = `${this.baseUrl}/ffl/seasons/2025/segments/0/leaguedefaults/1?view=mSettings`;
+      // Test with a private endpoint that requires authentication
+      // This endpoint lists the user's leagues, which requires valid auth
+      const testUrl = `${this.baseUrl}/ffl/seasons/2024/segments/0/leagues?view=mTeam`;
       console.log('ESPN API test URL:', testUrl);
       
       const response = await fetch(testUrl, { 
@@ -37,9 +38,20 @@ class EspnApiService {
       if (!response.ok) {
         const errorText = await response.text();
         console.log('ESPN API error response:', errorText);
+        // Status 401 = Unauthorized (invalid credentials)
+        // Status 403 = Forbidden (invalid credentials) 
+        return false;
       }
       
-      return response.ok;
+      // Additional check: try to parse response to ensure it's valid JSON
+      try {
+        const data = await response.json();
+        console.log('ESPN API validation - received valid response with data keys:', Object.keys(data));
+        return true;
+      } catch (parseError) {
+        console.log('ESPN API validation - failed to parse response as JSON:', parseError);
+        return false;
+      }
     } catch (error) {
       console.log('ESPN API validation error:', error);
       return false;
