@@ -110,8 +110,69 @@ export class ESPNLoginAutomation {
         if (disneyIframe) {
           console.log('Found Disney SSO iframe, navigating to it...');
           await this.page.goto(disneyIframe.src, { waitUntil: 'domcontentloaded', timeout: 20000 });
-          await this.page.waitForTimeout(5000);
-          foundLoginForm = true;
+          
+          // Wait for Disney SSO to fully load and show the actual login form
+          console.log('Waiting for Disney SSO login form to load...');
+          let loginFormLoaded = false;
+          
+          // Try waiting for actual email/login elements to appear (not just session-id)
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await this.page.waitForTimeout(3000);
+            
+            const formCheck = await this.page.evaluate(() => {
+              const emailInputs = document.querySelectorAll('input[type="email"], input[name*="email"], input[placeholder*="email"], input[name*="username"]');
+              const sessionIdOnly = document.querySelectorAll('input[id="session-id"]');
+              const hasRealLoginForm = emailInputs.length > 0;
+              const onlySessionId = sessionIdOnly.length > 0 && emailInputs.length === 0;
+              
+              return {
+                hasRealLoginForm,
+                onlySessionId,
+                title: document.title,
+                bodyTextStart: document.body?.textContent?.substring(0, 300) || '',
+                inputCount: document.querySelectorAll('input').length
+              };
+            });
+            
+            console.log(`Disney form check attempt ${attempt + 1}:`, JSON.stringify(formCheck, null, 2));
+            
+            if (formCheck.hasRealLoginForm) {
+              console.log('Real login form appeared!');
+              loginFormLoaded = true;
+              break;
+            } else if (formCheck.onlySessionId) {
+              console.log('Still showing session-id page, trying to trigger login form...');
+              
+              // Try various methods to trigger the actual login form
+              try {
+                // Try clicking anywhere on the page
+                await this.page.click('body');
+                await this.page.waitForTimeout(1000);
+                
+                // Try pressing tab to navigate
+                await this.page.keyboard.press('Tab');
+                await this.page.waitForTimeout(1000);
+                
+                // Try pressing enter
+                await this.page.keyboard.press('Enter');
+                await this.page.waitForTimeout(1000);
+                
+                // Try scrolling
+                await this.page.keyboard.press('PageDown');
+                await this.page.waitForTimeout(1000);
+                
+              } catch {
+                console.log('Could not trigger login form');
+              }
+            }
+          }
+          
+          if (loginFormLoaded) {
+            foundLoginForm = true;
+          } else {
+            console.log('Disney SSO never loaded proper login form');
+            foundLoginForm = false;
+          }
         } else {
           console.log('No Disney iframe found, trying to trigger login modal...');
           
@@ -379,6 +440,17 @@ export class ESPNLoginAutomation {
       if (!emailInput) {
         throw new Error('No email input found');
       }
+      // Check if this is the problematic session-id field
+      const isSessionIdField = await emailInput.getAttribute('id') === 'session-id';
+      if (isSessionIdField) {
+        console.log('Detected session-id field - this is not the proper login form');
+        return { 
+          success: false, 
+          waitingForMFA: false, 
+          error: 'Disney SSO did not load the proper login form. Please try again.' 
+        };
+      }
+
       await emailInput.fill(email);
 
       // Look for and click the login/continue button
