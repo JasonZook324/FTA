@@ -202,8 +202,27 @@ export class ESPNLoginAutomation {
 
       // Look for and click the login/continue button
       console.log('Looking for login button...');
-      const loginButton = this.page.locator('button:has-text("Log In"), button:has-text("Continue"), button:has-text("Sign In"), button[type="submit"]').first();
-      await loginButton.click();
+      
+      // First try to find buttons with text
+      try {
+        const textButton = this.page.locator('button:has-text("Log In"), button:has-text("Continue"), button:has-text("Sign In"), button:has-text("Submit")').first();
+        await textButton.click({ timeout: 3000 });
+        console.log('Clicked button with text');
+      } catch {
+        // If no text buttons found, try submit button or any button
+        console.log('No text buttons found, trying submit button...');
+        try {
+          const submitButton = this.page.locator('button[type="submit"]').first();
+          await submitButton.click({ timeout: 3000 });
+          console.log('Clicked submit button');
+        } catch {
+          // Last resort - click any button
+          console.log('Trying any available button...');
+          const anyButton = this.page.locator('button').first();
+          await anyButton.click();
+          console.log('Clicked first available button');
+        }
+      }
 
       // Wait for either MFA page or potential error message
       console.log('Waiting for next step...');
