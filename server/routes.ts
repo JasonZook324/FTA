@@ -610,19 +610,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store teams
       if (leagueData.teams) {
         for (const team of leagueData.teams) {
+          // Build team name properly handling undefined values
+          let teamName = `Team ${team.id}`;
+          if (team.location && team.nickname) {
+            teamName = `${team.location} ${team.nickname}`;
+          } else if (team.location) {
+            teamName = team.location;
+          } else if (team.nickname) {
+            teamName = team.nickname;
+          } else if (team.abbrev) {
+            teamName = team.abbrev;
+          }
+
+          // Find owner from members array using team.owners GUID
+          let ownerName = `Owner ${team.id}`;
+          if (team.owners && team.owners[0]) {
+            const ownerGuid = team.owners[0].replace(/[{}]/g, ''); // Remove braces from GUID
+            const member = leagueData.members?.find((m: any) => m.id.includes(ownerGuid));
+            if (member?.displayName) {
+              ownerName = member.displayName;
+            } else if (team.owners[0].displayName) {
+              ownerName = team.owners[0].displayName;
+            } else if (team.owners[0].firstName && team.owners[0].lastName) {
+              ownerName = `${team.owners[0].firstName} ${team.owners[0].lastName}`;
+            }
+          }
+
           await storage.createTeam({
             espnTeamId: team.id,
             leagueId: league.id,
-            name: team.location + ' ' + team.nickname || `Team ${team.id}`,
-            owner: team.owners?.[0]?.displayName || team.owners?.[0]?.firstName + ' ' + team.owners?.[0]?.lastName,
-            abbreviation: team.abbrev,
-            logoUrl: team.logo,
+            name: teamName,
+            owner: ownerName,
+            abbreviation: team.abbrev || null,
+            logoUrl: team.logo || null,
             wins: team.record?.overall?.wins || 0,
             losses: team.record?.overall?.losses || 0,
             ties: team.record?.overall?.ties || 0,
             pointsFor: team.record?.overall?.pointsFor?.toString() || "0",
             pointsAgainst: team.record?.overall?.pointsAgainst?.toString() || "0",
-            streak: team.record?.overall?.streakType + team.record?.overall?.streakLength || null,
+            streak: team.record?.overall?.streakType && team.record?.overall?.streakLength ? 
+              `${team.record.overall.streakType}${team.record.overall.streakLength}` : null,
             rank: team.playoffSeed || team.draftDayProjectedRank || null
           });
         }
