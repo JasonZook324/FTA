@@ -224,38 +224,79 @@ export class ESPNLoginAutomation {
         }
       }
 
-      // Wait for either MFA page or potential error message
-      console.log('Waiting for next step...');
-      try {
-        // Wait for MFA input or password field
-        await this.page.waitForSelector('input[type="password"], input[placeholder*="code"], input[placeholder*="Code"], input[placeholder*="verification"]', { timeout: 15000 });
+      // Wait for next step after button click
+      console.log('Waiting for next step after button click...');
+      await this.page.waitForTimeout(3000);
+      
+      // Check current page state
+      const currentState = await this.page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        const hasPasswordField = inputs.some(input => input.type === 'password');
+        const hasMFAField = inputs.some(input => 
+          input.placeholder?.toLowerCase().includes('code') ||
+          input.placeholder?.toLowerCase().includes('verification') ||
+          input.id?.toLowerCase().includes('code')
+        );
+        const hasEmailField = inputs.some(input => 
+          input.type === 'email' || 
+          input.placeholder?.toLowerCase().includes('email') ||
+          input.id?.toLowerCase().includes('email')
+        );
         
-        // Check if we got a password field (means we need to handle password login flow)
-        const passwordField = await this.page.locator('input[type="password"]').first();
-        if (await passwordField.isVisible()) {
-          return { 
-            success: false, 
-            waitingForMFA: false, 
-            error: 'Password required. Please use manual login or ensure your ESPN account is configured for passwordless login.' 
-          };
-        }
-
-        // If we reach here, we should have MFA input
-        console.log('MFA page loaded. Waiting for user to enter verification code...');
-        return { success: true, waitingForMFA: true };
-
-      } catch (waitError) {
-        // Try to find any error messages on the page
-        const errorMessage = await this.page.locator('text=error, text=invalid, text=incorrect').first().textContent();
-        if (errorMessage) {
-          return { 
-            success: false, 
-            waitingForMFA: false, 
-            error: `Login failed: ${errorMessage}` 
-          };
-        }
-        throw waitError;
+        return {
+          url: window.location.href,
+          title: document.title,
+          hasPasswordField,
+          hasMFAField,
+          hasEmailField,
+          inputs: inputs.map(input => ({
+            type: input.type,
+            id: input.id,
+            placeholder: input.placeholder,
+            name: input.name
+          })),
+          bodyText: document.body?.textContent?.substring(0, 300)
+        };
+      });
+      
+      console.log('Current page state:', JSON.stringify(currentState, null, 2));
+      
+      // Determine what happened based on page state
+      if (currentState.hasPasswordField) {
+        return { 
+          success: false, 
+          waitingForMFA: false, 
+          error: 'Password required. Please use manual login or ensure your ESPN account is configured for passwordless login.' 
+        };
       }
+      
+      if (currentState.hasMFAField) {
+        console.log('MFA page detected. Waiting for user to enter verification code...');
+        return { success: true, waitingForMFA: true };
+      }
+      
+      // Check if still on email page (might indicate error)
+      if (currentState.hasEmailField) {
+        // Look for error indicators in the page content
+        if (currentState.bodyText?.toLowerCase().includes('error') || 
+            currentState.bodyText?.toLowerCase().includes('invalid') ||
+            currentState.bodyText?.toLowerCase().includes('incorrect')) {
+          return { 
+            success: false, 
+            waitingForMFA: false, 
+            error: 'Login failed. Please check your email address and try again.' 
+          };
+        }
+        return { 
+          success: false, 
+          waitingForMFA: false, 
+          error: 'Login process did not progress. Please try again or use manual login.' 
+        };
+      }
+      
+      // If we can't determine the state, assume success and wait for MFA
+      console.log('Could not determine page state, assuming MFA step...');
+      return { success: true, waitingForMFA: true };
 
     } catch (error) {
       console.error('Error during login automation:', error);
