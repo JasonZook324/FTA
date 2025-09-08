@@ -377,7 +377,7 @@ export default function Authentication() {
                   Enter your ESPN cookies manually if automated login doesn't work
                 </CardDescription>
               </CardHeader>
-            <CardContent>
+              <CardContent>
               {credentials && (
                 <div className="mb-4 p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between">
@@ -516,7 +516,8 @@ export default function Authentication() {
                 </p>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         </div>
       </main>
     </>
