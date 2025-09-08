@@ -246,7 +246,7 @@ export class ESPNLoginAutomation {
 
       } catch (waitError) {
         // Try to find any error messages on the page
-        const errorMessage = await this.page.locator('text*="error", text*="invalid", text*="incorrect"').first().textContent();
+        const errorMessage = await this.page.locator('text=error, text=invalid, text=incorrect').first().textContent();
         if (errorMessage) {
           return { 
             success: false, 

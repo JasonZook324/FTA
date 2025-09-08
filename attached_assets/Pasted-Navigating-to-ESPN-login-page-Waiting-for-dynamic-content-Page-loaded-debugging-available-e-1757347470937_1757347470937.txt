@@ -1,0 +1,79 @@
+Navigating to ESPN login page...
+Waiting for dynamic content...
+Page loaded, debugging available elements...
+Page title: Log In
+Found iframes: [
+  {
+    "src": "https://cdn.registerdisney.go.com/v2/ESPN-ONESITE.WEB-PROD/en-US?include=config,l10n,js,html&?clientID=ESPN-ONESITE.WEBscheme=https&postMessageOrigin=https%3A%2F%2Fwww.espn.com%2Flogin&cookieDomain=www.espn.com&config=PROD&logLevel=LOG&topHost=www.espn.com&cssOverride=https%3A%2F%2Fsecure.espncdn.com%2Fcombiner%2Fc%3Fcss%3Ddisneyid%2Fcore.css&responderPage=https%3A%2F%2Fwww.espn.com%2Flogin%2Fresponder%2F&buildId=181874e5af6",
+    "id": "disneyid-iframe",
+    "className": ""
+  },
+  {
+    "src": "https://www.espn.com/login/responder/?clientId=ESPN-ONESITE.WEB-PROD&scheme=https&postMessageOrigin=https%3A%2F%2Fwww.espn.com%2Flogin&cookieDomain=www.espn.com&config=PROD&logLevel=LOG&topHost=www.espn.com&langPref=en-US&cssOverride=https%3A%2F%2Fsecure.espncdn.com%2Fcombiner%2Fc%3Fcss%3Ddisneyid%2Fcore.css&responderPage=https%3A%2F%2Fwww.espn.com%2Flogin%2Fresponder%2F&buildId=181874e5af6",
+    "id": "disneyid-secure-responder",
+    "className": ""
+  }
+]
+Disney SSO iframe detected, navigating directly...
+Navigating to Disney SSO iframe directly...
+Waiting for Disney SSO content...
+Disney SSO page elements: {
+  "url": "https://cdn.registerdisney.go.com/v2/ESPN-ONESITE.WEB-PROD/en-US?include=config,l10n,js,html&?clientID=ESPN-ONESITE.WEBscheme=https&postMessageOrigin=https%3A%2F%2Fwww.espn.com%2Flogin&cookieDomain=www.espn.com&config=PROD&logLevel=LOG&topHost=www.espn.com&cssOverride=https%3A%2F%2Fsecure.espncdn.com%2Fcombiner%2Fc%3Fcss%3Ddisneyid%2Fcore.css&responderPage=https%3A%2F%2Fwww.espn.com%2Flogin%2Fresponder%2F&buildId=181874e5af6",
+  "title": "Account Dialog",
+  "inputs": [
+    {
+      "type": "text",
+      "name": "",
+      "id": "session-id",
+      "placeholder": "session-id",
+      "className": ""
+    }
+  ],
+  "buttons": [
+    {
+      "text": "",
+      "className": "",
+      "type": "submit"
+    }
+  ],
+  "forms": 0,
+  "bodyText": "\n    \n        Disney account\n        \n        \n\n    \n    \n    (function (initial) {\n\n!function(){function e(t,n,o){function i(s,a){if(!n[s]){if(!t[s]){var c=\"function\"==typeof require&&require;if(!a&&"
+}
+Waiting for form elements...
+Form elements found!
+Looking for login elements...
+Available elements: {
+  "inputs": [
+    {
+      "type": "text",
+      "name": "",
+      "id": "session-id",
+      "placeholder": "session-id",
+      "className": ""
+    }
+  ],
+  "buttons": [
+    {
+      "text": "",
+      "className": "",
+      "type": "submit"
+    }
+  ],
+  "links": []
+}
+Found text input (assuming email)
+Entering email address...
+Looking for login button...
+No text buttons found, trying submit button...
+Trying any available button...
+Clicked first available button
+Waiting for next step...
+Error during login automation: locator.textContent: Unknown engine "text*" while parsing selector text*="error", text*="invalid", text*="incorrect" >> nth=0
+Call log:
+  - waiting for locator('text*="error", text*="invalid", text*="incorrect"').first()
+
+    at ESPNLoginAutomation.startLogin (/home/runner/workspace/server/espnLoginAutomation.ts:249:115)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:375:22) {
+  name: 'Error'
+}
+4:04:14 PM [express] POST /api/espn-login/start 400 in 45579ms :: {"success":false,"message":"locato…
