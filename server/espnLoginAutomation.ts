@@ -204,20 +204,22 @@ export class ESPNLoginAutomation {
       // Look for and click the login/continue button
       console.log('Looking for login button...');
       
-      // First try to find buttons with text
+      // Try pressing Enter key first (common for single input forms)
       try {
-        const textButton = this.page.locator('button:has-text("Log In"), button:has-text("Continue"), button:has-text("Sign In"), button:has-text("Submit")').first();
-        await textButton.click({ timeout: 3000 });
-        console.log('Clicked button with text');
+        console.log('Trying Enter key submission...');
+        await emailInput.press('Enter');
+        console.log('Pressed Enter key');
+        await this.page.waitForTimeout(2000);
       } catch {
-        // If no text buttons found, try submit button or any button
-        console.log('No text buttons found, trying submit button...');
+        console.log('Enter key failed, trying button click...');
+        
+        // Try clicking submit button
         try {
           const submitButton = this.page.locator('button[type="submit"]').first();
           await submitButton.click({ timeout: 3000 });
           console.log('Clicked submit button');
         } catch {
-          // Last resort - click any button
+          // Try any available button
           console.log('Trying any available button...');
           const anyButton = this.page.locator('button').first();
           await anyButton.click();
@@ -227,7 +229,42 @@ export class ESPNLoginAutomation {
 
       // Wait for next step after button click
       console.log('Waiting for next step after button click...');
-      await this.page.waitForTimeout(3000);
+      await this.page.waitForTimeout(5000);
+      
+      // Check if URL changed (indicates progression)
+      const newUrl = this.page.url();
+      console.log('Current URL after submission:', newUrl);
+      
+      // If URL didn't change, try alternative submission methods
+      if (newUrl === disneyIframe.src) {
+        console.log('URL unchanged, trying alternative submission...');
+        
+        // Try form submission
+        try {
+          await this.page.evaluate(() => {
+            const forms = document.querySelectorAll('form');
+            if (forms.length > 0) {
+              forms[0].submit();
+            }
+          });
+          console.log('Tried form.submit()');
+          await this.page.waitForTimeout(3000);
+        } catch {
+          console.log('Form submission failed');
+        }
+        
+        // Try triggering form events
+        try {
+          await emailInput.dispatchEvent('change');
+          await emailInput.dispatchEvent('blur');
+          await this.page.keyboard.press('Tab');
+          await this.page.keyboard.press('Enter');
+          console.log('Tried triggering form events');
+          await this.page.waitForTimeout(3000);
+        } catch {
+          console.log('Form events failed');
+        }
+      }
       
       // Check current page state
       const currentState = await this.page.evaluate(() => {
