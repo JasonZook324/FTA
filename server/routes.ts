@@ -876,11 +876,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transformedData = {
         ...standingsData,
         teams: storedTeams.map((storedTeam) => {
-          // Parse team name into location and nickname
+          // Handle team name display - use full name if available, split appropriately  
           const teamName = storedTeam.name || `Team ${storedTeam.espnTeamId}`;
-          const nameParts = teamName.split(' ');
-          const location = nameParts[0] || 'Team';
-          const nickname = nameParts.slice(1).join(' ') || storedTeam.espnTeamId?.toString() || 'Unknown';
+          let location, nickname;
+          
+          // If the team name looks like a full name (multiple words), split it properly
+          if (teamName.includes(' ') && teamName !== `Team ${storedTeam.espnTeamId}`) {
+            const nameParts = teamName.split(' ');
+            if (nameParts.length >= 2) {
+              // For names like "The JJ Express", split as "The JJ" + "Express"  
+              // For names like "Team Name", split as "Team" + "Name"
+              const midPoint = Math.ceil(nameParts.length / 2);
+              location = nameParts.slice(0, midPoint).join(' ');
+              nickname = nameParts.slice(midPoint).join(' ');
+            } else {
+              location = nameParts[0];
+              nickname = nameParts[1] || '';
+            }
+          } else {
+            // For abbreviations like "JAZ1" or single names, use the abbreviation as location
+            location = storedTeam.abbreviation || teamName;
+            nickname = '';
+          }
           
           const transformedTeam = {
             id: storedTeam.espnTeamId,
