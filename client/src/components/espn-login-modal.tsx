@@ -154,11 +154,20 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
       }
     },
     onError: (error: Error) => {
-      toast({
-        title: "Debug Mode Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error.message.includes('not available in Replit environment')) {
+        toast({
+          title: "Debug Mode Not Available",
+          description: "Browser windows can't be displayed in Replit. Please use manual cookie entry instead.",
+          variant: "destructive",
+          duration: 7000,
+        });
+      } else {
+        toast({
+          title: "Debug Mode Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -295,26 +304,17 @@ export function EspnLoginModal({ open, onOpenChange, onSuccess }: EspnLoginModal
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
-                disabled={loginMutation.isPending || debugLoginMutation.isPending}
-                onClick={() => debugLoginMutation.mutate(loginForm.getValues())}
+                className="w-full opacity-50"
+                disabled={true}
                 data-testid="button-debug-login"
               >
-                {debugLoginMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Opening browser...
-                  </>
-                ) : (
-                  <>
-                    🐛 Debug Mode (Manual Login)
-                    <Eye className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                🐛 Debug Mode (Not Available)
+                <Eye className="ml-2 h-4 w-4" />
               </Button>
               
               <p className="text-xs text-muted-foreground text-center">
-                Debug mode opens a visible browser window for manual login
+                ⚠️ Debug mode not available in Replit environment.<br/>
+                Use "Manual Cookie Entry" in Authentication page instead.
               </p>
             </div>
           </form>

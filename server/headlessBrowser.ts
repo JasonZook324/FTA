@@ -71,6 +71,19 @@ export class HeadlessBrowserService {
    * Handle debug mode login - let user manually complete login while monitoring
    */
   private async handleDebugModeLogin(page: Page, email: string): Promise<EspnLoginResult> {
+    // Check if we're in a Replit/containerized environment
+    const isContainerized = process.env.REPL_ID || process.env.REPLIT_CLUSTER || !process.env.DISPLAY;
+    
+    if (isContainerized) {
+      console.log('\n=== DEBUG MODE LIMITATION ===');
+      console.log('❌ Browser window cannot be displayed in Replit environment');
+      console.log('🔧 Browser is running but not visible (containerized environment)');
+      console.log('📝 Alternative: Use manual cookie extraction instead');
+      console.log('================================\n');
+      
+      throw new Error('Debug mode with visible browser is not available in Replit environment. Please use manual cookie entry instead.');
+    }
+    
     console.log('\n=== DEBUG MODE INSTRUCTIONS ===');
     console.log('1. A browser window should have opened');
     console.log('2. Manually trigger the login modal and enter your credentials:');
