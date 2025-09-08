@@ -650,6 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
+      // Get fresh standings data from ESPN API
       const standingsData = await espnApiService.getStandings(
         credentials,
         league.sport,
@@ -657,8 +658,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.espnLeagueId
       );
 
-      res.json(standingsData);
+      // Also get stored team data for additional info
+      const storedTeams = await storage.getTeams(req.params.leagueId);
+
+      // Transform and merge the data to match what the component expects
+      const transformedData = {
+        ...standingsData,
+        teams: standingsData.teams?.map((espnTeam: any) => {
+          // Find corresponding stored team data
+          const storedTeam = storedTeams.find(t => t.espnTeamId === espnTeam.id);
+          
+          return {
+            id: espnTeam.id,
+            location: espnTeam.location || storedTeam?.name?.split(' ')[0] || 'Team',
+            nickname: espnTeam.nickname || storedTeam?.name?.split(' ').slice(1).join(' ') || espnTeam.id.toString(),
+            owners: espnTeam.owners || [{
+              displayName: storedTeam?.owner || 'Unknown Owner',
+              firstName: storedTeam?.owner?.split(' ')[0] || 'Unknown',
+              lastName: storedTeam?.owner?.split(' ').slice(1).join(' ') || 'Owner'
+            }],
+            record: {
+              overall: {
+                wins: espnTeam.record?.overall?.wins || storedTeam?.wins || 0,
+                losses: espnTeam.record?.overall?.losses || storedTeam?.losses || 0,
+                ties: espnTeam.record?.overall?.ties || storedTeam?.ties || 0,
+                pointsFor: espnTeam.record?.overall?.pointsFor || parseFloat(storedTeam?.pointsFor || '0'),
+                pointsAgainst: espnTeam.record?.overall?.pointsAgainst || parseFloat(storedTeam?.pointsAgainst || '0'),
+                streak: espnTeam.record?.overall?.streak || null
+              }
+            }
+          };
+        }) || []
+      };
+
+      res.json(transformedData);
     } catch (error: any) {
+      console.error('Standings API error:', error);
       res.status(500).json({ message: error.message });
     }
   });
