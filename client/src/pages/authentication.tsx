@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertEspnCredentialsSchema, type EspnCredentials } from "@shared/schema";
@@ -37,6 +37,17 @@ export default function Authentication() {
   const { data: credentials, isLoading } = useQuery<EspnCredentials>({
     queryKey: ["/api/espn-credentials", userId],
   });
+
+  // Update form when credentials are loaded
+  useEffect(() => {
+    if (credentials) {
+      form.reset({
+        userId: userId,
+        espnS2: credentials.espnS2 || "",
+        swid: credentials.swid || "",
+      });
+    }
+  }, [credentials, userId, form]);
 
   // Save credentials mutation
   const saveCredentialsMutation = useMutation({
@@ -177,18 +188,38 @@ export default function Authentication() {
             </CardHeader>
             <CardContent>
               {credentials && (
-                <div className="mb-4 p-3 bg-muted rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status:</span>
-                    <Badge variant={credentials.isValid ? "default" : "destructive"}>
-                      {credentials.isValid ? "Valid" : "Invalid"}
-                    </Badge>
+                <div className="mb-4 space-y-3">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Status:</span>
+                      <Badge variant={credentials.isValid ? "default" : "destructive"}>
+                        {credentials.isValid ? "Valid" : "Invalid"}
+                      </Badge>
+                    </div>
+                    {credentials.lastValidated && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Last validated: {new Date(credentials.lastValidated).toLocaleString()}
+                      </p>
+                    )}
                   </div>
-                  {credentials.lastValidated && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Last validated: {new Date(credentials.lastValidated).toLocaleString()}
-                    </p>
-                  )}
+                  
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <h4 className="text-sm font-medium mb-2">Currently Stored Values:</h4>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="font-medium">ESPN S2 Cookie:</span>
+                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs break-all">
+                          {credentials.espnS2 ? `${credentials.espnS2.substring(0, 50)}...` : "Not set"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium">SWID:</span>
+                        <div className="mt-1 p-2 bg-background rounded border font-mono text-xs">
+                          {credentials.swid || "Not set"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -202,7 +233,7 @@ export default function Authentication() {
                         <FormLabel>ESPN_S2 Cookie</FormLabel>
                         <FormControl>
                           <Input
-                            type="password"
+                            type="text"
                             placeholder="Enter your ESPN_S2 cookie value"
                             {...field}
                             data-testid="input-espn-s2"
@@ -224,7 +255,7 @@ export default function Authentication() {
                         <FormLabel>SWID Cookie</FormLabel>
                         <FormControl>
                           <Input
-                            type="password"
+                            type="text"
                             placeholder="Enter your SWID cookie value"
                             {...field}
                             data-testid="input-swid"
