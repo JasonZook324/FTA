@@ -370,21 +370,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/espn-credentials/:userId/reload-league", async (req, res) => {
     try {
       const userId = req.params.userId;
+      console.log(`Reload league request for user: ${userId}`);
+      
       const credentials = await storage.getEspnCredentials(userId);
       if (!credentials || !credentials.isValid) {
+        console.log(`Invalid or missing credentials for user: ${userId}`);
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
       if (!credentials.testLeagueId || !credentials.testSeason) {
+        console.log(`Missing league ID or season: ${credentials.testLeagueId}, ${credentials.testSeason}`);
         return res.status(400).json({ message: "League ID and season required" });
       }
 
+      console.log(`Deleting existing leagues for user: ${userId}`);
       // Delete existing league and team data for this user
       const existingLeagues = await storage.getLeagues(userId);
+      console.log(`Found ${existingLeagues.length} existing leagues to delete`);
       for (const league of existingLeagues) {
+        console.log(`Deleting league: ${league.id} - ${league.name}`);
         await storage.deleteLeague(league.id);
       }
 
+      console.log(`Fetching fresh league data from ESPN API...`);
       // Reload league data using the FIXED logic
       const leagueData = await espnApiService.getLeagueData(
         credentials,
@@ -393,6 +401,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         credentials.testLeagueId,
         ['mTeam', 'mSettings']
       );
+      
+      console.log(`ESPN API returned league: ${leagueData.settings?.name}, teams: ${leagueData.teams?.length}, members: ${leagueData.members?.length}`);
       
       // Parse and store league information
       const leagueInfo = {
@@ -409,10 +419,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         settings: leagueData.settings || {}
       };
 
+      console.log(`Creating new league with ${leagueInfo.teamCount} teams`);
       const league = await storage.createLeague(leagueInfo);
 
       // Store teams using the FIXED logic
-      if (leagueData.teams) {        
+      if (leagueData.teams) {    
+        console.log(`Processing ${leagueData.teams.length} teams...`);
+        console.log('First team structure:', JSON.stringify(leagueData.teams[0], null, 2));
+        if (leagueData.members && leagueData.members.length > 0) {
+          console.log('First member structure:', JSON.stringify(leagueData.members[0], null, 2));
+        }
+        
         for (const team of leagueData.teams) {
           // Build team name properly handling undefined values
           let teamName = `Team ${team.id}`;
@@ -440,6 +457,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          console.log(`Creating team ${team.id}: "${teamName}" owned by "${ownerName}"`);
+          
           await storage.createTeam({
             espnTeamId: team.id,
             leagueId: league.id,
@@ -459,6 +478,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log(`Successfully created league with ${leagueData.teams?.length || 0} teams`);
+      
       // Set this league as the user's selected league
       await storage.updateUser(userId, { selectedLeagueId: league.id });
 
