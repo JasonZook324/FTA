@@ -1753,8 +1753,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Debug: Log first player to see actual data structure
       if (waiverWirePlayers.length > 0) {
-        const samplePlayer = waiverWirePlayers[0];
+        const sampleWrapper = waiverWirePlayers[0];
+        const samplePlayer = sampleWrapper.player || sampleWrapper;
         console.log('\n=== SAMPLE PLAYER DATA ===');
+        console.log('Wrapper top-level keys:', Object.keys(sampleWrapper).join(', '));
         console.log('Player name:', samplePlayer.fullName);
         console.log('Player proOpponent:', samplePlayer.proOpponent);
         console.log('Player proTeamId:', samplePlayer.proTeamId);
@@ -1764,7 +1766,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`  Stat ${idx}: sourceId=${stat.statSourceId}, splitTypeId=${stat.statSplitTypeId}, appliedTotal=${stat.appliedTotal}`);
           });
         }
-        console.log('Top-level keys:', Object.keys(samplePlayer).join(', '));
         console.log('=== END SAMPLE PLAYER ===\n');
       }
 
