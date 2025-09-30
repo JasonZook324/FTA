@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,18 @@ export default function Players() {
   const [viewMode, setViewMode] = useState<"all" | "waiver">("all");
   const [selectedPosition, setSelectedPosition] = useState<string>("all");
 
+  // Query user leagues
+  const { data: leagues } = useQuery<any[]>({
+    queryKey: ["/api/leagues", userId],
+  });
+
+  // Auto-select the first league when leagues load
+  useEffect(() => {
+    if (leagues && leagues.length > 0 && !selectedLeagueId) {
+      setSelectedLeagueId(leagues[0].id);
+    }
+  }, [leagues, selectedLeagueId]);
+
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
     queryKey: ["/api/players", selectedSport, selectedSeason, userId],
@@ -31,11 +43,6 @@ export default function Players() {
       return response.json();
     },
     enabled: !!selectedSport && !!selectedSeason && viewMode === "all",
-  });
-
-  // Query user leagues
-  const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
   });
 
   // Query waiver wire data
