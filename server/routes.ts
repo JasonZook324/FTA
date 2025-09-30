@@ -874,7 +874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      // Get fresh standings data from ESPN API
+      // Get fresh standings data from ESPN API - this has the live stats!
       const standingsData = await espnApiService.getStandings(
         credentials,
         league.sport,
@@ -891,61 +891,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league.espnLeagueId
       );
 
-      // Get stored team data - this has the complete info we need
-      const storedTeams = await storage.getTeams(req.params.leagueId);
-      console.log(`Found ${storedTeams.length} stored teams`);
-      if (storedTeams.length > 0) {
-        console.log('First stored team structure:', JSON.stringify(storedTeams[0], null, 2));
-      }
-
-      // Use stored teams as primary data source since ESPN API doesn't return complete team data
+      console.log(`Got ${standingsData.teams?.length || 0} teams from ESPN standings API`);
+      
+      // Use LIVE ESPN data as primary source since it has up-to-date stats
       const transformedData = {
         ...standingsData,
-        teams: storedTeams.map((storedTeam) => {
-          // Handle team name display - use full name if available, split appropriately  
-          const teamName = storedTeam.name || `Team ${storedTeam.espnTeamId}`;
-          let location, nickname;
+        teams: (standingsData.teams || []).map((espnTeam: any) => {
+          // ESPN returns location and nickname already split
+          const location = espnTeam.location || espnTeam.abbrev || 'Team';
+          const nickname = espnTeam.nickname || espnTeam.id.toString();
           
-          // If the team name looks like a full name (multiple words), split it properly
-          if (teamName.includes(' ') && teamName !== `Team ${storedTeam.espnTeamId}`) {
-            const nameParts = teamName.split(' ');
-            if (nameParts.length >= 2) {
-              // For names like "The JJ Express", split as "The JJ" + "Express"  
-              // For names like "Team Name", split as "Team" + "Name"
-              const midPoint = Math.ceil(nameParts.length / 2);
-              location = nameParts.slice(0, midPoint).join(' ');
-              nickname = nameParts.slice(midPoint).join(' ');
-            } else {
-              location = nameParts[0];
-              nickname = nameParts[1] || '';
-            }
-          } else {
-            // For abbreviations like "JAZ1" or single names, use the abbreviation as location
-            location = storedTeam.abbreviation || teamName;
-            nickname = '';
-          }
-          
-          // Get correct owner name from live API data (same logic as rosters page)
-          let correctOwnerName = storedTeam.owner || 'Unknown Owner';
-          if (rosterData.members && rosterData.teams) {
-            const liveTeam = rosterData.teams.find((t: any) => t.id === storedTeam.espnTeamId);
-            if (liveTeam && liveTeam.owners && liveTeam.owners[0]) {
-              const ownerId = liveTeam.owners[0]?.id || liveTeam.owners[0];
-              const member = rosterData.members.find((m: any) => m.id === ownerId);
-              
-              if (member) {
-                // Use same logic as rosters page - prefer firstName + lastName over displayName
-                if (member.firstName && member.lastName) {
-                  correctOwnerName = `${member.firstName} ${member.lastName}`;
-                } else {
-                  correctOwnerName = member.displayName || 'Unknown Owner';
-                }
+          // Get correct owner name from live API data
+          let correctOwnerName = 'Unknown Owner';
+          if (rosterData.members && espnTeam.owners && espnTeam.owners[0]) {
+            const ownerId = espnTeam.owners[0]?.id || espnTeam.owners[0];
+            const member = rosterData.members.find((m: any) => m.id === ownerId);
+            
+            if (member) {
+              // Prefer firstName + lastName over displayName
+              if (member.firstName && member.lastName) {
+                correctOwnerName = `${member.firstName} ${member.lastName}`;
+              } else {
+                correctOwnerName = member.displayName || 'Unknown Owner';
               }
             }
           }
 
           const transformedTeam = {
-            id: storedTeam.espnTeamId,
+            id: espnTeam.id,
             location,
             nickname,
             owners: [{
@@ -953,34 +926,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               firstName: correctOwnerName.split(' ')[0] || 'Unknown',
               lastName: correctOwnerName.split(' ').slice(1).join(' ') || 'Owner'
             }],
-            record: {
-              overall: {
-                wins: storedTeam.wins || 0,
-                losses: storedTeam.losses || 0,
-                ties: storedTeam.ties || 0,
-                pointsFor: parseFloat(storedTeam.pointsFor || '0'),
-                pointsAgainst: parseFloat(storedTeam.pointsAgainst || '0'),
-                streak: storedTeam.streak ? {
-                  type: storedTeam.streak.includes('W') ? 1 : 0,
-                  length: parseInt(storedTeam.streak.replace(/[WL]/, '')) || 1
-                } : null
-              }
-            }
+            record: espnTeam.record // ESPN API already has this in the right format
           };
           
-          console.log(`Stored team ${storedTeam.espnTeamId} transformed:`, {
-            originalName: storedTeam.name,
+          console.log(`ESPN team ${espnTeam.id} transformed:`, {
             location: transformedTeam.location,
             nickname: transformedTeam.nickname,
-            storedOwner: storedTeam.owner,
-            correctedOwner: transformedTeam.owners[0].displayName
+            wins: espnTeam.record?.overall?.wins,
+            losses: espnTeam.record?.overall?.losses,
+            pointsFor: espnTeam.record?.overall?.pointsFor,
+            owner: transformedTeam.owners[0].displayName
           });
           
           return transformedTeam;
         })
       };
 
-      console.log(`Transformed ${transformedData.teams.length} teams using stored data`);
+      console.log(`Transformed ${transformedData.teams.length} teams using live ESPN data`);
 
       res.json(transformedData);
     } catch (error: any) {
