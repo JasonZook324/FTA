@@ -52,9 +52,9 @@ export default function Authentication() {
     queryKey: ["/api/leagues", userId],
   });
 
-  // Query teams for selected league
+  // Query teams for selected league (use standings endpoint to get properly formatted team names)
   const { data: teamsData, isLoading: isLoadingTeams, isError: isTeamsError } = useQuery<{ teams?: any[] }>({
-    queryKey: ["/api/leagues", selectedLeagueId, "rosters"],
+    queryKey: ["/api/leagues", selectedLeagueId, "standings"],
     enabled: !!selectedLeagueId,
   });
 
