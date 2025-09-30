@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Sparkles, Loader2 } from "lucide-react";
+import { Download, Sparkles, Loader2, Copy, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useTeam } from "@/contexts/TeamContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface TeamRosterProps {
   data: any;
@@ -15,23 +16,47 @@ interface TeamRosterProps {
 }
 
 export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProps) {
+  const { toast } = useToast();
   const { selectedTeam } = useTeam();
   const [optimizingTeamId, setOptimizingTeamId] = useState<number | null>(null);
   const [optimizationResult, setOptimizationResult] = useState<any>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleOptimizeLineup = async (teamId: number) => {
     try {
       setIsOptimizing(true);
-      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup`);
+      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup-prompt`);
       const result = await response.json();
       setOptimizationResult(result);
       setOptimizingTeamId(teamId);
     } catch (error: any) {
-      console.error('Failed to optimize lineup:', error);
-      alert(`Failed to optimize lineup: ${error.message || 'Unknown error'}`);
+      console.error('Failed to generate lineup prompt:', error);
+      toast({
+        title: "Failed to generate prompt",
+        description: error.message || 'Unknown error',
+        variant: "destructive",
+      });
     } finally {
       setIsOptimizing(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: "Copied to clipboard",
+        description: "Prompt copied successfully. Paste it into your AI portal.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please try again or manually select and copy the text.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -285,80 +310,36 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
       <Dialog open={optimizingTeamId !== null} onOpenChange={(open) => !open && setOptimizingTeamId(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              AI Lineup Optimization
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                AI Lineup Optimization Prompt
+              </span>
+              {optimizationResult?.prompt && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyToClipboard(optimizationResult.prompt)}
+                  data-testid="button-copy-lineup-prompt"
+                >
+                  {copied ? (
+                    <><Check className="h-4 w-4 mr-2" /> Copied</>
+                  ) : (
+                    <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
+                  )}
+                </Button>
+              )}
             </DialogTitle>
             <DialogDescription>
-              AI-powered lineup recommendations based on current matchups, player performance, and scoring settings
+              Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to get lineup optimization recommendations
             </DialogDescription>
           </DialogHeader>
 
-          {optimizationResult && (
-            <div className="space-y-6 mt-4">
-              {/* Summary */}
-              <div className="bg-muted/50 p-4 rounded-lg">
-                <h3 className="font-semibold text-sm mb-2">Overall Assessment</h3>
-                <p className="text-sm text-muted-foreground">{optimizationResult.summary}</p>
+          {optimizationResult?.prompt && (
+            <div className="mt-4">
+              <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
+                <pre className="text-sm whitespace-pre-wrap font-mono">{optimizationResult.prompt}</pre>
               </div>
-
-              {/* Key Changes */}
-              {optimizationResult.keyChanges && optimizationResult.keyChanges.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm mb-3">Key Changes Recommended</h3>
-                  <div className="space-y-2">
-                    {optimizationResult.keyChanges.map((change: string, index: number) => (
-                      <div key={index} className="flex items-start gap-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-                        <Badge variant="default" className="shrink-0">Change {index + 1}</Badge>
-                        <p className="text-sm">{change}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Recommended Lineup */}
-              {optimizationResult.recommendedLineup && optimizationResult.recommendedLineup.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm mb-3">Recommended Starting Lineup</h3>
-                  <div className="space-y-2">
-                    {optimizationResult.recommendedLineup.map((item: any, index: number) => (
-                      <div key={index} className="flex items-start gap-3 p-3 border border-border rounded-md">
-                        <Badge className="shrink-0">{item.position}</Badge>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.player}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Bench Players */}
-              {optimizationResult.benchPlayers && optimizationResult.benchPlayers.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm mb-3">Bench This Week</h3>
-                  <div className="space-y-2">
-                    {optimizationResult.benchPlayers.map((item: any, index: number) => (
-                      <div key={index} className="flex items-start gap-3 p-3 border border-border rounded-md opacity-70">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.player}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Projected Impact */}
-              {optimizationResult.projectedImpact && (
-                <div className="bg-primary/10 p-4 rounded-lg">
-                  <h3 className="font-semibold text-sm mb-2">Projected Impact</h3>
-                  <p className="text-sm">{optimizationResult.projectedImpact}</p>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>
