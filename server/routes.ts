@@ -1751,6 +1751,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`After filtering: ${waiverWirePlayers.length} available players`);
 
+      // Debug: Log first player to see actual data structure
+      if (waiverWirePlayers.length > 0) {
+        const samplePlayer = waiverWirePlayers[0];
+        console.log('\n=== SAMPLE PLAYER DATA ===');
+        console.log('Player name:', samplePlayer.fullName);
+        console.log('Player proOpponent:', samplePlayer.proOpponent);
+        console.log('Player proTeamId:', samplePlayer.proTeamId);
+        console.log('Player stats array length:', samplePlayer.stats?.length);
+        if (samplePlayer.stats && samplePlayer.stats.length > 0) {
+          samplePlayer.stats.forEach((stat: any, idx: number) => {
+            console.log(`  Stat ${idx}: sourceId=${stat.statSourceId}, splitTypeId=${stat.statSplitTypeId}, appliedTotal=${stat.appliedTotal}`);
+          });
+        }
+        console.log('Top-level keys:', Object.keys(samplePlayer).join(', '));
+        console.log('=== END SAMPLE PLAYER ===\n');
+      }
+
       res.json({ 
         players: waiverWirePlayers,
         total: waiverWirePlayers.length,
