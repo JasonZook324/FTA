@@ -77,6 +77,28 @@ export default function Authentication() {
     }
   }, [credentials, userId, form]);
 
+  // Auto-select the currently loaded league (first one)
+  useEffect(() => {
+    if (leagues && leagues.length > 0 && !selectedLeagueId) {
+      setSelectedLeagueId(leagues[0].id);
+    }
+  }, [leagues, selectedLeagueId]);
+
+  // Auto-select the first team when teams are loaded
+  useEffect(() => {
+    if (teamsData?.teams && teamsData.teams.length > 0 && selectedLeagueId && !selectedTeam) {
+      const firstTeam = teamsData.teams[0];
+      const teamName = firstTeam.location && firstTeam.nickname 
+        ? `${firstTeam.location} ${firstTeam.nickname}` 
+        : `Team ${firstTeam.id}`;
+      setSelectedTeam({
+        teamId: firstTeam.id,
+        teamName,
+        leagueId: selectedLeagueId
+      });
+    }
+  }, [teamsData, selectedLeagueId, selectedTeam, setSelectedTeam]);
+
   // Save credentials mutation
   const saveCredentialsMutation = useMutation({
     mutationFn: async (data: CredentialsFormData) => {
