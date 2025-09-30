@@ -40,6 +40,21 @@ export interface TradeAnalysis {
   summary: string;
 }
 
+export interface LineupOptimization {
+  recommendedLineup: {
+    position: string;
+    player: string;
+    reason: string;
+  }[];
+  benchPlayers: {
+    player: string;
+    reason: string;
+  }[];
+  keyChanges: string[];
+  projectedImpact: string;
+  summary: string;
+}
+
 export class FantasyGeminiService {
   async analyzeLeague(leagueData: any, teamData?: any): Promise<FantasyAnalysis> {
     const maxRetries = 3;
@@ -407,6 +422,157 @@ For each trade option, consider:
   ],
   "marketAnalysis": "Overall analysis of trade market for this player position/type",
   "summary": "Overall assessment and trading strategy recommendations"
+}`;
+  }
+
+  async optimizeLineup(roster: any[], leagueSettings: any, currentDate: string, nflWeek: number): Promise<LineupOptimization> {
+    const maxRetries = 3;
+    const baseDelay = 2000;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const prompt = this.buildLineupOptimizationPrompt(roster, leagueSettings, currentDate, nflWeek);
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          config: {
+            systemInstruction: `You are an expert fantasy football analyst with access to real-time NFL data and player information. 
+Today's date is ${currentDate} and we are in NFL Week ${nflWeek} of the 2025 season.
+Use your knowledge of current player performance, injuries, matchups, and trends to provide accurate lineup optimization advice.`
+          },
+          contents: prompt
+        });
+
+        const rawJson = response.text;
+        if (rawJson) {
+          console.log('Raw lineup optimization response (first 200 chars):', rawJson.substring(0, 200));
+          
+          // Clean JSON response
+          let cleanJson = rawJson.trim();
+          cleanJson = cleanJson.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```\s*$/, '');
+          cleanJson = cleanJson.trim();
+          
+          const jsonStart = cleanJson.indexOf('{');
+          const jsonEnd = cleanJson.lastIndexOf('}');
+          
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+          }
+          
+          return JSON.parse(cleanJson) as LineupOptimization;
+        } else {
+          throw new Error("Empty response from AI model");
+        }
+      } catch (error: any) {
+        console.log(`Lineup optimization attempt ${attempt} failed:`, error.message);
+        
+        if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('UNAVAILABLE')) {
+          if (attempt < maxRetries) {
+            const delay = baseDelay * attempt;
+            console.log(`Retrying lineup optimization in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to optimize lineup after ${maxRetries} attempts: ${error.message}`);
+        }
+      }
+    }
+    
+    throw new Error("Unexpected error in optimizeLineup");
+  }
+
+  private buildLineupOptimizationPrompt(roster: any[], leagueSettings: any, currentDate: string, nflWeek: number): string {
+    // Format scoring type
+    let scoringFormat = 'Standard';
+    if (leagueSettings.receptionPoints === 1) {
+      scoringFormat = 'Full PPR';
+    } else if (leagueSettings.receptionPoints === 0.5) {
+      scoringFormat = 'Half PPR';
+    }
+
+    // Separate starters, bench, and IR
+    const starters = roster.filter((entry: any) => entry.lineupSlotId !== 20 && entry.lineupSlotId !== 21);
+    const bench = roster.filter((entry: any) => entry.lineupSlotId === 20 || entry.lineupSlotId === 21);
+
+    // Format starter info
+    const startersInfo = starters.map((entry: any) => {
+      const player = entry.playerPoolEntry?.player;
+      if (!player) return null;
+      
+      const position = player.defaultPositionId === 1 ? "QB" : 
+                       player.defaultPositionId === 2 ? "RB" :
+                       player.defaultPositionId === 3 ? "WR" :
+                       player.defaultPositionId === 4 ? "TE" :
+                       player.defaultPositionId === 5 ? "K" : "DEF";
+      
+      return `${player.fullName} (${position}) - Lineup Slot: ${entry.lineupSlotId}`;
+    }).filter(Boolean).join('\n');
+
+    // Format bench info
+    const benchInfo = bench.map((entry: any) => {
+      const player = entry.playerPoolEntry?.player;
+      if (!player) return null;
+      
+      const position = player.defaultPositionId === 1 ? "QB" : 
+                       player.defaultPositionId === 2 ? "RB" :
+                       player.defaultPositionId === 3 ? "WR" :
+                       player.defaultPositionId === 4 ? "TE" :
+                       player.defaultPositionId === 5 ? "K" : "DEF";
+      
+      return `${player.fullName} (${position})`;
+    }).filter(Boolean).join('\n');
+
+    return `
+You are an expert fantasy football analyst optimizing a lineup for Week ${nflWeek} of the 2025 NFL season.
+
+==== CURRENT DATE & CONTEXT ====
+Today: ${currentDate}
+NFL Week: ${nflWeek}
+Note: Use your knowledge of current player performance, injuries, matchups, and recent news to provide accurate recommendations.
+
+==== LEAGUE SETTINGS ====
+Scoring: ${scoringFormat} (${leagueSettings.receptionPoints || 0} points per reception)
+Season: ${leagueSettings.season}
+
+==== CURRENT STARTING LINEUP ====
+${startersInfo || 'No starters found'}
+
+==== BENCH PLAYERS ====
+${benchInfo || 'No bench players'}
+
+==== LINEUP OPTIMIZATION REQUESTED ====
+Analyze this roster and provide an optimized lineup for Week ${nflWeek}. Consider:
+
+1. **Current Week Matchups**: Which players have favorable matchups this week?
+2. **Recent Performance**: Who's hot and who's cold right now?
+3. **Injury Status**: Are there any injury concerns affecting the current lineup?
+4. **Scoring Format**: How does ${scoringFormat} scoring affect player values?
+5. **Start/Sit Decisions**: Should any bench players be starting over current starters?
+
+**IMPORTANT: Return your response as pure JSON only, no markdown formatting, no code blocks, just the raw JSON in this exact format:**
+
+{
+  "recommendedLineup": [
+    {
+      "position": "QB/RB/WR/TE/FLEX/K/DEF",
+      "player": "Player Full Name",
+      "reason": "Why this player should start (matchup, performance, etc.)"
+    }
+  ],
+  "benchPlayers": [
+    {
+      "player": "Player Full Name",
+      "reason": "Why this player should sit this week"
+    }
+  ],
+  "keyChanges": [
+    "List of key lineup changes recommended (e.g., 'Start Player X over Player Y')"
+  ],
+  "projectedImpact": "Expected point differential or impact of recommended changes",
+  "summary": "Overall lineup assessment and confidence in recommendations"
 }`;
   }
 }

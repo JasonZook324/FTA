@@ -2337,6 +2337,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Optimize team lineup using AI
+  app.post('/api/leagues/:id/teams/:teamId/optimize-lineup', async (req, res) => {
+    try {
+      const leagueId = req.params.id;
+      const teamId = parseInt(req.params.teamId);
+      
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const credentials = await storage.getEspnCredentials(league.userId);
+      if (!credentials || !credentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      }
+
+      // Get live roster data from ESPN
+      const rosterData = await espnApiService.getRosters(
+        credentials,
+        league.sport,
+        league.season,
+        league.espnLeagueId
+      );
+
+      // Find the specific team
+      const team = rosterData.teams?.find((t: any) => t.id === teamId);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      // Get league settings for AI context
+      const leagueSettings = {
+        receptionPoints: rosterData.settings?.scoringSettings?.receptionPoints || 0,
+        season: league.season
+      };
+
+      // Calculate current NFL week (2025 season starts Sept 4, 2025)
+      const currentDate = new Date();
+      const seasonStartDate = new Date('2025-09-04');
+      const daysSinceStart = Math.floor((currentDate.getTime() - seasonStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      const nflWeek = Math.max(1, Math.min(18, Math.ceil(daysSinceStart / 7) + 1));
+
+      // Format current date for AI
+      const formattedDate = currentDate.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      console.log(`Optimizing lineup for team ${teamId} - Week ${nflWeek}, Date: ${formattedDate}`);
+
+      // Call Gemini AI to optimize lineup
+      const optimization = await geminiService.optimizeLineup(
+        team.roster?.entries || [],
+        leagueSettings,
+        formattedDate,
+        nflWeek
+      );
+
+      res.json(optimization);
+    } catch (error: any) {
+      console.error('Lineup optimization error:', error);
+      res.status(500).json({ message: error.message || 'Failed to optimize lineup' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
