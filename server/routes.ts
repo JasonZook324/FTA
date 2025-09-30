@@ -1660,6 +1660,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
+      // Get league info to find current scoring period
+      const leagueData = await espnApiService.getLeagueData(
+        credentials,
+        league.sport,
+        league.season,
+        league.espnLeagueId
+      );
+      const currentScoringPeriodId = leagueData.scoringPeriodId || 1;
+      console.log('Current scoring period for waiver wire:', currentScoringPeriodId);
+
       // Get all players
       const playersData = await espnApiService.getPlayers(
         credentials,
@@ -1754,7 +1764,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         players: waiverWirePlayers,
         total: waiverWirePlayers.length,
-        takenPlayers: takenPlayerIds.size
+        takenPlayers: takenPlayerIds.size,
+        currentScoringPeriodId: currentScoringPeriodId
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

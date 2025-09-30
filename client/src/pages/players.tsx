@@ -107,13 +107,18 @@ export default function Players() {
   const getProjectedPoints = (playerData: any) => {
     const player = playerData.player || playerData;
     
+    // Get current scoring period from waiver wire data
+    const currentWeek = (waiverWireData as any)?.currentScoringPeriodId || 1;
+    
     // ESPN stores projections in the stats array
     // statSourceId: 1 = projected (0 = actual)
-    // statSplitTypeId: 0 = single week projection, 1 = season total
-    // We want current week projections (statSourceId=1, statSplitTypeId=0)
+    // statSplitTypeId: 1 = weekly (0 = cumulative/season)
+    // scoringPeriodId: specific week number
     if (player.stats && Array.isArray(player.stats)) {
       const weeklyProjection = player.stats.find((stat: any) => 
-        stat.statSourceId === 1 && stat.statSplitTypeId === 0
+        stat.statSourceId === 1 && 
+        stat.statSplitTypeId === 1 && 
+        stat.scoringPeriodId === currentWeek
       );
       
       if (weeklyProjection?.appliedTotal !== undefined) {
@@ -126,7 +131,7 @@ export default function Players() {
       return player.projectedStats.appliedTotal.toFixed(1);
     }
     
-    return "-";
+    return "0.0";
   };
 
   // Helper function to get opponent team
