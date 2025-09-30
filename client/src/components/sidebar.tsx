@@ -64,20 +64,19 @@ export default function Sidebar() {
             
             return (
               <li key={item.name}>
-                <Link href={item.href}>
-                  <a
-                    className={cn(
-                      "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
-                      isActive 
-                        ? "bg-primary text-primary-foreground" 
-                        : "text-foreground hover:bg-secondary"
-                    )}
-                    data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-sm">{item.name}</span>
-                  </a>
+                <Link 
+                  href={item.href}
+                  className={cn(
+                    "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
+                    isActive 
+                      ? "bg-primary text-primary-foreground" 
+                      : "text-foreground hover:bg-secondary"
+                  )}
+                  data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm">{item.name}</span>
                 </Link>
               </li>
             );

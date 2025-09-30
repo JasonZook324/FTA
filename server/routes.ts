@@ -1761,22 +1761,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Waiver wire: ${waiverWirePlayers.length} available players out of ${takenPlayerIds.size} taken`);
 
-      // Debug: Check Mike Evans specifically
-      const mikeEvans = waiverWirePlayers.find((p: any) => p.player?.fullName === 'Mike Evans');
-      if (mikeEvans) {
-        console.log('\n=== MIKE EVANS DEBUG ===');
-        console.log('Injury status:', mikeEvans.player?.injured);
-        console.log('Player status:', mikeEvans.status);
-        const projStats = mikeEvans.player?.stats?.filter((s: any) => 
+      // Debug: Check first 3 waiver players to see data structure
+      console.log('\n=== WAIVER PLAYER STATS DEBUG ===');
+      waiverWirePlayers.slice(0, 3).forEach((p: any) => {
+        const playerInfo = p.player;
+        console.log(`\nPlayer: ${playerInfo?.fullName} (${playerInfo?.proTeamId})`);
+        console.log('Injured:', playerInfo?.injured);
+        console.log('Injury Status:', playerInfo?.injuryStatus);
+        const projStats = playerInfo?.stats?.filter((s: any) => 
           s.statSourceId === 1 && s.statSplitTypeId === 1
-        );
-        console.log('All weekly projections:', projStats?.map((s: any) => ({
-          scoringPeriodId: s.scoringPeriodId,
-          appliedTotal: s.appliedTotal,
-          seasonId: s.seasonId
+        ) || [];
+        console.log('Weekly projections available:', projStats.map((s: any) => ({
+          week: s.scoringPeriodId,
+          points: s.appliedTotal
         })));
-        console.log('=== END MIKE EVANS ===\n');
-      }
+      });
+      console.log('=== END DEBUG ===\n');
 
       res.json({ 
         players: waiverWirePlayers,
