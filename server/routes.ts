@@ -1584,14 +1584,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRoster = userTeam.roster?.entries?.map((entry: any) => {
         const player = entry.playerPoolEntry?.player || entry.player;
         const lineupSlot = entry.lineupSlotId;
+        const isBench = lineupSlot === 20;
+        const isIR = lineupSlot === 21;
+        const isStarter = !isBench && !isIR;
         return {
           name: player?.fullName || 'Unknown Player',
           position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
           nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
           lineupSlot: getLineupSlotName(lineupSlot),
-          isStarter: lineupSlot < 20,
-          isBench: lineupSlot === 20,
-          isIR: lineupSlot === 21,
+          isStarter: isStarter,
+          isBench: isBench,
+          isIR: isIR,
           projectedPoints: getProjectedPoints(entry),
           injuryStatus: getInjuryStatus(entry)
         };
