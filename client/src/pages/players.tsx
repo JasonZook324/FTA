@@ -106,34 +106,38 @@ export default function Players() {
   // Helper function to get projected fantasy points
   const getProjectedPoints = (playerData: any) => {
     const player = playerData.player || playerData;
-    // Check for projected stats in various possible locations
-    const projection = player.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
-                      player.projectedStats ||
-                      player.outlook?.projectedStats;
     
-    if (projection?.appliedTotal !== undefined) {
-      return projection.appliedTotal.toFixed(1);
+    // ESPN stores projections in the stats array
+    // statSourceId: 1 = projected (0 = actual)
+    // statSplitTypeId: 0 = single week projection, 1 = season total
+    // We want current week projections (statSourceId=1, statSplitTypeId=0)
+    if (player.stats && Array.isArray(player.stats)) {
+      const weeklyProjection = player.stats.find((stat: any) => 
+        stat.statSourceId === 1 && stat.statSplitTypeId === 0
+      );
+      
+      if (weeklyProjection?.appliedTotal !== undefined) {
+        return weeklyProjection.appliedTotal.toFixed(1);
+      }
     }
-    if (projection?.total !== undefined) {
-      return projection.total.toFixed(1);
+    
+    // Fallback: try other projection locations
+    if (player.projectedStats?.appliedTotal !== undefined) {
+      return player.projectedStats.appliedTotal.toFixed(1);
     }
+    
     return "-";
   };
 
   // Helper function to get opponent team
   const getOpponent = (playerData: any) => {
     const player = playerData.player || playerData;
-    // Check for opponent info in various possible locations
-    const opponent = player.opponent || 
-                    player.nextOpponent ||
-                    player.schedule?.find((game: any) => game.isThisWeek);
     
-    if (opponent?.teamId) {
-      return `vs ${getTeamName(opponent.teamId)}`;
+    // ESPN stores opponent in proOpponent field (opponent's pro team ID)
+    if (player.proOpponent !== undefined && player.proOpponent > 0) {
+      return getTeamName(player.proOpponent);
     }
-    if (opponent?.opponentTeamId) {
-      return `vs ${getTeamName(opponent.opponentTeamId)}`;
-    }
+    
     return "-";
   };
 
