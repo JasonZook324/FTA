@@ -8,6 +8,15 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 
 ## Recent Changes
 
+**September 30, 2025** - Mobile Responsiveness Improvements
+- Fixed main layout overflow issue by removing h-screen overflow-hidden and implementing min-h-screen with scrollable main content area
+- Redesigned league header to be fully responsive - stacks vertically on small screens with full-width buttons
+- Implemented 44px minimum touch targets for all interactive elements (buttons, inputs, links)
+- Added responsive typography and spacing adjustments for mobile devices
+- Enhanced page headers (standings, rosters, etc.) to stack content on small screens
+- Added iOS-specific fixes (16px input font size to prevent zoom, proper touch targets)
+- All screen elements now visible and accessible on mobile devices
+
 **September 30, 2025** - Enhanced Generate Analysis Prompt Feature
 - Updated the Generate Analysis Prompt to use real ESPN API data instead of mock data
 - Integrated live team roster data (starters/bench/injured reserve) using TeamContext for selected team

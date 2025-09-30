@@ -26,17 +26,18 @@ export default function Standings() {
   return (
     <>
       {/* Header Bar */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-card border-b border-border px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">League Standings</h2>
-            <p className="text-muted-foreground">View team rankings and records</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">League Standings</h2>
+            <p className="text-sm text-muted-foreground">View team rankings and records</p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
             <Button
               variant="secondary"
               onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", currentLeague?.id, "standings"] })}
               disabled={!currentLeague}
+              className="w-full sm:w-auto min-h-[44px]"
               data-testid="button-refresh"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -47,7 +48,7 @@ export default function Standings() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto p-4 sm:p-6">
         {!currentLeague ? (
           <Card className="h-96">
             <CardContent className="flex items-center justify-center h-full">
