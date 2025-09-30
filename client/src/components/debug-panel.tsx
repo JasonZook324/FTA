@@ -17,10 +17,17 @@ interface DebugRequest {
 export const debugRequests: DebugRequest[] = [];
 
 export function addDebugRequest(request: DebugRequest) {
-  debugRequests.unshift(request);
-  if (debugRequests.length > 50) {
-    debugRequests.pop();
+  const existingIndex = debugRequests.findIndex(r => r.id === request.id);
+  
+  if (existingIndex !== -1) {
+    debugRequests[existingIndex] = request;
+  } else {
+    debugRequests.unshift(request);
+    if (debugRequests.length > 50) {
+      debugRequests.pop();
+    }
   }
+  
   window.dispatchEvent(new CustomEvent('debug-request-added'));
 }
 

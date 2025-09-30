@@ -114,12 +114,15 @@ export default function Players() {
     // statSourceId: 1 = projected (0 = actual)
     // statSplitTypeId: 1 = weekly (0 = cumulative/season)
     // scoringPeriodId: specific week number
+    // NOTE: ESPN may return multiple projections for the same week - use the LAST one (most recent)
     if (player.stats && Array.isArray(player.stats)) {
-      const weeklyProjection = player.stats.find((stat: any) => 
+      const matchingStats = player.stats.filter((stat: any) => 
         stat.statSourceId === 1 && 
         stat.statSplitTypeId === 1 && 
         stat.scoringPeriodId === currentWeek
       );
+      
+      const weeklyProjection = matchingStats.length > 0 ? matchingStats[matchingStats.length - 1] : null;
       
       if (weeklyProjection?.appliedTotal !== undefined) {
         return weeklyProjection.appliedTotal.toFixed(1);
