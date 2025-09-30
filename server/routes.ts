@@ -2370,7 +2370,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get league settings for AI context
       const leagueSettings = {
         receptionPoints: rosterData.settings?.scoringSettings?.receptionPoints || 0,
-        season: league.season
+        season: league.season,
+        teamCount: rosterData.teams?.length || 0
       };
 
       // Calculate current NFL week (2025 season starts Sept 4, 2025)

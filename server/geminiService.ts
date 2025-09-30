@@ -429,6 +429,14 @@ For each trade option, consider:
     const maxRetries = 3;
     const baseDelay = 2000;
     
+    // Format scoring type
+    let scoringFormat = 'Standard';
+    if (leagueSettings.receptionPoints === 1) {
+      scoringFormat = 'Full PPR';
+    } else if (leagueSettings.receptionPoints === 0.5) {
+      scoringFormat = 'Half PPR';
+    }
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const prompt = this.buildLineupOptimizationPrompt(roster, leagueSettings, currentDate, nflWeek);
@@ -438,7 +446,9 @@ For each trade option, consider:
           config: {
             systemInstruction: `You are an expert fantasy football analyst with access to real-time NFL data and player information. 
 Today's date is ${currentDate} and we are in NFL Week ${nflWeek} of the 2025 season.
-Use your knowledge of current player performance, injuries, matchups, and trends to provide accurate lineup optimization advice.`
+This is a ${leagueSettings.teamCount}-team ${scoringFormat} league.
+Use your knowledge of current player performance, injuries, matchups, and trends to provide accurate lineup optimization advice.
+Consider that in a ${leagueSettings.teamCount}-team league, roster depth and player availability are ${leagueSettings.teamCount >= 12 ? 'shallower' : 'deeper'} than standard leagues.`
           },
           contents: prompt
         });
@@ -534,6 +544,7 @@ NFL Week: ${nflWeek}
 Note: Use your knowledge of current player performance, injuries, matchups, and recent news to provide accurate recommendations.
 
 ==== LEAGUE SETTINGS ====
+League Size: ${leagueSettings.teamCount}-team league
 Scoring: ${scoringFormat} (${leagueSettings.receptionPoints || 0} points per reception)
 Season: ${leagueSettings.season}
 
