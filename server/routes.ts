@@ -1761,6 +1761,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Waiver wire: ${waiverWirePlayers.length} available players out of ${takenPlayerIds.size} taken`);
 
+      // Debug: Check Mike Evans specifically
+      const mikeEvans = waiverWirePlayers.find((p: any) => p.player?.fullName === 'Mike Evans');
+      if (mikeEvans) {
+        console.log('\n=== MIKE EVANS DEBUG ===');
+        console.log('Injury status:', mikeEvans.player?.injured);
+        console.log('Player status:', mikeEvans.status);
+        const projStats = mikeEvans.player?.stats?.filter((s: any) => 
+          s.statSourceId === 1 && s.statSplitTypeId === 1
+        );
+        console.log('All weekly projections:', projStats?.map((s: any) => ({
+          scoringPeriodId: s.scoringPeriodId,
+          appliedTotal: s.appliedTotal,
+          seasonId: s.seasonId
+        })));
+        console.log('=== END MIKE EVANS ===\n');
+      }
+
       res.json({ 
         players: waiverWirePlayers,
         total: waiverWirePlayers.length,
