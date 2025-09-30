@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, Sparkles, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface TeamRosterProps {
   data: any;
@@ -14,6 +15,7 @@ interface TeamRosterProps {
 }
 
 export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProps) {
+  const { selectedTeam } = useTeam();
   const [optimizingTeamId, setOptimizingTeamId] = useState<number | null>(null);
   const [optimizationResult, setOptimizationResult] = useState<any>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -155,20 +157,22 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleOptimizeLineup(team.id)}
-                    disabled={isOptimizing}
-                    data-testid={`button-optimize-team-${team.id}`}
-                  >
-                    {isOptimizing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 mr-2" />
-                    )}
-                    Optimize Lineup
-                  </Button>
+                  {selectedTeam?.teamId === team.id && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleOptimizeLineup(team.id)}
+                      disabled={isOptimizing}
+                      data-testid={`button-optimize-team-${team.id}`}
+                    >
+                      {isOptimizing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 mr-2" />
+                      )}
+                      Optimize Lineup
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
