@@ -304,7 +304,7 @@ ${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.top
 ).join('\n') : '- No waiver wire data available'}
 
 ==== REQUESTED ANALYSIS ====
-Please provide a comprehensive fantasy football analysis in HTML format with the following sections:
+Please provide a comprehensive fantasy football analysis with the following sections:
 
 1. **Roster Strengths** - What's working well with my current lineup
 2. **Roster Weaknesses** - Gaps and concerns in my roster
@@ -312,12 +312,12 @@ Please provide a comprehensive fantasy football analysis in HTML format with the
 4. **Lineup Optimization** - Suggested starter/bench changes for this week
 5. **Strategic Advice** - Overall strategy based on the scoring format and current situation
 
-Format your response as clean, styled HTML that I can view in a browser. Use:
-- Headers (h1, h2, h3) for sections
+Format your response with clear visual structure using:
+- Headers and section titles
+- Bullet points and numbered lists
 - Tables for player comparisons
-- Color coding (green for positives, red for concerns, blue for neutral info)
 - Bold text for player names and key recommendations
-- Lists (ul/li) for bullet points
+- Use emojis to highlight important points (✅ for strengths, ⚠️ for concerns, 🎯 for recommendations, 📊 for stats)
 
 Make your recommendations specific with player names, projected points, and clear reasoning based on the ${scoringFormat} scoring format.`;
   }
