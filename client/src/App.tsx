@@ -14,6 +14,7 @@ import TradeAnalyzer from "@/pages/trade-analyzer";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
+import { TeamProvider } from "@/contexts/TeamContext";
 
 function Router() {
   return (
@@ -43,10 +44,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <TeamProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </TeamProvider>
     </QueryClientProvider>
   );
 }

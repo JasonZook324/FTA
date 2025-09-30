@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut, Plus, Users, Calendar, Trophy, Settings } from "lucide-react";
+import { RefreshCw, Save, CheckCircle, TriangleAlert, Info, LogOut, Plus, Users, Calendar, Trophy, Settings, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTeam } from "@/contexts/TeamContext";
 
 const credentialsFormSchema = insertEspnCredentialsSchema.extend({
   userId: z.string().min(1, "User ID is required"),
@@ -27,6 +28,8 @@ export default function Authentication() {
   const [userId] = useState("default-user"); // In a real app, this would come from auth context
   const [showCredentialsForm, setShowCredentialsForm] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  const { selectedTeam, setSelectedTeam } = useTeam();
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
 
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
@@ -42,6 +45,17 @@ export default function Authentication() {
   // Query existing credentials
   const { data: credentials, isLoading } = useQuery<EspnCredentials>({
     queryKey: ["/api/espn-credentials", userId],
+  });
+
+  // Query user leagues
+  const { data: leagues } = useQuery<League[]>({
+    queryKey: ["/api/leagues", userId],
+  });
+
+  // Query teams for selected league
+  const { data: teamsData, isLoading: isLoadingTeams, isError: isTeamsError } = useQuery<{ teams?: any[] }>({
+    queryKey: ["/api/leagues", selectedLeagueId, "rosters"],
+    enabled: !!selectedLeagueId,
   });
 
 
@@ -177,7 +191,119 @@ export default function Authentication() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* Team Selector Card */}
+          {credentials && credentials.isValid && leagues && leagues.length > 0 && (
+            <Card data-testid="card-team-selector">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  Select Your Team
+                </CardTitle>
+                <CardDescription>
+                  Choose which team you manage in your league. This selection will be used throughout the application.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* League Selector */}
+                  <div className="space-y-2">
+                    <Label htmlFor="league-select">League</Label>
+                    <Select 
+                      value={selectedLeagueId} 
+                      onValueChange={(value) => {
+                        setSelectedLeagueId(value);
+                        setSelectedTeam(null);
+                      }}
+                    >
+                      <SelectTrigger id="league-select" data-testid="select-league">
+                        <SelectValue placeholder="Select a league" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {leagues.map((league) => (
+                          <SelectItem key={league.id} value={league.id}>
+                            {league.name} ({league.season})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Team Selector */}
+                  <div className="space-y-2">
+                    <Label htmlFor="team-select">Your Team</Label>
+                    <Select 
+                      value={selectedTeam?.teamId.toString() || ""} 
+                      onValueChange={(value) => {
+                        const teamId = parseInt(value);
+                        const team = teamsData?.teams?.find((t: any) => t.id === teamId);
+                        if (team && selectedLeagueId) {
+                          const teamName = team.location && team.nickname 
+                            ? `${team.location} ${team.nickname}` 
+                            : `Team ${team.id}`;
+                          setSelectedTeam({
+                            teamId,
+                            teamName,
+                            leagueId: selectedLeagueId
+                          });
+                          toast({
+                            title: "Team Selected",
+                            description: `You are now managing "${teamName}"`,
+                          });
+                        }
+                      }}
+                      disabled={!selectedLeagueId || isLoadingTeams || !teamsData?.teams?.length}
+                    >
+                      <SelectTrigger id="team-select" data-testid="select-team">
+                        <SelectValue placeholder={
+                          !selectedLeagueId 
+                            ? "Select a league first" 
+                            : isLoadingTeams 
+                              ? "Loading teams..." 
+                              : isTeamsError 
+                                ? "Error loading teams" 
+                                : !teamsData?.teams?.length 
+                                  ? "No teams found" 
+                                  : "Select your team"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamsData?.teams?.map((team: any) => {
+                          const teamName = team.location && team.nickname 
+                            ? `${team.location} ${team.nickname}` 
+                            : `Team ${team.id}`;
+                          return (
+                            <SelectItem key={team.id} value={team.id.toString()}>
+                              {teamName}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {isTeamsError && (
+                      <p className="text-xs text-destructive">Failed to load teams. Please try selecting a different league.</p>
+                    )}
+                  </div>
+                </div>
+
+                {selectedTeam && (
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                        Managing: {selectedTeam.teamName}
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      This team will be used for AI recommendations and analysis features
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Cookie Configuration */}
           <Card data-testid="card-cookie-configuration">
             <CardHeader>
@@ -428,8 +554,8 @@ export default function Authentication() {
             </CardContent>
             )}
           </Card>
+          </div>
         </div>
-
       </main>
     </>
   );
