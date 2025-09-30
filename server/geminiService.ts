@@ -409,28 +409,41 @@ Provide specific player names and detailed reasoning for each recommendation.
       scoringFormat = 'Half PPR';
     }
 
+    // Safely extract user team record with defaults
+    const userRecord = userTeam.record || {};
+    const userWins = userRecord.wins ?? 0;
+    const userLosses = userRecord.losses ?? 0;
+    const userPointsFor = userRecord.pointsFor ?? 0;
+    const userPointsAgainst = userRecord.pointsAgainst ?? 0;
+    const userTeamName = userTeam.name || 'Your Team';
+
     // Format user roster
     const userRoster = userTeam.roster?.map((player: any) => {
-      return `${player.name} (${player.position}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
+      return `${player.name || 'Unknown Player'} (${player.position || 'FLEX'}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
     }).join('\n') || 'No roster data';
 
     // Format other teams with their rosters
     const otherTeamsData = allTeams.filter(team => team.id !== userTeam.id).map(team => {
+      const teamRecord = team.record || {};
+      const teamWins = teamRecord.wins ?? 0;
+      const teamLosses = teamRecord.losses ?? 0;
+      const teamName = team.name || `Team ${team.id}`;
+      
       const teamRoster = team.roster?.map((player: any) => {
-        return `${player.name} (${player.position}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
+        return `${player.name || 'Unknown Player'} (${player.position || 'FLEX'}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
       }).join('\n  ') || 'No roster data';
 
-      return `=== ${team.name} (${team.record?.wins}-${team.record?.losses}) ===
+      return `=== ${teamName} (${teamWins}-${teamLosses}) ===
   ${teamRoster}`;
     }).join('\n\n');
 
     return `
 You are an expert fantasy football trade analyzer. Analyze potential trade opportunities for the selected player.
 
-==== YOUR TEAM: ${userTeam.name} ====
-Record: ${userTeam.record?.wins}-${userTeam.record?.losses}
-Points For: ${userTeam.record?.pointsFor}
-Points Against: ${userTeam.record?.pointsAgainst}
+==== YOUR TEAM: ${userTeamName} ====
+Record: ${userWins}-${userLosses}
+Points For: ${userPointsFor}
+Points Against: ${userPointsAgainst}
 
 Your Current Roster:
 ${userRoster}
@@ -440,7 +453,7 @@ ${selectedPlayer}
 
 ==== LEAGUE SETTINGS ====
 Scoring: ${scoringFormat} (${leagueSettings.receptionPoints || 0} points per reception)
-Season: ${leagueSettings.season}
+Season: ${leagueSettings.season || 'Unknown'}
 
 ==== ALL OTHER TEAMS ====
 ${otherTeamsData}
