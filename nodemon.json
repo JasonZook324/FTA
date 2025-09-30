@@ -1,0 +1,9 @@
+{
+  "watch": ["server"],
+  "ext": "ts,tsx,json",
+  "ignore": ["server/**/*.test.ts", "client", "node_modules"],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "exec": "node --inspect -r dotenv/config --import=tsx server/index.ts"
+}

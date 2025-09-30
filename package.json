@@ -8,7 +8,10 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "dev:server:debug": "nodemon",
+    "dev:server:debug:brk": "cross-env NODE_OPTIONS=--inspect-brk nodemon",
+    "dev:server:debug:9230": "cross-env NODE_OPTIONS=--inspect=9230 nodemon"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",
@@ -47,7 +50,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "connect-pg-simple": "^10.0.0",
-    "cross-env": "^10.0.0",
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.39.1",
@@ -94,8 +96,10 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
     "drizzle-kit": "^0.30.4",
     "esbuild": "^0.25.0",
+    "nodemon": "^3.1.10",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",

@@ -1225,7 +1225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 2. Available Waiver Wire Players
         waiverWire: {
-          topAvailable: waiverWirePlayers.slice(0, 25).map((playerData: any) => {
+          topAvailable: waiverWirePlayers.slice(0, 50).map((playerData: any) => {
             const player = playerData.player || playerData;
             return {
               name: player.fullName || 'Unknown Player',
@@ -1617,7 +1617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
-      // Filter available players and get top 20
+      // Filter available players and get top 50
       const availablePlayers = playersData
         .filter((playerData: any) => {
           const player = playerData.player || playerData;
@@ -1629,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const projB = getProjectedPoints(b) || 0;
           return projB - projA;
         })
-        .slice(0, 20)
+        .slice(0, 50)
         .map((playerData: any) => {
           const player = playerData.player || playerData;
           return {

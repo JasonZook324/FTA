@@ -11,7 +11,7 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 **September 30, 2025** - Enhanced Generate Analysis Prompt Feature
 - Updated the Generate Analysis Prompt to use real ESPN API data instead of mock data
 - Integrated live team roster data (starters/bench/injured reserve) using TeamContext for selected team
-- Added waiver wire player data with projections and ownership percentages (top 20 available players)
+- Added waiver wire player data with projections and ownership percentages (top 50 available players)
 - Implemented plain text prompt generation that requests AI to respond with user-friendly formatting
 - Frontend displays plain text prompts in scrollable pre element with copy-to-clipboard functionality
 - Backend helper functions (getNFLTeamName, getPositionNameLocal, getProjectedPoints, getInjuryStatus, getLineupSlotName) defined locally to handle ESPN data transformation

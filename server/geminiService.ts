@@ -311,6 +311,16 @@ Please provide a comprehensive fantasy football analysis with the following sect
 3. **Waiver Wire Recommendations** - Specific players to target and who to drop
 4. **Lineup Optimization** - Suggested starter/bench changes for this week
 5. **Strategic Advice** - Overall strategy based on the scoring format and current situation
+6. **Research & Trends Analysis** - Reference multiple expert sources including FantasyPros consensus rankings, start/sit advice, betting trends, and moneylines to provide comprehensive data-driven insights from recent NFL data
+
+**IMPORTANT: Base your analysis on current research from multiple sources, including:**
+- FantasyPros expert consensus rankings and start/sit recommendations
+- Player target shares, snap counts, and usage trends
+- Matchup analysis and defensive rankings against positions
+- Injury reports and their fantasy impact
+- Betting moneylines and trends that may indicate game script expectations
+- Vegas over/under totals and implied team scoring
+- Waiver wire pickup percentages and expert recommendations
 
 Format your response with clear visual structure using:
 - Headers and section titles

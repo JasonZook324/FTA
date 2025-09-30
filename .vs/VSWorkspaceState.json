@@ -1,6 +1,11 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\client",
+    "\\client\\src",
+    "\\client\\src\\pages",
+    "\\server"
   ],
+  "SelectedNode": "\\analysis_prompt.png",
   "PreviewInSolutionExplorer": false
 }
