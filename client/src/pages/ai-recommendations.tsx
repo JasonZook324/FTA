@@ -225,7 +225,7 @@ export default function AIRecommendations() {
           <Card data-testid="analysis-prompt-card">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>League Analysis Data</span>
+                <span>League Analysis Prompt</span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -235,20 +235,17 @@ export default function AIRecommendations() {
                   {copiedAnalysis ? (
                     <><Check className="h-4 w-4 mr-2" /> Copied</>
                   ) : (
-                    <><Copy className="h-4 w-4 mr-2" /> Copy HTML</>
+                    <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
                   )}
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <iframe
-                srcDoc={analysisPrompt.prompt}
-                className="w-full border border-border rounded-lg"
-                style={{ height: '600px' }}
-                title="League Analysis Data"
-              />
+              <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
+                <pre className="text-sm whitespace-pre-wrap font-mono">{analysisPrompt.prompt}</pre>
+              </div>
               <p className="text-xs text-muted-foreground mt-2">
-                ⬆️ This is your team's data formatted for readability. Click "Copy HTML" above, then paste the entire thing into ChatGPT, Claude, or your preferred AI assistant to get comprehensive fantasy football recommendations.
+                Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant. The AI will respond with HTML-formatted recommendations based on your team's data.
               </p>
             </CardContent>
           </Card>

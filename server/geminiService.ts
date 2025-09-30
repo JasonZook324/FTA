@@ -271,177 +271,55 @@ Provide a detailed, specific response that considers:
     const bench = userTeam.roster?.filter((p: any) => p.isBench) || [];
     const ir = userTeam.roster?.filter((p: any) => p.isIR) || [];
 
-    // Build HTML prompt
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-    h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-    h2 { color: #34495e; background: #ecf0f1; padding: 10px; border-left: 4px solid #3498db; margin-top: 20px; }
-    .section { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .player-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .player-table th { background: #3498db; color: white; padding: 10px; text-align: left; }
-    .player-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-    .player-table tr:hover { background: #f8f9fa; }
-    .injury { color: #e74c3c; font-weight: bold; }
-    .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-    .settings-item { background: #ecf0f1; padding: 12px; border-radius: 5px; }
-    .settings-label { font-weight: bold; color: #7f8c8d; font-size: 0.9em; }
-    .settings-value { font-size: 1.2em; color: #2c3e50; margin-top: 5px; }
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
-    .badge-starter { background: #27ae60; color: white; }
-    .badge-bench { background: #95a5a6; color: white; }
-    .badge-ir { background: #e74c3c; color: white; }
-  </style>
-</head>
-<body>
-  <h1>🏈 Fantasy Football Analysis - ${userTeam.name || 'Your Team'}</h1>
-  
-  <div class="section">
-    <h2>📊 League Information</h2>
-    <div class="settings-grid">
-      <div class="settings-item">
-        <div class="settings-label">League</div>
-        <div class="settings-value">${league.name || 'Unknown League'}</div>
-      </div>
-      <div class="settings-item">
-        <div class="settings-label">Season / Week</div>
-        <div class="settings-value">${weekContext.season} Season - Week ${weekContext.currentWeek}</div>
-      </div>
-      <div class="settings-item">
-        <div class="settings-label">Scoring Format</div>
-        <div class="settings-value">${scoringFormat}</div>
-      </div>
-      <div class="settings-item">
-        <div class="settings-label">Teams</div>
-        <div class="settings-value">${league.teamCount || 'Unknown'} Teams</div>
-      </div>
-    </div>
-  </div>
+    // Build plain text prompt that requests HTML response
+    return `You are a fantasy football expert. Analyze the following ESPN Fantasy Football data and provide comprehensive recommendations.
 
-  <div class="section">
-    <h2>👥 Your Roster - ${userTeam.name || 'Your Team'}</h2>
-    
-    <h3><span class="badge badge-starter">STARTERS</span></h3>
-    <table class="player-table">
-      <thead>
-        <tr>
-          <th>Player</th>
-          <th>Position</th>
-          <th>NFL Team</th>
-          <th>Proj. Points</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${starters.length > 0 ? starters.map((p: any) => `
-        <tr>
-          <td><strong>${p.name || 'Unknown'}</strong></td>
-          <td>${p.position || 'FLEX'}</td>
-          <td>${p.nflTeam || 'FA'}</td>
-          <td>${p.projectedPoints || '0.0'}</td>
-          <td${p.injuryStatus !== 'Active' ? ' class="injury"' : ''}>${p.injuryStatus || 'Active'}</td>
-        </tr>
-        `).join('') : '<tr><td colspan="5">No starters found</td></tr>'}
-      </tbody>
-    </table>
+==== LEAGUE INFORMATION ====
+League: ${league.name || 'Unknown League'}
+Season: ${weekContext.season}
+Current Week: ${weekContext.currentWeek}
+Scoring Format: ${scoringFormat}
+Teams in League: ${league.teamCount || 'Unknown'}
 
-    <h3><span class="badge badge-bench">BENCH</span></h3>
-    <table class="player-table">
-      <thead>
-        <tr>
-          <th>Player</th>
-          <th>Position</th>
-          <th>NFL Team</th>
-          <th>Proj. Points</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${bench.length > 0 ? bench.map((p: any) => `
-        <tr>
-          <td><strong>${p.name || 'Unknown'}</strong></td>
-          <td>${p.position || 'FLEX'}</td>
-          <td>${p.nflTeam || 'FA'}</td>
-          <td>${p.projectedPoints || '0.0'}</td>
-          <td${p.injuryStatus !== 'Active' ? ' class="injury"' : ''}>${p.injuryStatus || 'Active'}</td>
-        </tr>
-        `).join('') : '<tr><td colspan="5">No bench players</td></tr>'}
-      </tbody>
-    </table>
+==== MY TEAM ROSTER: ${userTeam.name || 'Your Team'} ====
 
-    ${ir.length > 0 ? `
-    <h3><span class="badge badge-ir">INJURED RESERVE</span></h3>
-    <table class="player-table">
-      <thead>
-        <tr>
-          <th>Player</th>
-          <th>Position</th>
-          <th>NFL Team</th>
-          <th>Proj. Points</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${ir.map((p: any) => `
-        <tr>
-          <td><strong>${p.name || 'Unknown'}</strong></td>
-          <td>${p.position || 'FLEX'}</td>
-          <td>${p.nflTeam || 'FA'}</td>
-          <td>${p.projectedPoints || '0.0'}</td>
-          <td class="injury">${p.injuryStatus || 'Injured'}</td>
-        </tr>
-        `).join('')}
-      </tbody>
-    </table>
-    ` : ''}
-  </div>
+STARTERS:
+${starters.length > 0 ? starters.map((p: any) => 
+  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+).join('\n') : '- No starters found'}
 
-  <div class="section">
-    <h2>🔍 Top Available Waiver Wire Players</h2>
-    <table class="player-table">
-      <thead>
-        <tr>
-          <th>Player</th>
-          <th>Position</th>
-          <th>NFL Team</th>
-          <th>Proj. Points</th>
-          <th>Ownership %</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => `
-        <tr>
-          <td><strong>${p.name || 'Unknown'}</strong></td>
-          <td>${p.position || 'FLEX'}</td>
-          <td>${p.nflTeam || 'FA'}</td>
-          <td>${p.projectedPoints || '0.0'}</td>
-          <td>${p.ownershipPercent || '0.0'}%</td>
-          <td${p.injuryStatus !== 'Active' ? ' class="injury"' : ''}>${p.injuryStatus || 'Active'}</td>
-        </tr>
-        `).join('') : '<tr><td colspan="6">No waiver wire data available</td></tr>'}
-      </tbody>
-    </table>
-  </div>
+BENCH:
+${bench.length > 0 ? bench.map((p: any) => 
+  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+).join('\n') : '- No bench players'}
 
-  <div class="section">
-    <h2>📝 Instructions</h2>
-    <p><strong>Copy this entire HTML page and paste it into ChatGPT, Claude, or your preferred AI assistant.</strong></p>
-    <p>Ask your AI to:</p>
-    <ul>
-      <li>Analyze your roster strengths and weaknesses</li>
-      <li>Suggest which waiver wire players to target</li>
-      <li>Recommend lineup changes for this week</li>
-      <li>Identify trade opportunities</li>
-      <li>Provide strategic advice for your scoring format</li>
-    </ul>
-  </div>
-</body>
-</html>
-`;
+${ir.length > 0 ? `INJURED RESERVE:
+${ir.map((p: any) => 
+  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Injured'}`
+).join('\n')}` : ''}
+
+==== TOP AVAILABLE WAIVER WIRE PLAYERS ====
+${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => 
+  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`
+).join('\n') : '- No waiver wire data available'}
+
+==== REQUESTED ANALYSIS ====
+Please provide a comprehensive fantasy football analysis in HTML format with the following sections:
+
+1. **Roster Strengths** - What's working well with my current lineup
+2. **Roster Weaknesses** - Gaps and concerns in my roster
+3. **Waiver Wire Recommendations** - Specific players to target and who to drop
+4. **Lineup Optimization** - Suggested starter/bench changes for this week
+5. **Strategic Advice** - Overall strategy based on the scoring format and current situation
+
+Format your response as clean, styled HTML that I can view in a browser. Use:
+- Headers (h1, h2, h3) for sections
+- Tables for player comparisons
+- Color coding (green for positives, red for concerns, blue for neutral info)
+- Bold text for player names and key recommendations
+- Lists (ul/li) for bullet points
+
+Make your recommendations specific with player names, projected points, and clear reasoning based on the ${scoringFormat} scoring format.`;
   }
 
   async analyzeTrade(selectedPlayer: string, userTeam: any, allTeams: any[], leagueSettings: any): Promise<TradeAnalysis> {
