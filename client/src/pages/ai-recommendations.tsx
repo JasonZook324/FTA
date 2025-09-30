@@ -8,6 +8,7 @@ import { Brain, Lightbulb, TrendingUp, Users, MessageSquare, Loader2, Copy, Chec
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface FantasyRecommendation {
   type: 'waiver_wire' | 'trade' | 'lineup' | 'general';
@@ -26,6 +27,7 @@ interface FantasyAnalysis {
 
 export default function AIRecommendations() {
   const { toast } = useToast();
+  const { selectedTeam } = useTeam();
   const [userId] = useState("default-user");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [question, setQuestion] = useState("");
@@ -40,14 +42,26 @@ export default function AIRecommendations() {
   // AI Analysis mutation - now returns prompt instead of calling AI
   const analysisMutation = useMutation({
     mutationFn: async (leagueId: string) => {
+      if (!selectedTeam) {
+        throw new Error('Please select a team first');
+      }
       const response = await fetch(`/api/leagues/${leagueId}/ai-recommendations-prompt`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId: selectedTeam })
       });
       if (!response.ok) throw new Error('Failed to generate prompt');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-analysis"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   });
 
@@ -211,7 +225,7 @@ export default function AIRecommendations() {
           <Card data-testid="analysis-prompt-card">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>League Analysis Prompt</span>
+                <span>League Analysis Data</span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -221,17 +235,20 @@ export default function AIRecommendations() {
                   {copiedAnalysis ? (
                     <><Check className="h-4 w-4 mr-2" /> Copied</>
                   ) : (
-                    <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
+                    <><Copy className="h-4 w-4 mr-2" /> Copy HTML</>
                   )}
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
-                <pre className="text-sm whitespace-pre-wrap font-mono">{analysisPrompt.prompt}</pre>
-              </div>
+              <iframe
+                srcDoc={analysisPrompt.prompt}
+                className="w-full border border-border rounded-lg"
+                style={{ height: '600px' }}
+                title="League Analysis Data"
+              />
               <p className="text-xs text-muted-foreground mt-2">
-                Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to get comprehensive fantasy football recommendations.
+                ⬆️ This is your team's data formatted for readability. Click "Copy HTML" above, then paste the entire thing into ChatGPT, Claude, or your preferred AI assistant to get comprehensive fantasy football recommendations.
               </p>
             </CardContent>
           </Card>

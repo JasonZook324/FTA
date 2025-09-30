@@ -1451,6 +1451,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Recommendations Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-recommendations-prompt", async (req, res) => {
     try {
+      const { teamId } = req.body;
+      
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
@@ -1461,33 +1463,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      // Get comprehensive data (same as the AI analysis route)
-      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
-        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
+      console.log(`Generating analysis prompt for team ${teamId} in league ${league.espnLeagueId}`);
+
+      // Get comprehensive data
+      const [rostersData, leagueDetailsData, playersResponse] = await Promise.all([
         espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings']),
+        espnApiService.getPlayers(credentials, league.sport, league.season)
       ]);
 
-      // Build league analysis data (simplified version)
-      const leagueAnalysisData = {
-        userTeam: {
-          name: standingsData.teams?.[0] ? `${standingsData.teams[0].location} ${standingsData.teams[0].nickname}` : 'Unknown Team',
-          roster: []
-        },
-        waiverWire: { topAvailable: [] },
-        scoringSettings: { receptionPoints: 0, isFullPPR: false, isHalfPPR: false, isStandard: true },
-        weekContext: { currentWeek: 1, season: league.season, seasonType: 'Regular Season' },
-        teams: standingsData.teams,
-        standings: standingsData.teams?.map((team: any) => ({
-          teamName: `${team.location} ${team.nickname}`,
-          wins: team.record?.overall?.wins || 0,
-          losses: team.record?.overall?.losses || 0,
-          pointsFor: team.record?.overall?.pointsFor || 0,
-          pointsAgainst: team.record?.overall?.pointsAgainst || 0
-        })) || []
+      // Extract scoring settings
+      const settings = leagueDetailsData.settings || rostersData.settings || {};
+      let receptionPoints = 0;
+      if (settings?.scoringSettings?.scoringItems) {
+        const receptionItem = settings.scoringSettings.scoringItems.find((item: any) => item.statId === 53);
+        if (receptionItem?.points !== undefined) {
+          receptionPoints = receptionItem.points;
+        }
+      }
+
+      const scoringSettings = {
+        scoringType: settings.scoringType || 'Head-to-Head Points',
+        isHalfPPR: receptionPoints === 0.5,
+        isFullPPR: receptionPoints === 1.0,
+        isStandard: receptionPoints === 0,
+        receptionPoints: receptionPoints
       };
 
-      // Get the prompt without calling AI
+      // Get current week context
+      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || league.currentWeek || 1;
+      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
+      const weekContext = {
+        currentWeek: currentScoringPeriod,
+        seasonType,
+        season: league.season
+      };
+
+      // Find user's team from rosters
+      const userTeam = rostersData.teams?.find((t: any) => t.id === teamId) || rostersData.teams?.[0];
+      if (!userTeam) {
+        return res.status(404).json({ message: "Team not found" });
+      }
+
+      // Format user roster with proper categorization
+      const userRoster = userTeam.roster?.entries?.map((entry: any) => {
+        const player = entry.playerPoolEntry?.player || entry.player;
+        const lineupSlot = entry.lineupSlotId;
+        return {
+          name: player?.fullName || 'Unknown Player',
+          position: getPositionName(player?.defaultPositionId) || 'FLEX',
+          nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
+          isStarter: lineupSlot < 20,
+          isBench: lineupSlot === 20,
+          isIR: lineupSlot === 21,
+          projectedPoints: getProjectedPoints(entry),
+          injuryStatus: getInjuryStatus(entry)
+        };
+      }) || [];
+
+      // Get waiver wire data
+      let playersData = [];
+      if (Array.isArray(playersResponse)) {
+        playersData = playersResponse;
+      } else if (playersResponse?.players && Array.isArray(playersResponse.players)) {
+        playersData = playersResponse.players;
+      }
+
+      // Get taken player IDs
+      const takenPlayerIds = new Set();
+      rostersData.teams?.forEach((team: any) => {
+        team.roster?.entries?.forEach((entry: any) => {
+          const playerId = entry.playerPoolEntry?.player?.id || entry.playerId;
+          if (playerId) takenPlayerIds.add(playerId);
+        });
+      });
+
+      // Filter available players and get top 20
+      const availablePlayers = playersData
+        .filter((playerData: any) => {
+          const player = playerData.player || playerData;
+          const playerId = player?.id;
+          return playerId && !takenPlayerIds.has(playerId);
+        })
+        .sort((a: any, b: any) => {
+          const projA = getProjectedPoints(a) || 0;
+          const projB = getProjectedPoints(b) || 0;
+          return projB - projA;
+        })
+        .slice(0, 20)
+        .map((playerData: any) => {
+          const player = playerData.player || playerData;
+          return {
+            name: player?.fullName || 'Unknown Player',
+            position: getPositionName(player?.defaultPositionId) || 'FLEX',
+            nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
+            projectedPoints: getProjectedPoints(playerData),
+            ownershipPercent: player?.ownership?.percentOwned?.toFixed(1) || '0.0',
+            injuryStatus: getInjuryStatus(playerData)
+          };
+        });
+
+      // Build league analysis data
+      const leagueAnalysisData = {
+        userTeam: {
+          name: userTeam.location && userTeam.nickname ? `${userTeam.location} ${userTeam.nickname}` : 'Your Team',
+          roster: userRoster,
+          record: {
+            wins: 0,
+            losses: 0
+          }
+        },
+        waiverWire: { topAvailable: availablePlayers },
+        scoringSettings,
+        weekContext,
+        league: {
+          name: league.name,
+          sport: league.sport,
+          season: league.season,
+          teamCount: rostersData.teams?.length || 0
+        }
+      };
+
+      console.log(`Prepared analysis data: Team ${leagueAnalysisData.userTeam.name}, ${userRoster.length} players, ${availablePlayers.length} waiver options`);
+
+      // Get the HTML-formatted prompt without calling AI
       const prompt = geminiService.getAnalysisPrompt(leagueAnalysisData);
       res.json({ prompt });
     } catch (error: any) {
