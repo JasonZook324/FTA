@@ -56,6 +56,61 @@ export interface LineupOptimization {
 }
 
 export class FantasyGeminiService {
+  // Public method to get the prompt without calling AI
+  getAnalysisPrompt(leagueData: any, teamData?: any): string {
+    return this.buildAnalysisPrompt(leagueData, teamData);
+  }
+
+  // Public method to get the question prompt without calling AI
+  getQuestionPrompt(question: string, leagueData: any): string {
+    const userTeam = leagueData.userTeam || {};
+    const scoringSettings = leagueData.scoringSettings || {};
+    const weekContext = leagueData.weekContext || {};
+
+    // Format scoring type for display
+    let scoringFormat = 'Standard';
+    if (scoringSettings.isFullPPR) {
+      scoringFormat = 'Full PPR';
+    } else if (scoringSettings.isHalfPPR) {
+      scoringFormat = 'Half PPR';
+    }
+
+    return `
+You are a fantasy football expert assistant. Answer the user's question using this comprehensive league context:
+
+==== YOUR TEAM ROSTER ====
+Team: ${userTeam.name}
+Starters: ${userTeam.roster?.filter((p: any) => p.isStarter).map((p: any) => p.name).join(', ') || 'Unknown'}
+Bench: ${userTeam.roster?.filter((p: any) => p.isBench).map((p: any) => p.name).join(', ') || 'Unknown'}
+
+==== LEAGUE SETTINGS ====
+Scoring: ${scoringFormat} (${scoringSettings.receptionPoints || 0} points per reception)
+Current Week: ${weekContext.currentWeek} (${weekContext.seasonType})
+Season: ${weekContext.season}
+
+==== LEAGUE TEAMS ====
+${leagueData.teams?.map((team: any) => `${team.location} ${team.nickname}: ${team.record?.overall?.wins || 0}-${team.record?.overall?.losses || 0}`).join('\n') || 'No team data'}
+
+User Question: ${question}
+
+Provide a detailed, specific response that considers:
+- The user's actual roster and team situation
+- The league's scoring format and how it affects strategy
+- The current week and season context
+- Specific actionable advice based on the data above
+`;
+  }
+
+  // Public method to get trade analysis prompt
+  getTradeAnalysisPrompt(selectedPlayer: string, userTeam: any, allTeams: any[], leagueSettings: any): string {
+    return this.buildTradeAnalysisPrompt(selectedPlayer, userTeam, allTeams, leagueSettings);
+  }
+
+  // Public method to get lineup optimization prompt
+  getLineupOptimizationPrompt(roster: any[], leagueSettings: any, currentDate: string, nflWeek: number): string {
+    return this.buildLineupOptimizationPrompt(roster, leagueSettings, currentDate, nflWeek);
+  }
+
   async analyzeLeague(leagueData: any, teamData?: any): Promise<FantasyAnalysis> {
     const maxRetries = 3;
     const baseDelay = 2000; // 2 seconds

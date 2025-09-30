@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Brain, Lightbulb, TrendingUp, Users, MessageSquare, Loader2 } from "lucide-react";
+import { Brain, Lightbulb, TrendingUp, Users, MessageSquare, Loader2, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface FantasyRecommendation {
   type: 'waiver_wire' | 'trade' | 'lineup' | 'general';
@@ -24,22 +25,25 @@ interface FantasyAnalysis {
 }
 
 export default function AIRecommendations() {
+  const { toast } = useToast();
   const [userId] = useState("default-user");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [question, setQuestion] = useState("");
+  const [copiedAnalysis, setCopiedAnalysis] = useState(false);
+  const [copiedQuestion, setCopiedQuestion] = useState(false);
 
   // Query user leagues
   const { data: leagues } = useQuery({
     queryKey: ["/api/leagues", userId],
   });
 
-  // AI Analysis mutation
+  // AI Analysis mutation - now returns prompt instead of calling AI
   const analysisMutation = useMutation({
     mutationFn: async (leagueId: string) => {
-      const response = await fetch(`/api/leagues/${leagueId}/ai-recommendations`, {
+      const response = await fetch(`/api/leagues/${leagueId}/ai-recommendations-prompt`, {
         method: 'POST'
       });
-      if (!response.ok) throw new Error('Failed to analyze league');
+      if (!response.ok) throw new Error('Failed to generate prompt');
       return response.json();
     },
     onSuccess: () => {
@@ -47,15 +51,15 @@ export default function AIRecommendations() {
     }
   });
 
-  // AI Question mutation
+  // AI Question mutation - now returns prompt instead of calling AI
   const questionMutation = useMutation({
     mutationFn: async ({ leagueId, question }: { leagueId: string; question: string }) => {
-      const response = await fetch(`/api/leagues/${leagueId}/ai-question`, {
+      const response = await fetch(`/api/leagues/${leagueId}/ai-question-prompt`, {
         method: 'POST',
         body: JSON.stringify({ question }),
         headers: { 'Content-Type': 'application/json' }
       });
-      if (!response.ok) throw new Error('Failed to ask question');
+      if (!response.ok) throw new Error('Failed to generate prompt');
       return response.json();
     }
   });
@@ -72,26 +76,31 @@ export default function AIRecommendations() {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'waiver_wire': return <Users className="h-4 w-4" />;
-      case 'trade': return <TrendingUp className="h-4 w-4" />;
-      case 'lineup': return <Lightbulb className="h-4 w-4" />;
-      default: return <Brain className="h-4 w-4" />;
+  const copyToClipboard = async (text: string, type: 'analysis' | 'question') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'analysis') {
+        setCopiedAnalysis(true);
+        setTimeout(() => setCopiedAnalysis(false), 2000);
+      } else {
+        setCopiedQuestion(true);
+        setTimeout(() => setCopiedQuestion(false), 2000);
+      }
+      toast({
+        title: "Copied to clipboard",
+        description: "Prompt copied successfully. Paste it into your AI portal.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please try again or manually select and copy the text.",
+        variant: "destructive",
+      });
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500 text-white';
-      case 'medium': return 'bg-yellow-500 text-black';
-      case 'low': return 'bg-green-500 text-white';
-      default: return 'bg-gray-500 text-white';
-    }
-  };
-
-  const analysisData = analysisMutation.data as FantasyAnalysis | undefined;
-  const questionAnswer = questionMutation.data as { answer: string } | undefined;
+  const analysisPrompt = analysisMutation.data as { prompt: string } | undefined;
+  const questionPrompt = questionMutation.data as { prompt: string } | undefined;
 
   return (
     <>
@@ -130,7 +139,7 @@ export default function AIRecommendations() {
                 ) : (
                   <Brain className="h-4 w-4 mr-2" />
                 )}
-                Analyze League
+                Generate Analysis Prompt
               </Button>
             )}
           </div>
@@ -165,15 +174,32 @@ export default function AIRecommendations() {
                 ) : (
                   <MessageSquare className="h-4 w-4 mr-2" />
                 )}
-                Ask Question
+                Generate Question Prompt
               </Button>
               
-              {questionAnswer && (
-                <div className="mt-4 p-4 bg-muted rounded-lg" data-testid="ai-answer">
-                  <h4 className="font-semibold mb-2">AI Response:</h4>
-                  <div className="max-h-80 overflow-y-auto">
-                    <p className="text-sm whitespace-pre-wrap">{questionAnswer.answer}</p>
+              {questionPrompt && (
+                <div className="mt-4" data-testid="ai-question-prompt">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold">AI Prompt Generated</h4>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(questionPrompt.prompt, 'question')}
+                      data-testid="button-copy-question"
+                    >
+                      {copiedQuestion ? (
+                        <><Check className="h-4 w-4 mr-2" /> Copied</>
+                      ) : (
+                        <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
+                      )}
+                    </Button>
                   </div>
+                  <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
+                    <pre className="text-sm whitespace-pre-wrap font-mono">{questionPrompt.prompt}</pre>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to get your answer.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -181,89 +207,34 @@ export default function AIRecommendations() {
         )}
 
         {/* Analysis Results */}
-        {analysisData && (
-          <div className="space-y-6">
-            {/* Summary */}
-            <Card data-testid="analysis-summary">
-              <CardHeader>
-                <CardTitle>League Analysis Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="max-h-40 overflow-y-auto">
-                  <p className="text-sm">{analysisData.summary}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Strengths & Weaknesses */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card data-testid="strengths-card">
-                <CardHeader>
-                  <CardTitle className="text-green-600">Strengths</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-60 overflow-y-auto">
-                    <ul className="space-y-2">
-                      {analysisData.strengths.map((strength, index) => (
-                        <li key={index} className="text-sm flex items-start gap-2">
-                          <span className="text-green-500 mt-1">•</span>
-                          {strength}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card data-testid="weaknesses-card">
-                <CardHeader>
-                  <CardTitle className="text-red-600">Areas for Improvement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-60 overflow-y-auto">
-                    <ul className="space-y-2">
-                      {analysisData.weaknesses.map((weakness, index) => (
-                        <li key={index} className="text-sm flex items-start gap-2">
-                          <span className="text-red-500 mt-1">•</span>
-                          {weakness}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recommendations */}
-            <Card data-testid="recommendations-card">
-              <CardHeader>
-                <CardTitle>Strategic Recommendations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="max-h-96 overflow-y-auto">
-                  <div className="space-y-4">
-                    {analysisData.recommendations.map((rec, index) => (
-                      <div key={index} className="border border-border rounded-lg p-4" data-testid={`recommendation-${index}`}>
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {getTypeIcon(rec.type)}
-                            <h4 className="font-semibold">{rec.title}</h4>
-                          </div>
-                          <Badge className={getPriorityColor(rec.priority)}>
-                            {rec.priority}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
-                        <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                          <strong>Reasoning:</strong> {rec.reasoning}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {analysisPrompt && (
+          <Card data-testid="analysis-prompt-card">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>League Analysis Prompt</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyToClipboard(analysisPrompt.prompt, 'analysis')}
+                  data-testid="button-copy-analysis"
+                >
+                  {copiedAnalysis ? (
+                    <><Check className="h-4 w-4 mr-2" /> Copied</>
+                  ) : (
+                    <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
+                  )}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
+                <pre className="text-sm whitespace-pre-wrap font-mono">{analysisPrompt.prompt}</pre>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to get comprehensive fantasy football recommendations.
+              </p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Error States */}
