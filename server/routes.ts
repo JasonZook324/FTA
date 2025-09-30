@@ -1491,26 +1491,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return "0.0";
       };
 
-      const getInjuryStatus = (playerData: any): string => {
-        const player = playerData.player || playerData;
-        const entry = playerData.playerPoolEntry?.player || player;
-        
-        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
-          return 'Injured';
-        }
-        if (entry.injuryStatus === 'QUESTIONABLE') {
-          return 'Questionable';
-        }
-        if (entry.injuryStatus === 'DOUBTFUL') {
-          return 'Doubtful';
-        }
-        if (entry.injuryStatus === 'OUT') {
-          return 'Out';
-        }
-        return 'Active';
-      };
-      
-      const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
