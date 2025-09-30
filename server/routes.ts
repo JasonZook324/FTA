@@ -1453,6 +1453,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { teamId } = req.body;
       
+      // Helper functions for roster data formatting (local to this endpoint)
+      const getNFLTeamName = (teamId: number): string => {
+        const teamNames: Record<number, string> = {
+          1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET",
+          9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN",
+          17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC",
+          25: "SF", 26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU"
+        };
+        return teamNames[teamId] || "FA";
+      };
+
+      const getPositionNameLocal = (positionId: number): string => {
+        const positions: Record<number, string> = {
+          0: "QB", 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 
+          16: "DEF", 17: "K", 23: "FLEX"
+        };
+        return positions[positionId] || `POS_${positionId}`;
+      };
+
+      const getProjectedPoints = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const entry = playerData.playerPoolEntry || playerData;
+        
+        // Look for projection in stats array
+        const projection = player.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
+                          entry.player?.stats?.find((stat: any) => stat.statSourceId === 1 && stat.statSplitTypeId === 1) ||
+                          player.projectedStats ||
+                          player.outlook?.projectedStats;
+        
+        if (projection?.appliedTotal !== undefined) {
+          return projection.appliedTotal.toFixed(1);
+        }
+        if (projection?.total !== undefined) {
+          return projection.total.toFixed(1);
+        }
+        return "0.0";
+      };
+
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE') {
+          return 'Questionable';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL') {
+          return 'Doubtful';
+        }
+        if (entry.injuryStatus === 'OUT') {
+          return 'Out';
+        }
+        return 'Active';
+      };
+      
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
@@ -1511,7 +1568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lineupSlot = entry.lineupSlotId;
         return {
           name: player?.fullName || 'Unknown Player',
-          position: getPositionName(player?.defaultPositionId) || 'FLEX',
+          position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
           nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
           isStarter: lineupSlot < 20,
           isBench: lineupSlot === 20,
@@ -1555,7 +1612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const player = playerData.player || playerData;
           return {
             name: player?.fullName || 'Unknown Player',
-            position: getPositionName(player?.defaultPositionId) || 'FLEX',
+            position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
             nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
             projectedPoints: getProjectedPoints(playerData),
             ownershipPercent: player?.ownership?.percentOwned?.toFixed(1) || '0.0',
