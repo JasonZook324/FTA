@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Download, Sparkles, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface TeamRosterProps {
   data: any;
@@ -11,6 +14,25 @@ interface TeamRosterProps {
 }
 
 export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProps) {
+  const [optimizingTeamId, setOptimizingTeamId] = useState<number | null>(null);
+  const [optimizationResult, setOptimizationResult] = useState<any>(null);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const handleOptimizeLineup = async (teamId: number) => {
+    try {
+      setIsOptimizing(true);
+      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup`);
+      const result = await response.json();
+      setOptimizationResult(result);
+      setOptimizingTeamId(teamId);
+    } catch (error: any) {
+      console.error('Failed to optimize lineup:', error);
+      alert(`Failed to optimize lineup: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -132,18 +154,34 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
-                    window.open(url, '_blank');
-                  }}
-                  data-testid={`button-export-team-${team.id}`}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleOptimizeLineup(team.id)}
+                    disabled={isOptimizing}
+                    data-testid={`button-optimize-team-${team.id}`}
+                  >
+                    {isOptimizing ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Optimize Lineup
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
+                      window.open(url, '_blank');
+                    }}
+                    data-testid={`button-export-team-${team.id}`}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -238,6 +276,89 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
           </Card>
         );
       })}
+
+      {/* Optimization Dialog */}
+      <Dialog open={optimizingTeamId !== null} onOpenChange={(open) => !open && setOptimizingTeamId(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AI Lineup Optimization
+            </DialogTitle>
+            <DialogDescription>
+              AI-powered lineup recommendations based on current matchups, player performance, and scoring settings
+            </DialogDescription>
+          </DialogHeader>
+
+          {optimizationResult && (
+            <div className="space-y-6 mt-4">
+              {/* Summary */}
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <h3 className="font-semibold text-sm mb-2">Overall Assessment</h3>
+                <p className="text-sm text-muted-foreground">{optimizationResult.summary}</p>
+              </div>
+
+              {/* Key Changes */}
+              {optimizationResult.keyChanges && optimizationResult.keyChanges.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm mb-3">Key Changes Recommended</h3>
+                  <div className="space-y-2">
+                    {optimizationResult.keyChanges.map((change: string, index: number) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
+                        <Badge variant="default" className="shrink-0">Change {index + 1}</Badge>
+                        <p className="text-sm">{change}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommended Lineup */}
+              {optimizationResult.recommendedLineup && optimizationResult.recommendedLineup.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm mb-3">Recommended Starting Lineup</h3>
+                  <div className="space-y-2">
+                    {optimizationResult.recommendedLineup.map((item: any, index: number) => (
+                      <div key={index} className="flex items-start gap-3 p-3 border border-border rounded-md">
+                        <Badge className="shrink-0">{item.position}</Badge>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{item.player}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bench Players */}
+              {optimizationResult.benchPlayers && optimizationResult.benchPlayers.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm mb-3">Bench This Week</h3>
+                  <div className="space-y-2">
+                    {optimizationResult.benchPlayers.map((item: any, index: number) => (
+                      <div key={index} className="flex items-start gap-3 p-3 border border-border rounded-md opacity-70">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{item.player}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Projected Impact */}
+              {optimizationResult.projectedImpact && (
+                <div className="bg-primary/10 p-4 rounded-lg">
+                  <h3 className="font-semibold text-sm mb-2">Projected Impact</h3>
+                  <p className="text-sm">{optimizationResult.projectedImpact}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
