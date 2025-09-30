@@ -1761,26 +1761,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Waiver wire: ${waiverWirePlayers.length} available players out of ${takenPlayerIds.size} taken`);
 
-      // Debug: Check Mike Evans specifically for week 5 projections
-      const mikeEvans = waiverWirePlayers.find((p: any) => p.player?.fullName === 'Mike Evans');
-      if (mikeEvans) {
-        console.log('\n=== MIKE EVANS WEEK 5 DEBUG ===');
-        const week5Stats = mikeEvans.player?.stats?.filter((s: any) => 
-          s.statSourceId === 1 && s.statSplitTypeId === 1 && s.scoringPeriodId === 5
-        ) || [];
-        console.log('Number of week 5 projections:', week5Stats.length);
-        week5Stats.forEach((stat: any, idx: number) => {
-          console.log(`\nWeek 5 Projection #${idx + 1}:`);
-          console.log('  appliedTotal:', stat.appliedTotal);
-          console.log('  seasonId:', stat.seasonId);
-          console.log('  statSourceId:', stat.statSourceId);
-          console.log('  statSplitTypeId:', stat.statSplitTypeId);
-          console.log('  scoringPeriodId:', stat.scoringPeriodId);
-          console.log('  All keys:', Object.keys(stat));
-        });
-        console.log('=== END DEBUG ===\n');
-      }
-
       res.json({ 
         players: waiverWirePlayers,
         total: waiverWirePlayers.length,
