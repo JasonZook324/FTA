@@ -12,9 +12,10 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Updated the Generate Analysis Prompt to use real ESPN API data instead of mock data
 - Integrated live team roster data (starters/bench/injured reserve) using TeamContext for selected team
 - Added waiver wire player data with projections and ownership percentages (top 20 available players)
-- Implemented HTML-formatted prompt generation with styled tables and color-coded sections
-- Frontend now displays HTML prompts in iframe with full copy-to-clipboard functionality
+- Implemented plain text prompt generation that requests AI to respond with HTML formatting
+- Frontend displays plain text prompts in scrollable pre element with copy-to-clipboard functionality
 - Backend helper functions (getNFLTeamName, getPositionNameLocal, getProjectedPoints, getInjuryStatus) defined locally to handle ESPN data transformation
+- Prompt includes comprehensive league information, team roster details, and waiver wire data with instructions for AI to format response as styled HTML
 
 ## User Preferences
 
