@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy, Check } from "lucide-react";
 import { AlertCircle, TrendingUp, Users, Star } from "lucide-react";
 import { useSelectedLeague } from "@/hooks/useSelectedLeague";
+import { useToast } from "@/hooks/use-toast";
 
 interface Player {
   name: string;
@@ -44,9 +45,11 @@ const getPositionName = (positionId: number): string => {
 };
 
 export default function TradeAnalyzer() {
+  const { toast } = useToast();
   const [userId] = useState("default-user");
   const { selectedLeagueId, setSelectedLeagueId, leagues, hasAutoSelected } = useSelectedLeague(userId);
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
+  const [copied, setCopied] = useState(false);
 
   // Find the selected league object
   const selectedLeague = leagues?.find((l: any) => l.id === selectedLeagueId);
@@ -95,18 +98,36 @@ export default function TradeAnalyzer() {
     return updatedText;
   };
 
-  // Trade analysis mutation
+  // Trade analysis mutation - now returns prompt instead of calling AI
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
-      const response = await apiRequest('POST', `/api/leagues/${selectedLeagueId}/trade-analysis`, data);
+      const response = await apiRequest('POST', `/api/leagues/${selectedLeagueId}/trade-analysis-prompt`, data);
       return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/leagues", selectedLeagueId, "trade-analysis"] 
+        queryKey: ["/api/leagues", selectedLeagueId, "trade-analysis-prompt"] 
       });
     }
   });
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: "Copied to clipboard",
+        description: "Prompt copied successfully. Paste it into your AI portal.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please try again or manually select and copy the text.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (!selectedLeagueId || !selectedLeague) {
     return (
@@ -231,7 +252,7 @@ export default function TradeAnalyzer() {
               ) : (
                 <>
                   <TrendingUp className="mr-2 h-5 w-5" />
-                  Analyze Trade Options
+                  Generate Trade Analysis Prompt
                 </>
               )}
             </Button>
@@ -239,93 +260,35 @@ export default function TradeAnalyzer() {
         </CardContent>
       </Card>
 
-      {/* Trade Analysis Results */}
+      {/* Trade Analysis Prompt */}
       {tradeAnalysisMutation.data && (
-        <div className="space-y-6" data-testid="trade-analysis-results">
-          <Card>
-            <CardHeader>
-              <CardTitle>Trade Analysis for {(tradeAnalysisMutation.data as TradeAnalysis)?.selectedPlayer}</CardTitle>
-              <CardDescription>
-                AI-powered insights based on your league's roster composition and scoring settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Player Value Assessment</h3>
-                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.playerValue || '')}</p>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="font-semibold mb-2">Market Analysis</h3>
-                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.marketAnalysis || '')}</p>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="font-semibold mb-2">Summary</h3>
-                <p className="text-sm text-muted-foreground">{replaceTeamNamesInText((tradeAnalysisMutation.data as TradeAnalysis)?.summary || '')}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Trade Options */}
-          <div className="grid gap-4" data-testid="trade-options">
-            <h2 className="text-2xl font-bold">Trade Opportunities</h2>
-            {((tradeAnalysisMutation.data as TradeAnalysis)?.tradeOptions || []).map((option: TradeOption, index: number) => (
-              <Card key={index} data-testid={`trade-option-${index}`}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{getTeamName(option.targetTeam)}</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getFairnessColor(option.fairnessRating)}>
-                        {option.fairnessRating}/10 Fairness
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-2">You Give</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {option.playersOffered.map((player, playerIndex) => (
-                          <Badge key={playerIndex} variant="secondary" className="text-xs">
-                            {player}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-2">You Get</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {option.playersRequested.map((player, playerIndex) => (
-                          <Badge key={playerIndex} variant="default" className="text-xs">
-                            {player}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <h4 className="font-medium mb-2">Trade Rationale</h4>
-                    <p className="text-sm text-muted-foreground">{replaceTeamNamesInText(option.tradeRationale)}</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium mb-2">Benefit Analysis</h4>
-                    <p className="text-sm text-muted-foreground">{replaceTeamNamesInText(option.benefitAnalysis)}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        <Card data-testid="trade-analysis-prompt">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Trade Analysis Prompt for {selectedPlayer}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copyToClipboard((tradeAnalysisMutation.data as { prompt: string }).prompt)}
+                data-testid="button-copy-trade-prompt"
+              >
+                {copied ? (
+                  <><Check className="h-4 w-4 mr-2" /> Copied</>
+                ) : (
+                  <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
+                )}
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to analyze trade opportunities
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
+              <pre className="text-sm whitespace-pre-wrap font-mono">{(tradeAnalysisMutation.data as { prompt: string }).prompt}</pre>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Error handling */}
