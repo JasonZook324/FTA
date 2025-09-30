@@ -339,7 +339,7 @@ export default function Players() {
                 <span>{viewMode === "waiver" ? "Waiver Wire Players" : "Player Database"}</span>
                 {viewMode === "waiver" && waiverWireData && typeof waiverWireData === 'object' && 'total' in waiverWireData && (
                   <Badge variant="secondary" className="ml-2">
-                    {(waiverWireData as any).total} available
+                    {String((waiverWireData as any).total)} available
                   </Badge>
                 )}
               </CardTitle>
