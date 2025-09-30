@@ -1528,6 +1528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return slots[slotId] || `Slot_${slotId}`;
       };
 
+      const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
