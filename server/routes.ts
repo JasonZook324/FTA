@@ -1491,6 +1491,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return "0.0";
       };
 
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE') {
+          return 'Questionable';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL') {
+          return 'Doubtful';
+        }
+        if (entry.injuryStatus === 'OUT') {
+          return 'Out';
+        }
+        return 'Active';
+      };
+
+      const getLineupSlotName = (slotId: number): string => {
+        const slots: Record<number, string> = {
+          0: "QB",
+          2: "RB",
+          4: "WR",
+          6: "TE",
+          16: "D/ST",
+          17: "K",
+          20: "Bench",
+          21: "I.R.",
+          23: "FLEX",
+          7: "OP",
+          10: "UTIL",
+          12: "RB/WR/TE"
+        };
+        return slots[slotId] || `Slot_${slotId}`;
+      };
+
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -1550,6 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: player?.fullName || 'Unknown Player',
           position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
           nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
+          lineupSlot: getLineupSlotName(lineupSlot),
           isStarter: lineupSlot < 20,
           isBench: lineupSlot === 20,
           isIR: lineupSlot === 21,

@@ -14,8 +14,9 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Added waiver wire player data with projections and ownership percentages (top 20 available players)
 - Implemented plain text prompt generation that requests AI to respond with user-friendly formatting
 - Frontend displays plain text prompts in scrollable pre element with copy-to-clipboard functionality
-- Backend helper functions (getNFLTeamName, getPositionNameLocal, getProjectedPoints, getInjuryStatus) defined locally to handle ESPN data transformation
-- Prompt includes comprehensive league information, team roster details, and waiver wire data with instructions for AI to format response with headers, bullet points, tables, and emojis
+- Backend helper functions (getNFLTeamName, getPositionNameLocal, getProjectedPoints, getInjuryStatus, getLineupSlotName) defined locally to handle ESPN data transformation
+- Prompt includes comprehensive league information, team roster details with lineup slot assignments (QB, RB, WR, TE, FLEX, D/ST, K, Bench, I.R.), waiver wire data, and instructions for AI to format response with headers, bullet points, tables, and emojis
+- Each player in the roster now shows their actual lineup slot position (e.g., [FLEX] David Montgomery) rather than just their player position, enabling better analysis and recommendations
 
 ## User Preferences
 

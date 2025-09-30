@@ -285,17 +285,17 @@ Teams in League: ${league.teamCount || 'Unknown'}
 
 STARTERS:
 ${starters.length > 0 ? starters.map((p: any) => 
-  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  `- [${p.lineupSlot || 'FLEX'}] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
 ).join('\n') : '- No starters found'}
 
 BENCH:
 ${bench.length > 0 ? bench.map((p: any) => 
-  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  `- [Bench] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
 ).join('\n') : '- No bench players'}
 
 ${ir.length > 0 ? `INJURED RESERVE:
 ${ir.map((p: any) => 
-  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Injured'}`
+  `- [I.R.] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Injured'}`
 ).join('\n')}` : ''}
 
 ==== TOP AVAILABLE WAIVER WIRE PLAYERS ====
