@@ -3044,6 +3044,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
+      const { options = {} } = req.body;
+
+      console.log(`Generating optimize lineup prompt for league ${leagueId}, team ${teamId}`);
+      console.log('Context data options received:', {
+        includeFantasyPros: options.includeFantasyPros,
+        includeVegasOdds: options.includeVegasOdds,
+        includeInjuryReports: options.includeInjuryReports,
+        includeWeatherData: options.includeWeatherData,
+        includeNewsUpdates: options.includeNewsUpdates,
+        includeMatchupAnalysis: options.includeMatchupAnalysis
+      });
       
       const league = await storage.getLeague(leagueId);
       if (!league) {
@@ -3104,18 +3115,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Generating lineup optimization prompt for team ${teamId} - Week ${nflWeek}, Date: ${formattedDate}`);
 
-      // Get the prompt without calling AI
-      const prompt = geminiService.getLineupOptimizationPrompt(
-        team.roster?.entries || [],
-        leagueSettings,
-        formattedDate,
-        nflWeek
+      // Helper functions for consistent formatting (matching custom prompt pattern)
+      const getLineupSlotName = (slotId: number): string => {
+        const slots: Record<number, string> = {
+          0: "QB", 2: "RB", 4: "WR", 6: "TE", 16: "D/ST", 17: "K", 20: "Bench", 21: "I.R.", 23: "FLEX", 7: "OP", 10: "UTIL", 12: "RB/WR/TE"
+        };
+        return slots[slotId] || `Slot_${slotId}`;
+      };
+
+      const getScoringDescription = (settings: any): string => {
+        if (receptionPoints === 1) {
+          return "Full PPR (1 point per reception)";
+        } else if (receptionPoints === 0.5) {
+          return "Half PPR (0.5 points per reception)";
+        } else {
+          return "Standard (0 points per reception)";
+        }
+      };
+
+      // Separate starters, bench, and IR
+      const roster = team.roster?.entries || [];
+      const starters = roster.filter((entry: any) => entry.lineupSlotId !== 20 && entry.lineupSlotId !== 21);
+      const bench = roster.filter((entry: any) => entry.lineupSlotId === 20 || entry.lineupSlotId === 21);
+
+      // Format starter info
+      const startersInfo = starters.map((entry: any) => {
+        const player = entry.playerPoolEntry?.player;
+        if (!player) return null;
+        
+        const position = player.defaultPositionId === 1 ? "QB" : 
+                         player.defaultPositionId === 2 ? "RB" :
+                         player.defaultPositionId === 3 ? "WR" :
+                         player.defaultPositionId === 4 ? "TE" :
+                         player.defaultPositionId === 5 ? "K" : "DEF";
+        
+        const lineupSlotName = getLineupSlotName(entry.lineupSlotId);
+        return `[${lineupSlotName}] ${player.fullName} (${position})`;
+      }).filter(Boolean).join('\n');
+
+      // Format bench info
+      const benchInfo = bench.map((entry: any) => {
+        const player = entry.playerPoolEntry?.player;
+        if (!player) return null;
+        
+        const position = player.defaultPositionId === 1 ? "QB" : 
+                         player.defaultPositionId === 2 ? "RB" :
+                         player.defaultPositionId === 3 ? "WR" :
+                         player.defaultPositionId === 4 ? "TE" :
+                         player.defaultPositionId === 5 ? "K" : "DEF";
+        
+        const lineupSlotName = getLineupSlotName(entry.lineupSlotId);
+        return `[${lineupSlotName}] ${player.fullName} (${position})`;
+      }).filter(Boolean).join('\n');
+
+      // Build prompt sections array like custom prompt endpoint
+      const promptSections = [];
+
+      // Add main optimization context
+      promptSections.push(
+        `You are an expert fantasy football analyst optimizing a lineup for Week ${nflWeek} of the 2025 NFL season.\n\n` +
+        `==== CURRENT DATE & CONTEXT ====\n` +
+        `Today: ${formattedDate}\n` +
+        `NFL Week: ${nflWeek}\n` +
+        `Note: Use your knowledge of current player performance, injuries, matchups, and recent news to provide accurate recommendations.\n\n` +
+        `==== LEAGUE SETTINGS ====\n` +
+        `League Size: ${leagueSettings.teamCount}-team league\n` +
+        `Scoring: ${getScoringDescription(leagueSettings)}\n` +
+        `Season: ${league.season}\n\n` +
+        `==== CURRENT STARTING LINEUP ====\n` +
+        `${startersInfo || 'No starters found'}\n\n` +
+        `==== BENCH PLAYERS ====\n` +
+        `${benchInfo || 'No bench players'}\n\n` +
+        `==== LINEUP OPTIMIZATION REQUESTED ====\n` +
+        `Analyze this roster and provide an optimized lineup for Week ${nflWeek}. Consider:\n\n` +
+        `1. **Current Week Matchups**: Which players have favorable matchups this week?\n` +
+        `2. **Recent Performance**: Who's hot and who's cold right now?\n` +
+        `3. **Injury Status**: Are there any injury concerns affecting the current lineup?\n` +
+        `4. **Scoring Format**: How does ${getScoringDescription(leagueSettings)} scoring affect player values?\n` +
+        `5. **Start/Sit Decisions**: Should any bench players be starting over current starters?\n\n`
       );
 
-      res.json({ prompt });
+      // Add research directives for AI to gather external data (same pattern as custom prompt)
+      const researchDirectives = [];
+      
+      if (options.includeFantasyPros) {
+        researchDirectives.push("- Research current FantasyPros expert consensus rankings and start/sit recommendations for this week");
+      }
+
+      if (options.includeVegasOdds) {
+        researchDirectives.push("- Look up current Vegas betting lines, over/under totals, and player prop bets for relevant NFL games");
+      }
+
+      if (options.includeInjuryReports) {
+        researchDirectives.push("- Check the latest NFL injury reports and player statuses (questionable, doubtful, out) from official sources");
+      }
+
+      if (options.includeWeatherData) {
+        researchDirectives.push("- Research current weather forecasts for outdoor NFL stadiums this week (temperature, wind, precipitation)");
+      }
+
+      if (options.includeNewsUpdates) {
+        researchDirectives.push("- Find the latest NFL news, beat reporter updates, and breaking news that could impact player performance");
+      }
+
+      if (options.includeMatchupAnalysis) {
+        researchDirectives.push("- Analyze defensive matchups and recent performance trends against specific positions (QB, RB, WR, TE)");
+      }
+
+      if (researchDirectives.length > 0) {
+        promptSections.push(
+          `==== RESEARCH INSTRUCTIONS ====\n` +
+          `Please research and incorporate the following external data sources into your analysis:\n\n` +
+          researchDirectives.join('\n') + '\n\n' +
+          `Use this research to provide more informed lineup optimization recommendations.\n\n`
+        );
+      }
+
+      promptSections.push(
+        `**IMPORTANT: Provide specific actionable recommendations based on current NFL information.**\n`
+      );
+
+      const finalPrompt = promptSections.join('\n');
+
+      console.log(`Generated optimize lineup prompt with ${promptSections.length} sections`);
+
+      res.json({ prompt: finalPrompt });
     } catch (error: any) {
-      console.error('Lineup optimization prompt error:', error);
-      res.status(500).json({ message: error.message || 'Failed to generate lineup prompt' });
+      console.error('Optimize lineup prompt generation error:', error);
+      res.status(500).json({ message: error.message || 'Failed to generate optimize lineup prompt' });
     }
   });
 
