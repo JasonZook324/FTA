@@ -122,9 +122,44 @@
       padding-right: 0.75rem;
     }
     
-    /* Better mobile button sizing */
-    button {
+    /* Better mobile button and interactive element sizing */
+    button, a[role="button"], [role="button"] {
       min-height: 44px;
+    }
+    
+    /* Ensure inputs and form controls are touch-friendly */
+    input, select, textarea {
+      min-height: 44px;
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Improve table readability on mobile */
+    table {
+      font-size: 0.875rem;
+    }
+    
+    /* Better spacing for cards on mobile */
+    .card {
+      margin-bottom: 0.75rem;
+    }
+  }
+  
+  /* Improve text readability on all screen sizes */
+  @media (max-width: 768px) {
+    body {
+      font-size: 14px;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+    }
+    
+    h2 {
+      font-size: 1.25rem;
+    }
+    
+    h3 {
+      font-size: 1.125rem;
     }
   }
 }

@@ -48,7 +48,7 @@ export default function AIRecommendations() {
       const response = await fetch(`/api/leagues/${leagueId}/ai-recommendations-prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeam })
+        body: JSON.stringify({ teamId: selectedTeam.teamId })
       });
       if (!response.ok) throw new Error('Failed to generate prompt');
       return response.json();

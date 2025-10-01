@@ -85,17 +85,17 @@ export default function LeagueHeader() {
   // No league loaded - show authentication prompt
   if (!currentLeague) {
     return (
-      <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950 border-b border-orange-200 dark:border-orange-800 px-6 py-3">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950 border-b border-orange-200 dark:border-orange-800 px-4 sm:px-6 py-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between">
           <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
             <div>
               <span className="text-sm font-medium text-orange-800 dark:text-orange-200">No League Connected</span>
               <p className="text-xs text-orange-600 dark:text-orange-400">Configure your ESPN credentials to get started</p>
             </div>
           </div>
-          <Link href="/authentication">
-            <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900">
+          <Link href="/authentication" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto min-h-[44px] border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900">
               <Settings className="w-4 h-4 mr-2" />
               Setup Authentication
             </Button>
@@ -107,48 +107,48 @@ export default function LeagueHeader() {
 
   // League loaded - show league info with disconnect option
   return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-b border-green-200 dark:border-green-800 px-6 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Trophy className="w-5 h-5 text-green-600 dark:text-green-400" />
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-semibold text-green-800 dark:text-green-200">{currentLeague.name}</span>
-              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-b border-green-200 dark:border-green-800 px-4 sm:px-6 py-3">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:justify-between">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="font-semibold text-green-800 dark:text-green-200 text-sm sm:text-base truncate">{currentLeague.name}</span>
+              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 flex-shrink-0">
                 {currentLeague.sport.toUpperCase()}
               </Badge>
             </div>
-            <div className="flex items-center space-x-4 text-xs text-green-600 dark:text-green-400">
-              <span>Season {currentLeague.season}</span>
-              <span>•</span>
-              <span>{currentLeague.teamCount} teams</span>
-              <span>•</span>
-              <span>Week {currentLeague.currentWeek}</span>
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-green-600 dark:text-green-400 mt-1">
+              <span className="whitespace-nowrap">Season {currentLeague.season}</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="whitespace-nowrap">{currentLeague.teamCount} teams</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="whitespace-nowrap">Week {currentLeague.currentWeek}</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           <Button
             variant="outline"
-            size="sm"
             onClick={() => reloadLeagueMutation.mutate()}
             disabled={reloadLeagueMutation.isPending}
-            className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
+            className="flex-1 lg:flex-initial min-h-[44px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
             data-testid="button-refresh-header"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            {reloadLeagueMutation.isPending ? "Refreshing..." : "Refresh Data"}
+            <span className="hidden sm:inline">{reloadLeagueMutation.isPending ? "Refreshing..." : "Refresh Data"}</span>
+            <span className="sm:hidden">{reloadLeagueMutation.isPending ? "..." : "Refresh"}</span>
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={() => disconnectMutation.mutate()}
             disabled={disconnectMutation.isPending}
-            className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
+            className="flex-1 lg:flex-initial min-h-[44px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
             data-testid="button-disconnect-header"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
+            <span className="hidden sm:inline">{disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}</span>
+            <span className="sm:hidden">Exit</span>
           </Button>
         </div>
       </div>
