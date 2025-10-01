@@ -1890,8 +1890,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Debug: Log first team from each data source
-      console.log('First standings team:', JSON.stringify(standingsData.teams?.[0], null, 2).substring(0, 500));
-      console.log('First roster team:', JSON.stringify(rostersData.teams?.[0], null, 2).substring(0, 500));
+      console.log('First standings team:', JSON.stringify(standingsData.teams?.[0], null, 2).substring(0, 800));
+      console.log('First roster team:', JSON.stringify(rostersData.teams?.[0], null, 2).substring(0, 800));
 
       // Find user's team using the provided teamId (normalize types for comparison)
       const userTeam = standingsData.teams?.find((t: any) => String(t.id) === String(teamId));
@@ -1902,12 +1902,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get roster data for all teams
       const allTeams = rostersData.teams?.map((team: any) => {
         const standingsTeam = standingsData.teams?.find((t: any) => String(t.id) === String(team.id));
-        console.log(`Matching roster team ${team.id}, found standings: ${standingsTeam ? 'YES' : 'NO'}, location: ${standingsTeam?.location}, nickname: ${standingsTeam?.nickname}`);
         return {
           id: team.id,
-          name: standingsTeam?.location && standingsTeam?.nickname 
-            ? `${standingsTeam.location} ${standingsTeam.nickname}` 
-            : `Team ${team.id}`,
+          name: team.name || `Team ${team.id}`,
           roster: team.roster?.entries?.map((entry: any) => ({
             name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
             position: getPositionName(entry.playerPoolEntry?.player?.defaultPositionId) || 'FLEX',
