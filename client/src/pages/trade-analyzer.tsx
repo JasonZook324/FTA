@@ -168,8 +168,8 @@ export default function TradeAnalyzer() {
     );
   }
 
-  // Get user's team (first team in roster data)
-  const userTeam = rostersData?.teams?.[0];
+  // Get user's selected team from roster data
+  const userTeam = rostersData?.teams?.find((t: any) => t.id === selectedTeam?.teamId);
   const userRoster = userTeam?.roster?.entries?.map((entry: any) => ({
     name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
     position: entry.playerPoolEntry?.player?.defaultPositionId ? 
