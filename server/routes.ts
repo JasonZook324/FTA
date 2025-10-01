@@ -1900,7 +1900,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const standingsTeam = standingsData.teams?.find((t: any) => t.id === team.id);
         return {
           id: team.id,
-          name: team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`,
+          name: standingsTeam?.location && standingsTeam?.nickname 
+            ? `${standingsTeam.location} ${standingsTeam.nickname}` 
+            : `Team ${team.id}`,
           roster: team.roster?.entries?.map((entry: any) => ({
             name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
             position: getPositionName(entry.playerPoolEntry?.player?.defaultPositionId) || 'FLEX',
