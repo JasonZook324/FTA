@@ -1897,7 +1897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get roster data for all teams
       const allTeams = rostersData.teams?.map((team: any) => {
-        const standingsTeam = standingsData.teams?.find((t: any) => t.id === team.id);
+        const standingsTeam = standingsData.teams?.find((t: any) => String(t.id) === String(team.id));
         return {
           id: team.id,
           name: standingsTeam?.location && standingsTeam?.nickname 
@@ -1930,6 +1930,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pointsAgainst: userTeam.record?.overall?.pointsAgainst || 0
         }
       };
+
+      // Log team data for debugging
+      console.log('User team:', JSON.stringify({ id: userTeamWithRoster.id, name: userTeamWithRoster.name }, null, 2));
+      console.log('All teams sample:', allTeams.slice(0, 3).map(t => ({ id: t.id, name: t.name })));
 
       // Get the prompt without calling AI
       const prompt = geminiService.getTradeAnalysisPrompt(
