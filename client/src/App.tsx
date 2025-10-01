@@ -11,6 +11,7 @@ import Matchups from "@/pages/matchups";
 import Players from "@/pages/players";
 import AIRecommendations from "@/pages/ai-recommendations";
 import TradeAnalyzer from "@/pages/trade-analyzer";
+import PromptBuilder from "@/pages/prompt-builder";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -33,6 +34,7 @@ function Router() {
               <Route path="/players" component={Players} />
               <Route path="/ai-recommendations" component={AIRecommendations} />
               <Route path="/trade-analyzer" component={TradeAnalyzer} />
+              <Route path="/prompt-builder" component={PromptBuilder} />
               <Route component={NotFound} />
             </Switch>
           </main>

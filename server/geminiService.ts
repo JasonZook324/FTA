@@ -88,9 +88,6 @@ Scoring: ${scoringFormat} (${scoringSettings.receptionPoints || 0} points per re
 Current Week: ${weekContext.currentWeek} (${weekContext.seasonType})
 Season: ${weekContext.season}
 
-==== LEAGUE TEAMS ====
-${leagueData.teams?.map((team: any) => `${team.location} ${team.nickname}: ${team.record?.overall?.wins || 0}-${team.record?.overall?.losses || 0}`).join('\n') || 'No team data'}
-
 User Question: ${question}
 
 Provide a detailed, specific response that considers:

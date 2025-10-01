@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +27,7 @@ interface FantasyAnalysis {
 
 export default function AIRecommendations() {
   const { toast } = useToast();
-  const { selectedTeam } = useTeam();
+  const { selectedTeam, setSelectedTeam } = useTeam();
   const [userId] = useState("default-user");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [question, setQuestion] = useState("");
@@ -38,6 +38,34 @@ export default function AIRecommendations() {
   const { data: leagues } = useQuery({
     queryKey: ["/api/leagues", userId],
   });
+
+  // Query teams for selected league (use standings endpoint to get properly formatted team names)
+  const { data: teamsData, isLoading: isLoadingTeams } = useQuery<{ teams?: any[] }>({
+    queryKey: ["/api/leagues", selectedLeagueId, "standings"],
+    enabled: !!selectedLeagueId,
+  });
+
+  // Auto-select the league if there's only one available
+  useEffect(() => {
+    if (leagues && Array.isArray(leagues) && leagues.length === 1 && !selectedLeagueId) {
+      setSelectedLeagueId(leagues[0].id);
+    }
+  }, [leagues, selectedLeagueId]);
+
+  // Auto-select the team if there's only one available for the selected league
+  useEffect(() => {
+    if (teamsData?.teams && teamsData.teams.length === 1 && selectedLeagueId && !selectedTeam) {
+      const firstTeam = teamsData.teams[0];
+      const teamName = firstTeam.location && firstTeam.nickname 
+        ? `${firstTeam.location} ${firstTeam.nickname}` 
+        : `Team ${firstTeam.id}`;
+      setSelectedTeam({
+        teamId: firstTeam.id,
+        teamName,
+        leagueId: selectedLeagueId
+      });
+    }
+  }, [teamsData, selectedLeagueId, selectedTeam, setSelectedTeam]);
 
   // AI Analysis mutation - now returns prompt instead of calling AI
   const analysisMutation = useMutation({
@@ -68,9 +96,12 @@ export default function AIRecommendations() {
   // AI Question mutation - now returns prompt instead of calling AI
   const questionMutation = useMutation({
     mutationFn: async ({ leagueId, question }: { leagueId: string; question: string }) => {
+      if (!selectedTeam) {
+        throw new Error('Please select a team first');
+      }
       const response = await fetch(`/api/leagues/${leagueId}/ai-question-prompt`, {
         method: 'POST',
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, teamId: selectedTeam.teamId }),
         headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to generate prompt');
@@ -134,7 +165,7 @@ export default function AIRecommendations() {
                 <SelectValue placeholder="Select a league" />
               </SelectTrigger>
               <SelectContent>
-                {(leagues || []).map((league: any) => (
+                {(leagues && Array.isArray(leagues) ? leagues : []).map((league: any) => (
                   <SelectItem key={league.id} value={league.id}>
                     {league.name} ({league.season})
                   </SelectItem>
@@ -143,6 +174,55 @@ export default function AIRecommendations() {
             </Select>
             
             {selectedLeagueId && (
+              <Select 
+                value={selectedTeam?.teamId.toString() || ""} 
+                onValueChange={(value) => {
+                  const teamId = parseInt(value);
+                  const team = teamsData?.teams?.find((t: any) => t.id === teamId);
+                  if (team && selectedLeagueId) {
+                    const teamName = team.location && team.nickname 
+                      ? `${team.location} ${team.nickname}` 
+                      : `Team ${team.id}`;
+                    setSelectedTeam({
+                      teamId,
+                      teamName,
+                      leagueId: selectedLeagueId
+                    });
+                    toast({
+                      title: "Team Selected",
+                      description: `You are now analyzing "${teamName}"`,
+                    });
+                  }
+                }}
+                disabled={!selectedLeagueId || isLoadingTeams || !teamsData?.teams?.length}
+              >
+                <SelectTrigger className="w-48" data-testid="select-team">
+                  <SelectValue placeholder={
+                    !selectedLeagueId 
+                      ? "Select a league first" 
+                      : isLoadingTeams 
+                        ? "Loading teams..." 
+                        : !teamsData?.teams?.length 
+                          ? "No teams found" 
+                          : "Select your team"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamsData?.teams?.map((team: any) => {
+                    const teamName = team.location && team.nickname 
+                      ? `${team.location} ${team.nickname}` 
+                      : `Team ${team.id}`;
+                    return (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {teamName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {selectedLeagueId && selectedTeam && (
               <Button 
                 onClick={handleAnalyze}
                 disabled={analysisMutation.isPending}
@@ -162,7 +242,7 @@ export default function AIRecommendations() {
 
       <main className="flex-1 p-6 space-y-6 overflow-y-auto">
         {/* AI Question Section */}
-        {selectedLeagueId && (
+        {selectedLeagueId && selectedTeam && (
           <Card data-testid="ai-question-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

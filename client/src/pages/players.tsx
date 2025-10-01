@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, UsersRound, Search, Download } from "lucide-react";
+import { RefreshCw, UsersRound, Search, Download, Plus, Eye } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +33,10 @@ export default function Players() {
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
-    queryKey: ["/api/players", selectedSport, selectedSeason, userId],
+    queryKey: ["/api/players", selectedSport, selectedSeason, userId, selectedLeagueId],
     queryFn: async () => {
-      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?userId=${userId}`);
+      const leagueParam = selectedLeagueId ? `&leagueId=${selectedLeagueId}` : '';
+      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?userId=${userId}${leagueParam}`);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch players: ${response.status} ${errorText}`);
@@ -86,10 +87,240 @@ export default function Players() {
     return player.proTeamId;
   };
 
-  // Helper function to get injury status
+  // Helper function to get detailed injury status
   const getInjuryStatus = (playerData: any) => {
     const player = playerData.player || playerData;
-    return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+    
+    // Return the actual injury status from ESPN, or default to Active
+    const status = player.injuryStatus || (player.injured ? 'INJURED' : 'ACTIVE');
+    
+    // Convert ESPN status codes to display text
+    switch (status) {
+      case 'ACTIVE':
+        return 'Active';
+      case 'QUESTIONABLE':
+        return 'Questionable';
+      case 'DOUBTFUL':
+        return 'Doubtful';
+      case 'OUT':
+        return 'Out';
+      case 'IR':
+        return 'IR';
+      case 'INJURED':
+        return 'Injured';
+      default:
+        return player.injured ? 'Injured' : 'Active';
+    }
+  };
+
+  // Helper function to get injury status badge variant
+  const getInjuryStatusVariant = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'default';
+      case 'Questionable':
+        return 'secondary';
+      case 'Doubtful':
+        return 'secondary';
+      case 'Out':
+        return 'destructive';
+      case 'IR':
+        return 'destructive';
+      case 'Injured':
+        return 'destructive';
+      default:
+        return 'default';
+    }
+  };
+
+  // Helper function to get game time/status
+  const getGameTime = (playerData: any) => {
+    const player = playerData.player || playerData;
+    // For now, return a placeholder time
+    return "Sun 1:00 PM";
+  };
+
+  // Helper function to get position rank based on opponent defense from live ESPN data
+  const getPositionRank = (playerData: any) => {
+    const player = playerData.player || playerData;
+    
+    // First priority: Direct opponent rank from ESPN API
+    if (player.opponentRank !== undefined && player.opponentRank !== null) {
+      return player.opponentRank.toString();
+    }
+    
+    // Second priority: Check ESPN's defense rankings data structure
+    if (player.defenseRankings && typeof player.defenseRankings === 'object') {
+      const position = getPositionName(getPlayerPositionId(player));
+      const defenseRank = player.defenseRankings[`vs${position}`] || player.defenseRankings[position.toLowerCase()];
+      if (defenseRank !== undefined && defenseRank !== null) {
+        return defenseRank.toString();
+      }
+    }
+    
+    // Third priority: Check kona_player_rankings data
+    if (player.playerRankings && typeof player.playerRankings === 'object') {
+      const currentWeek = getCurrentNFLWeek();
+      const weeklyRanking = player.playerRankings[currentWeek] || player.playerRankings.current;
+      if (weeklyRanking && weeklyRanking.opponentRank !== undefined) {
+        return weeklyRanking.opponentRank.toString();
+      }
+    }
+    
+    // Fourth priority: Check stats for opponent ranking data
+    if (player.stats && Array.isArray(player.stats)) {
+      for (const stat of player.stats) {
+        if (stat.opponentRank !== undefined && stat.opponentRank !== null) {
+          return stat.opponentRank.toString();
+        }
+        // ESPN sometimes stores it in stat details
+        if (stat.statDetail && stat.statDetail.opponentRank) {
+          return stat.statDetail.opponentRank.toString();
+        }
+        // Check for defense vs position stats
+        if (stat.opponentDefenseVsPosition !== undefined) {
+          return stat.opponentDefenseVsPosition.toString();
+        }
+      }
+    }
+    
+    // Fifth priority: Check player outlook for matchup data
+    if (player.outlook) {
+      if (player.outlook.opponentRank !== undefined && player.outlook.opponentRank !== null) {
+        return player.outlook.opponentRank.toString();
+      }
+      // Check outlook stats
+      if (player.outlook.stats && player.outlook.stats.opponentRank) {
+        return player.outlook.stats.opponentRank.toString();
+      }
+      // Check outlook matchup data
+      if (player.outlook.defenseRank !== undefined && player.outlook.defenseRank !== null) {
+        return player.outlook.defenseRank.toString();
+      }
+    }
+    
+    // Sixth priority: Check rankings object for positional rankings
+    if (player.rankings && typeof player.rankings === 'object') {
+      // ESPN sometimes stores opponent rankings by week/position
+      for (const rankKey in player.rankings) {
+        const ranking = player.rankings[rankKey];
+        if (ranking && ranking.opponentRank !== undefined) {
+          return ranking.opponentRank.toString();
+        }
+        if (ranking && ranking.defenseRank !== undefined) {
+          return ranking.defenseRank.toString();
+        }
+      }
+    }
+    
+    // Seventh priority: Check ESPN's game/matchup data structure
+    if (player.game && typeof player.game === 'object') {
+      const opponentDefense = player.game.opponentDefenseRank || player.game.defenseRank;
+      if (opponentDefense !== undefined && opponentDefense !== null) {
+        return opponentDefense.toString();
+      }
+    }
+    
+    // Eighth priority: Check if there's schedule/matchup data with opponent defense stats
+    if (player.schedule && Array.isArray(player.schedule)) {
+      const currentGame = player.schedule.find((game: any) => 
+        game.isCurrentWeek || game.isThisWeek || game.isActive
+      );
+      if (currentGame && currentGame.opponentDefenseRank) {
+        return currentGame.opponentDefenseRank.toString();
+      }
+      if (currentGame && currentGame.defenseRank) {
+        return currentGame.defenseRank.toString();
+      }
+    }
+    
+    // Ninth priority: Check player's team schedule data
+    if (player.teamSchedule && Array.isArray(player.teamSchedule)) {
+      const currentMatchup = player.teamSchedule.find((matchup: any) => 
+        matchup.isCurrentWeek || matchup.week === getCurrentNFLWeek()
+      );
+      if (currentMatchup && currentMatchup.defenseRank) {
+        return currentMatchup.defenseRank.toString();
+      }
+    }
+    
+    // Tenth priority: Check if opponent team data includes defensive rankings
+    const opponentTeamId = getOpponentTeamId(player);
+    if (opponentTeamId && player.opponentTeamStats) {
+      const position = getPositionName(getPlayerPositionId(player));
+      const defenseVsPosition = player.opponentTeamStats[`defense_vs_${position.toLowerCase()}`];
+      if (defenseVsPosition && defenseVsPosition.rank) {
+        return defenseVsPosition.rank.toString();
+      }
+    }
+    
+    // Eleventh priority: Check ESPN's proOpponent and team defense data
+    if (player.proOpponent !== undefined && player.teamDefenseRankings) {
+      const position = getPositionName(getPlayerPositionId(player));
+      const opponentDefense = player.teamDefenseRankings[player.proOpponent];
+      if (opponentDefense && opponentDefense[position.toLowerCase()]) {
+        return opponentDefense[position.toLowerCase()].toString();
+      }
+    }
+    
+    // If no live ESPN data is available, return empty
+    console.warn('No opponent rank data found in ESPN API for player:', getPlayerName(player));
+    return "--";
+  };
+  
+  // Helper function to get current NFL week
+  const getCurrentNFLWeek = () => {
+    const currentDate = new Date();
+    const seasonStart = new Date('2025-09-01'); // Approximate NFL season start
+    const weeksPassed = Math.floor((currentDate.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(1, Math.min(18, weeksPassed + 1));
+  };
+  
+  // Helper function to get opponent team ID from live ESPN data
+  const getOpponentTeamId = (player: any) => {
+    // First check direct opponent field
+    if (player.opponent && player.opponent.teamId) {
+      return player.opponent.teamId;
+    }
+    
+    // Check schedule for current week opponent
+    if (player.schedule && Array.isArray(player.schedule)) {
+      const currentGame = player.schedule.find((game: any) => 
+        game.isCurrentWeek || game.isThisWeek
+      );
+      if (currentGame) {
+        return currentGame.opponentTeamId || currentGame.opponent;
+      }
+    }
+    
+    // Check ESPN's proOpponent field
+    if (player.proOpponent !== undefined && player.proOpponent > 0) {
+      return player.proOpponent;
+    }
+    
+    return null;
+  };
+
+  // Helper function to get position rank color based on actual ranking
+  const getPositionRankColor = (playerData: any) => {
+    const ranking = parseInt(getPositionRank(playerData));
+    if (isNaN(ranking)) return "text-gray-600 bg-gray-50 border-gray-200";
+    
+    if (ranking <= 5) return "text-green-600 bg-green-50 border-green-200"; // Great matchup
+    if (ranking <= 12) return "text-blue-600 bg-blue-50 border-blue-200"; // Good matchup
+    if (ranking <= 20) return "text-yellow-600 bg-yellow-50 border-yellow-200"; // Average matchup
+    return "text-red-600 bg-red-50 border-red-200"; // Tough matchup
+  };
+
+  // Helper function to get season fantasy points
+  const getSeasonPoints = (playerData: any) => {
+    const player = playerData.player || playerData;
+    // Look for season stats
+    const seasonStats = player.stats?.find((stat: any) => stat.statSourceId === 0 && stat.statSplitTypeId === 0);
+    if (seasonStats?.appliedTotal !== undefined) {
+      return seasonStats.appliedTotal.toFixed(1);
+    }
+    return "--";
   };
 
   // Helper function to get team name from pro team ID
@@ -108,21 +339,34 @@ export default function Players() {
     const player = playerData.player || playerData;
     
     // Get current scoring period from waiver wire data
-    const currentWeek = (waiverWireData as any)?.currentScoringPeriodId || 1;
+    const currentWeek = (waiverWireData as any)?.currentScoringPeriodId || 5;
     
     // ESPN stores projections in the stats array
     // statSourceId: 1 = projected (0 = actual)
     // statSplitTypeId: 1 = weekly (0 = cumulative/season)
-    // scoringPeriodId: specific week number
-    // NOTE: ESPN may return multiple projections for the same week - use the LAST one (most recent)
     if (player.stats && Array.isArray(player.stats)) {
-      const matchingStats = player.stats.filter((stat: any) => 
+      // First try to find current week projections
+      let matchingStats = player.stats.filter((stat: any) => 
         stat.statSourceId === 1 && 
         stat.statSplitTypeId === 1 && 
         stat.scoringPeriodId === currentWeek
       );
       
-      const weeklyProjection = matchingStats.length > 0 ? matchingStats[matchingStats.length - 1] : null;
+      // If no current week projections, try to find any recent weekly projections
+      if (matchingStats.length === 0) {
+        const weeklyProjections = player.stats.filter((stat: any) => 
+          stat.statSourceId === 1 && 
+          stat.statSplitTypeId === 1
+        );
+        
+        // Use the most recent weekly projection
+        if (weeklyProjections.length > 0) {
+          // Sort by scoring period descending and take the first (most recent)
+          matchingStats = weeklyProjections.sort((a: any, b: any) => b.scoringPeriodId - a.scoringPeriodId).slice(0, 1);
+        }
+      }
+      
+      const weeklyProjection = matchingStats.length > 0 ? matchingStats[0] : null;
       
       if (weeklyProjection?.appliedTotal !== undefined) {
         return weeklyProjection.appliedTotal.toFixed(1);
@@ -141,12 +385,9 @@ export default function Players() {
   const getOpponent = (playerData: any) => {
     const player = playerData.player || playerData;
     
-    // ESPN stores opponent in proOpponent field (opponent's pro team ID)
-    if (player.proOpponent !== undefined && player.proOpponent > 0) {
-      return getTeamName(player.proOpponent);
-    }
-    
-    return "-";
+    // ESPN Fantasy API doesn't provide opponent data in player endpoints
+    // This would require NFL schedule data from a different source
+    return "N/A";
   };
 
   // Helper function to get game status/time
@@ -337,11 +578,6 @@ export default function Players() {
               <CardTitle className="flex items-center space-x-2">
                 <UsersRound className="w-5 h-5" />
                 <span>{viewMode === "waiver" ? "Waiver Wire Players" : "Player Database"}</span>
-                {viewMode === "waiver" && waiverWireData && typeof waiverWireData === 'object' && 'total' in waiverWireData && (
-                  <Badge variant="secondary" className="ml-2">
-                    {String((waiverWireData as any).total)} available
-                  </Badge>
-                )}
               </CardTitle>
               <div className="flex items-center space-x-2">
                 <Select
@@ -396,59 +632,91 @@ export default function Players() {
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Player</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Opponent</TableHead>
-                      <TableHead>Proj. Pts</TableHead>
-                      <TableHead>% Owned</TableHead>
-                      <TableHead>Status</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">PLAYER</TableHead>
+                      <TableHead className="font-semibold text-center">OPP</TableHead>
+                      <TableHead className="font-semibold text-center">STATUS</TableHead>
+                      <TableHead className="font-semibold text-center">PROJ</TableHead>
+                      <TableHead className="font-semibold text-center">SCORE</TableHead>
+                      <TableHead className="font-semibold text-center">OPRK</TableHead>
+                      <TableHead className="font-semibold text-center">%ROST</TableHead>
+                      <TableHead className="font-semibold text-center">+/-</TableHead>
+                      <TableHead className="font-semibold text-center">FPTS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredPlayers.slice(0, 100).map((player: any) => (
                       <TableRow
                         key={player.id}
-                        className="hover:bg-muted/50"
+                        className="hover:bg-muted/30 border-b border-border/50"
                         data-testid={`row-player-${player.id}`}
                       >
                         <TableCell>
-                          <div className="font-medium text-foreground">
-                            {getPlayerName(player)}
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              <Badge 
+                                className={`${getPositionColor(getPlayerPositionId(player))} text-white text-xs`}
+                              >
+                                {getPositionName(getPlayerPositionId(player))}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {getProTeamId(player) ? getTeamName(getProTeamId(player)) : "FA"}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="font-medium text-sm">
+                                {getPlayerName(player)}
+                              </div>
+                              {getInjuryStatus(player) !== 'Active' && (
+                                <Badge 
+                                  variant={getInjuryStatusVariant(getInjuryStatus(player))}
+                                  className="text-xs"
+                                >
+                                  {getInjuryStatus(player)}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={`${getPositionColor(getPlayerPositionId(player))} text-white`}
-                          >
-                            {getPositionName(getPlayerPositionId(player))}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {getProTeamId(player) ? getTeamName(getProTeamId(player)) : "Free Agent"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
+                        <TableCell className="text-center">
+                          <span className="text-xs font-medium text-blue-600">
                             {getOpponent(player)}
                           </span>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-foreground font-medium">
+                        <TableCell className="text-center">
+                          <span className="text-xs">
+                            {getGameTime(player)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-xs font-medium">
                             {getProjectedPoints(player)}
                           </span>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-foreground">
+                        <TableCell className="text-center">
+                          <span className="text-xs text-muted-foreground">
+                            --
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={`text-xs font-medium ${getPositionRankColor(player)}`}>
+                            {getPositionRank(player)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-xs">
                             {getOwnershipPercent(player)}%
                           </span>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant={getInjuryStatus(player) === "Injured" ? "destructive" : "default"}>
-                            {getInjuryStatus(player)}
-                          </Badge>
+                        <TableCell className="text-center">
+                          <span className="text-xs text-muted-foreground">
+                            --
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-xs font-medium">
+                            {getSeasonPoints(player)}
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))}
