@@ -3,20 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\nodemon.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:nodemon.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\server\\geminiService.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:server\\geminiService.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:package.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\rosters.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:client\\src\\pages\\rosters.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\ai-recommendations.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:client\\src\\pages\\ai-recommendations.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\server\\geminiService.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:server\\geminiService.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\players.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
@@ -47,38 +43,25 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "package.json",
-              "DocumentMoniker": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\package.json",
-              "RelativeDocumentMoniker": "package.json",
-              "ToolTip": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\package.json",
-              "RelativeToolTip": "package.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2025-09-30T20:43:39.081Z",
+              "Title": "rosters.tsx",
+              "DocumentMoniker": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\rosters.tsx",
+              "RelativeDocumentMoniker": "client\\src\\pages\\rosters.tsx",
+              "ToolTip": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\rosters.tsx",
+              "RelativeToolTip": "client\\src\\pages\\rosters.tsx",
+              "ViewState": "AgIAABcAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2025-10-01T13:58:48.412Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "nodemon.json",
-              "DocumentMoniker": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\nodemon.json",
-              "RelativeDocumentMoniker": "nodemon.json",
-              "ToolTip": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\nodemon.json",
-              "RelativeToolTip": "nodemon.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2025-09-30T20:43:17.234Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
               "Title": "geminiService.ts",
               "DocumentMoniker": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\server\\geminiService.ts",
               "RelativeDocumentMoniker": "server\\geminiService.ts",
               "ToolTip": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\server\\geminiService.ts",
               "RelativeToolTip": "server\\geminiService.ts",
-              "ViewState": "AgIAADoBAAAAAAAAAAAgwDkBAABcAAAAAAAAAA==",
+              "ViewState": "AgIAAF8AAAAAAAAAAAAQwG0AAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2025-09-30T20:33:31.32Z",
               "EditorCaption": ""
@@ -91,14 +74,14 @@
               "RelativeDocumentMoniker": "client\\src\\pages\\ai-recommendations.tsx",
               "ToolTip": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\ai-recommendations.tsx",
               "RelativeToolTip": "client\\src\\pages\\ai-recommendations.tsx",
-              "ViewState": "AgIAACcAAAAAAAAAAAAYwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAKgAAAAAAAAAAAAowCwAAAAGAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
               "WhenOpened": "2025-09-30T20:31:56.247Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 3,
               "Title": "players.tsx",
               "DocumentMoniker": "C:\\Users\\64515C\\source\\repos\\LEARNING\\replilt\\FTA\\client\\src\\pages\\players.tsx",
               "RelativeDocumentMoniker": "client\\src\\pages\\players.tsx",
@@ -106,8 +89,7 @@
               "RelativeToolTip": "client\\src\\pages\\players.tsx",
               "ViewState": "AgIAABoAAAAAAAAAAAAAwIQAAAACAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2025-09-30T18:03:17.32Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-30T18:03:17.32Z"
             }
           ]
         }

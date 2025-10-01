@@ -396,18 +396,18 @@ Make your recommendations specific with player names, projected points, and clea
     }
 
     // Safely extract user team record with defaults
-    const userRecord = userTeam.record || {};
-    const userWins = userRecord.wins ?? 0;
-    const userLosses = userRecord.losses ?? 0;
-    const userPointsFor = userRecord.pointsFor ?? 0;
-    const userPointsAgainst = userRecord.pointsAgainst ?? 0;
+    //const userRecord = userTeam.record || {};
+    //const userWins = userRecord.wins ?? 0;
+    //const userLosses = userRecord.losses ?? 0;
+    //const userPointsFor = userRecord.pointsFor ?? 0;
+    //const userPointsAgainst = userRecord.pointsAgainst ?? 0;
     const userTeamName = userTeam.name || 'Your Team';
 
     // Format user roster
     const userRoster = userTeam.roster?.map((player: any) => {
       return `${player.name || 'Unknown Player'} (${player.position || 'FLEX'}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
     }).join('\n') || 'No roster data';
-
+      console.log("Team data:", allTeams);
     // Format other teams with their rosters
     const otherTeamsData = allTeams.filter(team => team.id !== userTeam.id).map(team => {
       const teamRecord = team.record || {};
@@ -427,10 +427,6 @@ Make your recommendations specific with player names, projected points, and clea
 You are an expert fantasy football trade analyzer. Analyze potential trade opportunities for the selected player.
 
 ==== YOUR TEAM: ${userTeamName} ====
-Record: ${userWins}-${userLosses}
-Points For: ${userPointsFor}
-Points Against: ${userPointsAgainst}
-
 Your Current Roster:
 ${userRoster}
 
@@ -451,6 +447,24 @@ Based on the data above, provide a comprehensive trade analysis for "${selectedP
 2. **Realistic Trade Partners**: Identify teams that would benefit from this player and have valuable pieces to offer
 3. **Fair Trade Proposals**: Suggest 3-5 specific trade scenarios with different teams
 4. **Market Analysis**: Overall trade market assessment for this player type
+5. **Strategic Advice** - Overall strategy based on the scoring format and current situation
+6. **Research & Trends Analysis** - Reference multiple expert sources including FantasyPros consensus rankings, start/sit advice, betting trends, and moneylines to provide comprehensive data-driven insights from recent NFL data
+
+**IMPORTANT: Base your analysis on current research from multiple sources, including:**
+- FantasyPros expert consensus rankings and start/sit recommendations
+- Player target shares, snap counts, and usage trends
+- Matchup analysis and defensive rankings against positions
+- Injury reports and their fantasy impact
+- Betting moneylines and trends that may indicate game script expectations
+- Vegas over/under totals and implied team scoring
+
+Format your response with clear visual structure using:
+- Headers and section titles
+- Bullet points and numbered lists
+- Tables for player comparisons
+- Bold text for player names and key recommendations
+- Use emojis to highlight important points (✅ for strengths, ⚠️ for concerns, 🎯 for recommendations, 📊 for stats)
+
 
 For each trade option, consider:
 - Team needs and roster construction
@@ -458,25 +472,7 @@ For each trade option, consider:
 - Team records and playoff positioning
 - Realistic likelihood of acceptance
 
-**IMPORTANT: Return your response as pure JSON only, no markdown formatting, no code blocks, just the raw JSON in this exact format:**
-
-{
-  "selectedPlayer": "${selectedPlayer}",
-  "playerValue": "Assessment of player's current trade value and appeal",
-  "tradeOptions": [
-    {
-      "targetTeam": "Team Name",
-      "targetTeamId": "team_id",
-      "playersOffered": ["${selectedPlayer}"],
-      "playersRequested": ["Player from target team"],
-      "tradeRationale": "Why this trade makes sense for both teams",
-      "fairnessRating": 7,
-      "benefitAnalysis": "How this helps your team specifically"
-    }
-  ],
-  "marketAnalysis": "Overall analysis of trade market for this player position/type",
-  "summary": "Overall assessment and trading strategy recommendations"
-}`;
+**IMPORTANT: Return your response as pure JSON only, no markdown formatting, no code blocks, just the raw JSON in this exact format:**`;
   }
 
   async optimizeLineup(roster: any[], leagueSettings: any, currentDate: string, nflWeek: number): Promise<LineupOptimization> {
