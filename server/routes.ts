@@ -693,7 +693,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const teams = await storage.getTeams(league.id);
         const matchups = await storage.getMatchups(league.id);
         const allPlayers = await storage.getPlayers();
-        const leaguePlayers = allPlayers.filter(p => p.leagueId === league.id);
         
         // Delete teams, matchups, and players
         for (const team of teams) {
@@ -702,7 +701,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const matchup of matchups) {
           await storage.deleteMatchup(matchup.id);
         }
-        for (const player of leaguePlayers) {
+        
+        // Delete all players (global cleanup)
+        for (const player of allPlayers) {
           await storage.deletePlayer(player.id);
         }
         
@@ -1660,8 +1661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return playerId && player?.proTeamId && player.proTeamId > 0 && !takenPlayerIds.has(playerId);
         })
         .sort((a: any, b: any) => {
-          const projA = getProjectedPoints(a) || 0;
-          const projB = getProjectedPoints(b) || 0;
+          const projA = Number(getProjectedPoints(a)) || 0;
+          const projB = Number(getProjectedPoints(b)) || 0;
           return projB - projA;
         })
         .slice(0, 50)
@@ -1880,7 +1881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }) || [];
 
       console.log('User roster length:', userRoster.length);
-      console.log('Sample roster players:', userRoster.slice(0, 3).map(p => ({ name: p.name, position: p.position, isStarter: p.isStarter })));
+      console.log('Sample roster players:', userRoster.slice(0, 3).map((p: any) => ({ name: p.name, position: p.position, isStarter: p.isStarter })));
 
       // Get waiver wire data
       let playersData = [];
@@ -3125,6 +3126,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId, customPrompt, options } = req.body;
 
       console.log(`Generating custom prompt for league ${leagueId}, team ${teamId}`);
+      console.log('Context data options received:', {
+        includeFantasyPros: options.includeFantasyPros,
+        includeVegasOdds: options.includeVegasOdds,
+        includeInjuryReports: options.includeInjuryReports,
+        includeWeatherData: options.includeWeatherData,
+        includeNewsUpdates: options.includeNewsUpdates,
+        includeMatchupAnalysis: options.includeMatchupAnalysis
+      });
 
       // Get league data from storage
       const leagues = await storage.getLeagues("default-user");
@@ -3530,6 +3539,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           console.log(`Custom prompt: No available players found for waiver wire section`);
         }
+      }
+
+      // Add research directives for AI to gather external data
+      const researchDirectives = [];
+      
+      if (options.includeFantasyPros) {
+        researchDirectives.push("- Research current FantasyPros expert consensus rankings and start/sit recommendations for this week");
+      }
+
+      if (options.includeVegasOdds) {
+        researchDirectives.push("- Look up current Vegas betting lines, over/under totals, and player prop bets for relevant NFL games");
+      }
+
+      if (options.includeInjuryReports) {
+        researchDirectives.push("- Check the latest NFL injury reports and player statuses (questionable, doubtful, out) from official sources");
+      }
+
+      if (options.includeWeatherData) {
+        researchDirectives.push("- Research current weather forecasts for outdoor NFL stadiums this week (temperature, wind, precipitation)");
+      }
+
+      if (options.includeNewsUpdates) {
+        researchDirectives.push("- Find the latest NFL news, beat reporter updates, and breaking news that could impact player performance");
+      }
+
+      if (options.includeMatchupAnalysis) {
+        researchDirectives.push("- Analyze defensive matchups and recent performance trends against specific positions (QB, RB, WR, TE)");
+      }
+
+      if (researchDirectives.length > 0) {
+        promptSections.push(
+          `==== RESEARCH INSTRUCTIONS ====\n` +
+          `Please research and incorporate the following external data sources into your analysis:\n\n` +
+          researchDirectives.join('\n') + '\n\n' +
+          `Use this research to provide more informed recommendations and insights.\n\n`
+        );
       }
 
       const finalPrompt = promptSections.join('\n');
