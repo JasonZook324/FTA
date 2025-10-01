@@ -1889,10 +1889,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
       };
 
-      // Debug: Log first team from each data source
-      console.log('First standings team:', JSON.stringify(standingsData.teams?.[0], null, 2).substring(0, 800));
-      console.log('First roster team:', JSON.stringify(rostersData.teams?.[0], null, 2).substring(0, 800));
-
       // Find user's team using the provided teamId (normalize types for comparison)
       const userTeam = standingsData.teams?.find((t: any) => String(t.id) === String(teamId));
       if (!userTeam) {
@@ -1932,10 +1928,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pointsAgainst: userTeam.record?.overall?.pointsAgainst || 0
         }
       };
-
-      // Log team data for debugging
-      console.log('User team:', JSON.stringify({ id: userTeamWithRoster.id, name: userTeamWithRoster.name }, null, 2));
-      console.log('All teams sample:', allTeams.slice(0, 3).map(t => ({ id: t.id, name: t.name })));
 
       // Get the prompt without calling AI
       const prompt = geminiService.getTradeAnalysisPrompt(
