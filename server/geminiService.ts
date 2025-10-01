@@ -407,19 +407,15 @@ Make your recommendations specific with player names, projected points, and clea
     const userRoster = userTeam.roster?.map((player: any) => {
       return `${player.name || 'Unknown Player'} (${player.position || 'FLEX'}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
     }).join('\n') || 'No roster data';
-      console.log("Team data:", allTeams);
     // Format other teams with their rosters
     const otherTeamsData = allTeams.filter(team => team.id !== userTeam.id).map(team => {
-      const teamRecord = team.record || {};
-      const teamWins = teamRecord.wins ?? 0;
-      const teamLosses = teamRecord.losses ?? 0;
       const teamName = team.name || `Team ${team.id}`;
       
       const teamRoster = team.roster?.map((player: any) => {
         return `${player.name || 'Unknown Player'} (${player.position || 'FLEX'}) - ${player.isStarter ? 'Starter' : 'Bench'}`;
       }).join('\n  ') || 'No roster data';
 
-      return `=== ${teamName} (${teamWins}-${teamLosses}) ===
+      return `=== ${teamName} ===
   ${teamRoster}`;
     }).join('\n\n');
 

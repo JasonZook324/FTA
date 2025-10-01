@@ -1897,10 +1897,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get roster data for all teams
       const allTeams = rostersData.teams?.map((team: any) => {
-        const standingsTeam = standingsData.teams?.find((t: any) => t.id === team.id);
+        const standingsTeam = standingsData.teams?.find((t: any) => String(t.id) === String(team.id));
         return {
           id: team.id,
-          name: team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`,
+          name: team.name || `Team ${team.id}`,
           roster: team.roster?.entries?.map((entry: any) => ({
             name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
             position: getPositionName(entry.playerPoolEntry?.player?.defaultPositionId) || 'FLEX',
