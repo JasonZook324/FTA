@@ -1836,9 +1836,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trade analysis prompt-only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/trade-analysis-prompt", async (req, res) => {
     try {
-      const { selectedPlayer } = req.body;
+      const { selectedPlayer, teamId } = req.body;
       if (!selectedPlayer) {
         return res.status(400).json({ message: "Selected player is required" });
+      }
+      if (!teamId) {
+        return res.status(400).json({ message: "Team ID is required" });
       }
 
       const league = await storage.getLeague(req.params.leagueId);
@@ -1850,6 +1853,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!credentials || !credentials.isValid) {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
+
+      console.log(`Generating trade analysis prompt for team ${teamId} in league ${league.espnLeagueId}`);
 
       // Get comprehensive roster data for all teams (same as trade-analysis route)
       const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
@@ -1884,10 +1889,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
       };
 
-      // Find user's team
-      const userTeam = standingsData.teams?.[0];
+      // Find user's team using the provided teamId (normalize types for comparison)
+      const userTeam = standingsData.teams?.find((t: any) => String(t.id) === String(teamId));
       if (!userTeam) {
-        return res.status(404).json({ message: "User team not found" });
+        return res.status(404).json({ message: `Team with ID ${teamId} not found in league` });
       }
 
       // Get roster data for all teams

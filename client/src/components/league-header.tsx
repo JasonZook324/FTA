@@ -5,10 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw } from "lucide-react";
+import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw, Users } from "lucide-react";
+import { useTeam } from "@/contexts/TeamContext";
 
 export default function LeagueHeader() {
   const { toast } = useToast();
+  const { selectedTeam } = useTeam();
   const [userId] = useState("default-user");
 
   // Query current leagues
@@ -124,6 +126,15 @@ export default function LeagueHeader() {
               <span className="whitespace-nowrap">{currentLeague.teamCount} teams</span>
               <span className="hidden sm:inline">•</span>
               <span className="whitespace-nowrap">Week {currentLeague.currentWeek}</span>
+              {selectedTeam && (
+                <>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="whitespace-nowrap flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {selectedTeam.teamName}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

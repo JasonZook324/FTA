@@ -10,6 +10,7 @@ import { Loader2, Copy, Check } from "lucide-react";
 import { AlertCircle, TrendingUp, Users, Star } from "lucide-react";
 import { useSelectedLeague } from "@/hooks/useSelectedLeague";
 import { useToast } from "@/hooks/use-toast";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface Player {
   name: string;
@@ -46,6 +47,7 @@ const getPositionName = (positionId: number): string => {
 
 export default function TradeAnalyzer() {
   const { toast } = useToast();
+  const { selectedTeam } = useTeam();
   const [userId] = useState("default-user");
   const { selectedLeagueId, setSelectedLeagueId, leagues, hasAutoSelected } = useSelectedLeague(userId);
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
@@ -101,7 +103,13 @@ export default function TradeAnalyzer() {
   // Trade analysis mutation - now returns prompt instead of calling AI
   const tradeAnalysisMutation = useMutation({
     mutationFn: async (data: { selectedPlayer: string }) => {
-      const response = await apiRequest('POST', `/api/leagues/${selectedLeagueId}/trade-analysis-prompt`, data);
+      if (!selectedTeam) {
+        throw new Error('Please select a team first');
+      }
+      const response = await apiRequest('POST', `/api/leagues/${selectedLeagueId}/trade-analysis-prompt`, {
+        ...data,
+        teamId: selectedTeam.teamId
+      });
       return await response.json();
     },
     onSuccess: () => {
@@ -160,8 +168,8 @@ export default function TradeAnalyzer() {
     );
   }
 
-  // Get user's team (first team in roster data)
-  const userTeam = rostersData?.teams?.[0];
+  // Get user's selected team from roster data
+  const userTeam = rostersData?.teams?.find((t: any) => t.id === selectedTeam?.teamId);
   const userRoster = userTeam?.roster?.entries?.map((entry: any) => ({
     name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
     position: entry.playerPoolEntry?.player?.defaultPositionId ? 
