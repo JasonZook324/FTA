@@ -1575,9 +1575,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Find user's team from rosters
-      const userTeam = rostersData.teams?.find((t: any) => t.id === teamId) || rostersData.teams?.[0];
+      const userTeam = rostersData.teams?.find((t: any) => t.id === teamId);
       if (!userTeam) {
-        return res.status(404).json({ message: "Team not found" });
+        return res.status(404).json({ message: `Team with ID ${teamId} not found in league` });
       }
 
       // Format user roster with proper categorization
