@@ -549,6 +549,25 @@ Consider that in a ${leagueSettings.teamCount}-team league, roster depth and pla
   }
 
   private buildLineupOptimizationPrompt(roster: any[], leagueSettings: any, currentDate: string, nflWeek: number): string {
+    // Helper function to get lineup slot name
+    const getLineupSlotName = (slotId: number): string => {
+      const slots: Record<number, string> = {
+        0: "QB",
+        2: "RB",
+        4: "WR",
+        6: "TE",
+        16: "D/ST",
+        17: "K",
+        20: "Bench",
+        21: "I.R.",
+        23: "FLEX",
+        7: "OP",
+        10: "UTIL",
+        12: "RB/WR/TE"
+      };
+      return slots[slotId] || `Slot_${slotId}`;
+    };
+
     // Format scoring type
     let scoringFormat = 'Standard';
     if (leagueSettings.receptionPoints === 1) {
@@ -572,7 +591,8 @@ Consider that in a ${leagueSettings.teamCount}-team league, roster depth and pla
                        player.defaultPositionId === 4 ? "TE" :
                        player.defaultPositionId === 5 ? "K" : "DEF";
       
-      return `${player.fullName} (${position}) - Lineup Slot: ${entry.lineupSlotId}`;
+      const lineupSlotName = getLineupSlotName(entry.lineupSlotId);
+      return `[${lineupSlotName}] ${player.fullName} (${position})`;
     }).filter(Boolean).join('\n');
 
     // Format bench info
@@ -586,7 +606,8 @@ Consider that in a ${leagueSettings.teamCount}-team league, roster depth and pla
                        player.defaultPositionId === 4 ? "TE" :
                        player.defaultPositionId === 5 ? "K" : "DEF";
       
-      return `${player.fullName} (${position})`;
+      const lineupSlotName = getLineupSlotName(entry.lineupSlotId);
+      return `[${lineupSlotName}] ${player.fullName} (${position})`;
     }).filter(Boolean).join('\n');
 
     return `

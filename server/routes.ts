@@ -2798,13 +2798,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      // Get live roster data from ESPN
-      const rosterData = await espnApiService.getRosters(
-        credentials,
-        league.sport,
-        league.season,
-        league.espnLeagueId
-      );
+      // Get live roster data and league settings from ESPN
+      const [rosterData, leagueDetailsData] = await Promise.all([
+        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
+        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
+      ]);
 
       // Find the specific team
       const team = rosterData.teams?.find((t: any) => t.id === teamId);
@@ -2812,9 +2810,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team not found" });
       }
 
+      // Extract scoring settings correctly by searching for reception points (statId 53)
+      let receptionPoints = 0;
+      const settingsSources = [leagueDetailsData.settings, rosterData.settings];
+      
+      for (const settings of settingsSources) {
+        if (settings?.scoringSettings?.scoringItems) {
+          const receptionItem = settings.scoringSettings.scoringItems.find((item: any) => item.statId === 53);
+          if (receptionItem?.points !== undefined) {
+            receptionPoints = receptionItem.points;
+            break;
+          }
+        }
+      }
+
       // Get league settings for AI context
       const leagueSettings = {
-        receptionPoints: rosterData.settings?.scoringSettings?.receptionPoints || 0,
+        receptionPoints,
         season: league.season,
         teamCount: rosterData.teams?.length || 0
       };
