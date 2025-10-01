@@ -1889,6 +1889,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
       };
 
+      // Debug: Log first team from each data source
+      console.log('First standings team:', JSON.stringify(standingsData.teams?.[0], null, 2).substring(0, 500));
+      console.log('First roster team:', JSON.stringify(rostersData.teams?.[0], null, 2).substring(0, 500));
+
       // Find user's team using the provided teamId (normalize types for comparison)
       const userTeam = standingsData.teams?.find((t: any) => String(t.id) === String(teamId));
       if (!userTeam) {
@@ -1898,6 +1902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get roster data for all teams
       const allTeams = rostersData.teams?.map((team: any) => {
         const standingsTeam = standingsData.teams?.find((t: any) => String(t.id) === String(team.id));
+        console.log(`Matching roster team ${team.id}, found standings: ${standingsTeam ? 'YES' : 'NO'}, location: ${standingsTeam?.location}, nickname: ${standingsTeam?.nickname}`);
         return {
           id: team.id,
           name: standingsTeam?.location && standingsTeam?.nickname 
