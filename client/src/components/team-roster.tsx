@@ -181,7 +181,19 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
+                      window.open(url, '_blank');
+                    }}
+                    data-testid={`button-export-team-${team.id}`}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </Button>
                   {selectedTeam?.teamId === team.id && (
                     <Button
                       variant="default"
@@ -198,18 +210,6 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                       Optimize Lineup
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
-                      window.open(url, '_blank');
-                    }}
-                    data-testid={`button-export-team-${team.id}`}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                  </Button>
                 </div>
               </div>
             </CardHeader>

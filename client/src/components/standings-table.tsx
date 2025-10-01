@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -75,22 +74,7 @@ export default function StandingsTable({ data, isLoading, leagueId }: StandingsT
   return (
     <Card data-testid="standings-table">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>League Standings</CardTitle>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-muted-foreground">View:</span>
-            <Select defaultValue="mStandings">
-              <SelectTrigger className="w-32" data-testid="select-view">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mStandings">mStandings</SelectItem>
-                <SelectItem value="mTeam">mTeam</SelectItem>
-                <SelectItem value="mSettings">mSettings</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <CardTitle>League Standings</CardTitle>
       </CardHeader>
       
       <CardContent>
