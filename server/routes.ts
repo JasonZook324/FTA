@@ -8,6 +8,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { geminiService } from './geminiService';
+import { setupAuth } from "./auth";
 
 // ESPN API service
 class EspnApiService {
@@ -310,7 +311,18 @@ class EspnApiService {
 
 const espnApiService = new EspnApiService();
 
+// Middleware to check if user is authenticated
+function requireAuth(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication routes (register, login, logout, /api/user)
+  setupAuth(app);
+
   // ESPN Credentials routes
   app.post("/api/espn-credentials", async (req, res) => {
     try {
