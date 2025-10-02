@@ -769,6 +769,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user's selected team and league
+  app.put("/api/user/selected-team", requireAuth, async (req: any, res) => {
+    try {
+      const { teamId, leagueId } = req.body;
+      
+      if (!teamId || !leagueId) {
+        return res.status(400).json({ message: "teamId and leagueId are required" });
+      }
+
+      const updated = await storage.updateUser(req.user.id, {
+        selectedTeamId: parseInt(teamId),
+        selectedLeagueId: leagueId
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ 
+        success: true,
+        selectedTeamId: updated.selectedTeamId,
+        selectedLeagueId: updated.selectedLeagueId
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/leagues/load", requireAuth, async (req: any, res) => {
     try {
       const { espnLeagueId, sport, season } = req.body;
