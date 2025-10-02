@@ -324,10 +324,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
   // ESPN Credentials routes
-  app.post("/api/espn-credentials", async (req, res) => {
+  app.post("/api/espn-credentials", requireAuth, async (req: any, res) => {
     try {
       console.log('Received ESPN credentials request:', JSON.stringify(req.body, null, 2));
-      const validatedData = insertEspnCredentialsSchema.parse(req.body);
+      const validatedData = insertEspnCredentialsSchema.parse({ ...req.body, userId: req.user.id });
       
       // Validate credentials with ESPN API
       console.log('Validating credentials with ESPN API...');
@@ -392,9 +392,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/espn-credentials/:userId", async (req, res) => {
+  app.get("/api/espn-credentials", requireAuth, async (req: any, res) => {
     try {
-      const credentials = await storage.getEspnCredentials(req.params.userId);
+      const credentials = await storage.getEspnCredentials(req.user.id);
       if (!credentials) {
         return res.status(404).json({ message: "ESPN credentials not found" });
       }
@@ -406,9 +406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reload league data (delete existing and re-import)
-  app.post("/api/espn-credentials/:userId/reload-league", async (req, res) => {
+  app.post("/api/espn-credentials/reload-league", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.params.userId;
+      const userId = req.user.id;
       console.log(`Reload league request for user: ${userId}`);
       
       const credentials = await storage.getEspnCredentials(userId);
@@ -586,9 +586,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/espn-credentials/:userId/validate", async (req, res) => {
+  app.post("/api/espn-credentials/validate", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.params.userId;
+      const userId = req.user.id;
       const credentials = await storage.getEspnCredentials(userId);
       if (!credentials) {
         return res.status(404).json({ message: "ESPN credentials not found" });
@@ -687,9 +687,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Disconnect/logout route - clears ESPN credentials and all associated data
-  app.delete("/api/espn-credentials/:userId", async (req, res) => {
+  app.delete("/api/espn-credentials", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.params.userId;
+      const userId = req.user.id;
       
       // Check if credentials exist
       const credentials = await storage.getEspnCredentials(userId);
@@ -745,9 +745,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // League routes
-  app.get("/api/leagues/:userId", async (req, res) => {
+  app.get("/api/leagues", requireAuth, async (req: any, res) => {
     try {
-      const leagues = await storage.getLeagues(req.params.userId);
+      const leagues = await storage.getLeagues(req.user.id);
       res.json(leagues);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -755,9 +755,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user's selected league
-  app.get("/api/user/:userId/selected-league", async (req, res) => {
+  app.get("/api/user/selected-league", requireAuth, async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.params.userId);
+      const user = await storage.getUser(req.user.id);
       if (!user?.selectedLeagueId) {
         return res.json({ selectedLeague: null });
       }
@@ -769,10 +769,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:userId/load", async (req, res) => {
+  app.post("/api/leagues/load", requireAuth, async (req: any, res) => {
     try {
       const { espnLeagueId, sport, season } = req.body;
-      const userId = req.params.userId;
+      const userId = req.user.id;
 
       if (!espnLeagueId || !sport || !season) {
         return res.status(400).json({ 
@@ -902,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Standings route
-  app.get("/api/leagues/:leagueId/standings", async (req, res) => {
+  app.get("/api/leagues/:leagueId/standings", requireAuth, async (req: any, res) => {
     try {
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
@@ -1015,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Matchups route
-  app.get("/api/leagues/:leagueId/matchups", async (req, res) => {
+  app.get("/api/leagues/:leagueId/matchups", requireAuth, async (req: any, res) => {
     try {
       const { week } = req.query;
       const league = await storage.getLeague(req.params.leagueId);
@@ -1043,7 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Recommendations route
-  app.post("/api/leagues/:leagueId/ai-recommendations", async (req, res) => {
+  app.post("/api/leagues/:leagueId/ai-recommendations", requireAuth, async (req: any, res) => {
     try {
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
@@ -1317,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Question route
-  app.post("/api/leagues/:leagueId/ai-question", async (req, res) => {
+  app.post("/api/leagues/:leagueId/ai-question", requireAuth, async (req: any, res) => {
     try {
       const { question } = req.body;
       if (!question) {
@@ -1497,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Recommendations Prompt-Only route (returns prompt instead of calling AI)
-  app.post("/api/leagues/:leagueId/ai-recommendations-prompt", async (req, res) => {
+  app.post("/api/leagues/:leagueId/ai-recommendations-prompt", requireAuth, async (req: any, res) => {
     try {
       const { teamId } = req.body;
       
@@ -1723,7 +1723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI Question Prompt-Only route (returns prompt instead of calling AI)
-  app.post("/api/leagues/:leagueId/ai-question-prompt", async (req, res) => {
+  app.post("/api/leagues/:leagueId/ai-question-prompt", requireAuth, async (req: any, res) => {
     try {
       const { question, teamId } = req.body;
       if (!question) {
@@ -1980,7 +1980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Trade analysis route
-  app.post("/api/leagues/:leagueId/trade-analysis", async (req, res) => {
+  app.post("/api/leagues/:leagueId/trade-analysis", requireAuth, async (req: any, res) => {
     try {
       const { selectedPlayer } = req.body;
       if (!selectedPlayer) {
@@ -2086,7 +2086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Trade analysis prompt-only route (returns prompt instead of calling AI)
-  app.post("/api/leagues/:leagueId/trade-analysis-prompt", async (req, res) => {
+  app.post("/api/leagues/:leagueId/trade-analysis-prompt", requireAuth, async (req: any, res) => {
     try {
       const { selectedPlayer, teamId } = req.body;
       if (!selectedPlayer) {
@@ -2197,7 +2197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rosters route
-  app.get("/api/leagues/:leagueId/rosters", async (req, res) => {
+  app.get("/api/leagues/:leagueId/rosters", requireAuth, async (req: any, res) => {
     try {
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
@@ -2223,16 +2223,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Players route
-  app.get("/api/players/:sport/:season", async (req, res) => {
+  app.get("/api/players/:sport/:season", requireAuth, async (req: any, res) => {
     try {
       const { sport, season } = req.params;
-      const { userId, leagueId } = req.query;
+      const { leagueId } = req.query;
 
-      if (!userId) {
-        return res.status(400).json({ message: "User ID required" });
-      }
-
-      const credentials = await storage.getEspnCredentials(userId as string);
+      const credentials = await storage.getEspnCredentials(req.user.id);
       if (!credentials || !credentials.isValid) {
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
@@ -2260,7 +2256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Teams route
-  app.get("/api/leagues/:leagueId/teams", async (req, res) => {
+  app.get("/api/leagues/:leagueId/teams", requireAuth, async (req: any, res) => {
     try {
       const teams = await storage.getTeams(req.params.leagueId);
       res.json(teams);
@@ -2270,7 +2266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Waiver wire route - get available players not on any roster
-  app.get("/api/leagues/:leagueId/waiver-wire", async (req, res) => {
+  app.get("/api/leagues/:leagueId/waiver-wire", requireAuth, async (req: any, res) => {
     try {
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
@@ -2396,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export waiver wire as CSV
-  app.get("/api/leagues/:leagueId/waiver-wire/export", async (req, res) => {
+  app.get("/api/leagues/:leagueId/waiver-wire/export", requireAuth, async (req: any, res) => {
     try {
       const league = await storage.getLeague(req.params.leagueId);
       if (!league) {
@@ -2594,7 +2590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export roster details for all teams
-  app.get('/api/leagues/:id/roster-export', async (req, res) => {
+  app.get('/api/leagues/:id/roster-export', requireAuth, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const league = await storage.getLeague(leagueId);
@@ -2603,7 +2599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      const credentials = await storage.getEspnCredentials('default-user');
+      const credentials = await storage.getEspnCredentials(req.user.id);
       if (!credentials) {
         return res.status(404).json({ message: 'ESPN credentials not found' });
       }
@@ -2804,7 +2800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export individual team roster
-  app.get('/api/leagues/:id/teams/:teamId/roster-export', async (req, res) => {
+  app.get('/api/leagues/:id/teams/:teamId/roster-export', requireAuth, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
@@ -2815,7 +2811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      const credentials = await storage.getEspnCredentials('default-user');
+      const credentials = await storage.getEspnCredentials(req.user.id);
       if (!credentials) {
         return res.status(404).json({ message: 'ESPN credentials not found' });
       }
@@ -2984,7 +2980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Optimize team lineup using AI
-  app.post('/api/leagues/:id/teams/:teamId/optimize-lineup', async (req, res) => {
+  app.post('/api/leagues/:id/teams/:teamId/optimize-lineup', requireAuth, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
@@ -3052,7 +3048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Optimize team lineup prompt-only (returns prompt instead of calling AI)
-  app.post('/api/leagues/:id/teams/:teamId/optimize-lineup-prompt', async (req, res) => {
+  app.post('/api/leagues/:id/teams/:teamId/optimize-lineup-prompt', requireAuth, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
@@ -3259,7 +3255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Custom prompt builder endpoint
-  app.post("/api/leagues/:leagueId/custom-prompt", async (req, res) => {
+  app.post("/api/leagues/:leagueId/custom-prompt", requireAuth, async (req: any, res) => {
     try {
       const { leagueId } = req.params;
       const { teamId, customPrompt, options } = req.body;
@@ -3275,7 +3271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get league data from storage
-      const leagues = await storage.getLeagues("default-user");
+      const leagues = await storage.getLeagues(req.user.id);
       const league = leagues.find(l => l.id === leagueId);
       
       if (!league) {
@@ -3283,7 +3279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get ESPN data with comprehensive views (same as waiver wire endpoint)
-      const credentials = await storage.getEspnCredentials('default-user');
+      const credentials = await storage.getEspnCredentials(req.user.id);
       if (!credentials) {
         return res.status(404).json({ message: 'ESPN credentials not found' });
       }
