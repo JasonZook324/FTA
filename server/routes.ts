@@ -863,7 +863,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         settings: leagueData.settings || {}
       };
 
-      const league = await storage.createLeague(leagueInfo);
+      // Upsert logic: check if league exists, update or create
+      const existingLeague = await storage.getLeagueByEspnId(userId, espnLeagueId, parseInt(season));
+      
+      let league;
+      if (existingLeague) {
+        console.log(`Updating existing league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
+        league = await storage.updateLeague(existingLeague.id, leagueInfo);
+      } else {
+        console.log(`Creating new league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
+        league = await storage.createLeague(leagueInfo);
+      }
 
       // Store teams
       if (leagueData.teams) {
