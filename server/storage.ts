@@ -10,8 +10,17 @@ import {
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import session from "express-session";
+import type { Store } from "express-session";
+import connectPg from "connect-pg-simple";
+import createMemoryStore from "memorystore";
+import { pool } from "./db";
 
+// Reference: blueprint:javascript_auth_all_persistance
 export interface IStorage {
+  // Session store for authentication
+  sessionStore: Store;
+
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -27,12 +36,14 @@ export interface IStorage {
   // League methods
   getLeagues(userId: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
+  getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
   updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
   deleteLeague(id: string): Promise<boolean>;
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
+  getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: string, team: Partial<Team>): Promise<Team | undefined>;
   deleteTeam(id: string): Promise<boolean>;
@@ -51,7 +62,11 @@ export interface IStorage {
   deletePlayer(id: string): Promise<boolean>;
 }
 
+const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
+
 export class MemStorage implements IStorage {
+  sessionStore: Store;
   private users: Map<string, User>;
   private espnCredentials: Map<string, EspnCredentials>;
   private leagues: Map<string, League>;
@@ -60,6 +75,9 @@ export class MemStorage implements IStorage {
   private players: Map<string, Player>;
 
   constructor() {
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // 24 hours
+    });
     this.users = new Map();
     this.espnCredentials = new Map();
     this.leagues = new Map();
@@ -81,7 +99,13 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, selectedLeagueId: null };
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      selectedLeagueId: null,
+      selectedTeamId: null,
+      createdAt: new Date()
+    };
     this.users.set(id, user);
     return user;
   }
@@ -109,7 +133,9 @@ export class MemStorage implements IStorage {
       id, 
       isValid: true,
       createdAt: new Date(),
-      lastValidated: null
+      lastValidated: null,
+      testLeagueId: credentials.testLeagueId ?? null,
+      testSeason: credentials.testSeason ?? null
     };
     this.espnCredentials.set(id, cred);
     return cred;
@@ -141,6 +167,12 @@ export class MemStorage implements IStorage {
 
   async getLeague(id: string): Promise<League | undefined> {
     return this.leagues.get(id);
+  }
+
+  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
+    return Array.from(this.leagues.values()).find(
+      (league) => league.userId === userId && league.espnLeagueId === espnLeagueId && league.season === season,
+    );
   }
 
   async createLeague(league: InsertLeague): Promise<League> {
@@ -181,6 +213,12 @@ export class MemStorage implements IStorage {
   async getTeams(leagueId: string): Promise<Team[]> {
     return Array.from(this.teams.values()).filter(
       (team) => team.leagueId === leagueId,
+    );
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    return Array.from(this.teams.values()).find(
+      (team) => team.leagueId === leagueId && team.espnTeamId === espnTeamId,
     );
   }
 
@@ -297,6 +335,15 @@ export class MemStorage implements IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  sessionStore: Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
+    });
+  }
+
   // User methods
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -382,6 +429,20 @@ export class DatabaseStorage implements IStorage {
     return league || undefined;
   }
 
+  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
+    const [league] = await db
+      .select()
+      .from(leagues)
+      .where(
+        and(
+          eq(leagues.userId, userId),
+          eq(leagues.espnLeagueId, espnLeagueId),
+          eq(leagues.season, season)
+        )
+      );
+    return league || undefined;
+  }
+
   async createLeague(league: InsertLeague): Promise<League> {
     const [newLeague] = await db
       .insert(leagues)
@@ -418,6 +479,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(teams)
       .where(eq(teams.leagueId, leagueId));
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.leagueId, leagueId), eq(teams.espnTeamId, espnTeamId)))
+      .limit(1);
+    return team || undefined;
   }
 
   async createTeam(team: InsertTeam): Promise<Team> {

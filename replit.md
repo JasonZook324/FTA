@@ -8,6 +8,19 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 
 ## Recent Changes
 
+**October 2, 2025** - Multi-User Authentication System Implementation
+- Implemented complete username/password authentication system using passport-local strategy
+- Replaced hardcoded "default-user" with session-based authentication for true multi-user support
+- Users can now register accounts, login, and manage their own ESPN credentials and leagues
+- All 26 API routes protected with requireAuth middleware - data completely isolated per user
+- Database schema updated with foreign key constraints (users → espnCredentials, leagues) with ON DELETE CASCADE
+- Password security: bcrypt hashing with 10 salt rounds (replaced initial scrypt implementation)
+- Session management: PostgreSQL-backed session store with 7-day cookie expiration
+- Frontend: useAuth hook, AuthProvider context, ProtectedRoute wrapper, and authentication page at /auth
+- Sidebar now shows logged-in username and includes logout button with user context
+- Application now portable - can deploy anywhere (not tied to Replit Auth infrastructure)
+- End-to-end tested: registration, login, logout, protected route access, and session persistence
+
 **September 30, 2025** - Mobile Responsiveness Improvements
 - Fixed main layout overflow issue by removing h-screen overflow-hidden and implementing min-h-screen with scrollable main content area
 - Redesigned league header to be fully responsive - stacks vertically on small screens with full-width buttons
@@ -49,7 +62,13 @@ The application uses PostgreSQL as the primary database with Drizzle ORM for typ
 For development flexibility, the system includes an in-memory storage implementation that mirrors the database interface, allowing for rapid prototyping and testing without database dependencies.
 
 ### Authentication and Authorization
-The system implements ESPN-specific authentication using ESPN's S2 session tokens and SWID (Sports Web ID) credentials. These credentials are securely stored and validated against ESPN's API endpoints. The application includes credential validation functionality to ensure tokens remain active and valid.
+The application implements a dual-layer authentication system:
+
+**User Authentication**: Uses passport-local strategy with bcrypt-hashed passwords for secure user account management. Sessions are stored in PostgreSQL with connect-pg-simple, providing persistent login state across server restarts. All API routes are protected with requireAuth middleware that verifies session authentication before processing requests.
+
+**ESPN API Authentication**: Once logged in, users manage their own ESPN credentials (S2 session tokens and SWID) which are stored per-user in the database. These credentials authenticate requests to ESPN's Fantasy API and are validated to ensure they remain active.
+
+This architecture provides complete data isolation between users - each user can only access their own ESPN credentials, leagues, and team data.
 
 ### External Service Integrations
 The primary external integration is with ESPN's Fantasy Sports API v3, which provides access to league data, player information, matchups, and statistics. The ESPN API service includes comprehensive support for different sports (football, basketball, hockey, baseball) and various data views (team info, rosters, matchups, settings, standings).
@@ -64,6 +83,8 @@ The application also integrates with Neon Database for PostgreSQL hosting and in
 - **ORM**: Drizzle ORM with PostgreSQL dialect for type-safe database operations
 - **Frontend Framework**: React 18 with TypeScript for component-based UI
 - **Backend Framework**: Express.js for RESTful API server
+- **Authentication**: Passport.js with passport-local strategy and bcrypt for password hashing
+- **Session Management**: express-session with connect-pg-simple PostgreSQL store
 - **State Management**: TanStack React Query for server state and caching
 - **UI Components**: Radix UI primitives with shadcn/ui component library
 - **Styling**: Tailwind CSS with custom design system

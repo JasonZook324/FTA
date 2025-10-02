@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 
 interface League {
   id: string;
@@ -12,19 +13,20 @@ interface SelectedLeagueResponse {
   selectedLeague: League | null;
 }
 
-export function useSelectedLeague(userId: string) {
+export function useSelectedLeague() {
+  const { user } = useAuth();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
 
   // Query user's selected league from backend
   const { data: selectedLeagueData } = useQuery<SelectedLeagueResponse>({
-    queryKey: ["/api/user", userId, "selected-league"],
-    enabled: !!userId,
+    queryKey: ["/api/user/selected-league"],
+    enabled: !!user,
   });
 
   // Query all user leagues
   const { data: leagues } = useQuery<League[]>({
-    queryKey: ["/api/leagues", userId],
-    enabled: !!userId,
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Auto-set the selected league when data loads

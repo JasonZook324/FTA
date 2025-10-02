@@ -21,11 +21,12 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function PromptBuilder() {
   const { toast } = useToast();
   const { selectedTeam, setSelectedTeam } = useTeam();
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [copied, setCopied] = useState(false);
@@ -41,9 +42,18 @@ export default function PromptBuilder() {
   const [waiverWireTeam, setWaiverWireTeam] = useState("");
   const [includeLeagueSettings, setIncludeLeagueSettings] = useState(true);
 
+  // Context data options
+  const [includeFantasyPros, setIncludeFantasyPros] = useState(false);
+  const [includeVegasOdds, setIncludeVegasOdds] = useState(false);
+  const [includeInjuryReports, setIncludeInjuryReports] = useState(false);
+  const [includeWeatherData, setIncludeWeatherData] = useState(false);
+  const [includeNewsUpdates, setIncludeNewsUpdates] = useState(false);
+  const [includeMatchupAnalysis, setIncludeMatchupAnalysis] = useState(false);
+
   // Query user leagues
   const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Query teams for selected league
@@ -99,7 +109,14 @@ export default function PromptBuilder() {
             includeWaiverWire,
             waiverWirePosition,
             waiverWireTeam,
-            includeLeagueSettings
+            includeLeagueSettings,
+            // Context data options
+            includeFantasyPros,
+            includeVegasOdds,
+            includeInjuryReports,
+            includeWeatherData,
+            includeNewsUpdates,
+            includeMatchupAnalysis
           }
         })
       });
@@ -382,6 +399,87 @@ export default function PromptBuilder() {
                       <Crown className="h-4 w-4" />
                       League Settings & Scoring
                     </label>
+                  </div>
+
+                  <Separator />
+
+                  {/* Context Data Options */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <Globe className="h-4 w-4" />
+                      External Research Data
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Include external data sources to help the AI make more informed recommendations
+                    </p>
+                    
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-fantasypros" 
+                          checked={includeFantasyPros}
+                          onCheckedChange={(checked) => setIncludeFantasyPros(checked as boolean)}
+                        />
+                        <label htmlFor="include-fantasypros" className="text-sm">
+                          FantasyPros Rankings & Expert Consensus
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-vegas-odds" 
+                          checked={includeVegasOdds}
+                          onCheckedChange={(checked) => setIncludeVegasOdds(checked as boolean)}
+                        />
+                        <label htmlFor="include-vegas-odds" className="text-sm">
+                          Vegas Betting Lines & Player Props
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-injury-reports" 
+                          checked={includeInjuryReports}
+                          onCheckedChange={(checked) => setIncludeInjuryReports(checked as boolean)}
+                        />
+                        <label htmlFor="include-injury-reports" className="text-sm">
+                          Injury Reports & Player Status
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-weather-data" 
+                          checked={includeWeatherData}
+                          onCheckedChange={(checked) => setIncludeWeatherData(checked as boolean)}
+                        />
+                        <label htmlFor="include-weather-data" className="text-sm">
+                          Weather Conditions & Forecasts
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-news-updates" 
+                          checked={includeNewsUpdates}
+                          onCheckedChange={(checked) => setIncludeNewsUpdates(checked as boolean)}
+                        />
+                        <label htmlFor="include-news-updates" className="text-sm">
+                          Latest News & Beat Reporter Updates
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-matchup-analysis" 
+                          checked={includeMatchupAnalysis}
+                          onCheckedChange={(checked) => setIncludeMatchupAnalysis(checked as boolean)}
+                        />
+                        <label htmlFor="include-matchup-analysis" className="text-sm">
+                          Defensive Matchup Analysis & Target Data
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

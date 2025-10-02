@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Download } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const leagueFormSchema = z.object({
   espnLeagueId: z.string().min(1, "League ID is required"),
@@ -21,12 +21,12 @@ const leagueFormSchema = z.object({
 type LeagueFormData = z.infer<typeof leagueFormSchema>;
 
 interface LeagueSelectorProps {
-  userId: string;
   disabled?: boolean;
 }
 
-export default function LeagueSelector({ userId, disabled }: LeagueSelectorProps) {
+export default function LeagueSelector({ disabled }: LeagueSelectorProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<LeagueFormData>({
     resolver: zodResolver(leagueFormSchema),
@@ -40,7 +40,7 @@ export default function LeagueSelector({ userId, disabled }: LeagueSelectorProps
   // Load league mutation
   const loadLeagueMutation = useMutation({
     mutationFn: async (data: LeagueFormData) => {
-      const response = await apiRequest("POST", `/api/leagues/${userId}/load`, {
+      const response = await apiRequest("POST", `/api/leagues/load`, {
         ...data,
         season: parseInt(data.season),
       });

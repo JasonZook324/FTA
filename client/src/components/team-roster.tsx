@@ -26,7 +26,20 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
   const handleOptimizeLineup = async (teamId: number) => {
     try {
       setIsOptimizing(true);
-      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup-prompt`);
+      
+      // Default options that make sense for lineup optimization
+      const options = {
+        includeFantasyPros: true,       // Expert rankings are crucial for lineup decisions
+        includeVegasOdds: true,         // Vegas lines help with game flow predictions
+        includeInjuryReports: true,     // Critical for lineup decisions
+        includeWeatherData: false,      // Less critical for weekly optimization
+        includeNewsUpdates: true,       // Breaking news affects lineups
+        includeMatchupAnalysis: true    // Matchup analysis is essential for start/sit
+      };
+
+      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup-prompt`, {
+        body: JSON.stringify({ options })
+      });
       const result = await response.json();
       setOptimizationResult(result);
       setOptimizingTeamId(teamId);

@@ -1,17 +1,18 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, BarChart3 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import StandingsTable from "@/components/standings-table";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Standings() {
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
 
   // Query user leagues
   const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Get the current league (first one in the list)

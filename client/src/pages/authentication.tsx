@@ -16,16 +16,16 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAuth } from "@/hooks/use-auth";
 
-const credentialsFormSchema = insertEspnCredentialsSchema.extend({
-  userId: z.string().min(1, "User ID is required"),
-});
+const credentialsFormSchema = insertEspnCredentialsSchema.omit({ userId: true });
 
 type CredentialsFormData = z.infer<typeof credentialsFormSchema>;
 
 export default function Authentication() {
   const { toast } = useToast();
-  const [userId] = useState("default-user"); // In a real app, this would come from auth context
+  const { user, logoutMutation } = useAuth();
+  const userId = user?.id;
   const [showCredentialsForm, setShowCredentialsForm] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const { selectedTeam, setSelectedTeam } = useTeam();
@@ -34,7 +34,6 @@ export default function Authentication() {
   const form = useForm<CredentialsFormData>({
     resolver: zodResolver(credentialsFormSchema),
     defaultValues: {
-      userId: userId,
       espnS2: "",
       swid: "",
       testLeagueId: "",
@@ -44,12 +43,14 @@ export default function Authentication() {
 
   // Query existing credentials
   const { data: credentials, isLoading } = useQuery<EspnCredentials>({
-    queryKey: ["/api/espn-credentials", userId],
+    queryKey: ["/api/espn-credentials"],
+    enabled: !!userId,
   });
 
   // Query user leagues
   const { data: leagues } = useQuery<League[]>({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!userId,
   });
 
   // Query teams for selected league (use standings endpoint to get properly formatted team names)
@@ -63,7 +64,6 @@ export default function Authentication() {
   useEffect(() => {
     if (credentials) {
       form.reset({
-        userId: userId,
         espnS2: credentials.espnS2 || "",
         swid: credentials.swid || "",
         testLeagueId: credentials.testLeagueId || "",
@@ -75,7 +75,7 @@ export default function Authentication() {
       // No credentials exist, show form
       setShowCredentialsForm(true);
     }
-  }, [credentials, userId, form]);
+  }, [credentials, form]);
 
   // Auto-select the currently loaded league (first one)
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function Authentication() {
   // Reload league data mutation
   const reloadLeagueMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/espn-credentials/${userId}/reload-league`);
+      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`);
       return response.json();
     },
     onSuccess: (data) => {
@@ -153,7 +153,7 @@ export default function Authentication() {
   // Validate credentials mutation
   const validateCredentialsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/espn-credentials/${userId}/validate`);
+      const response = await apiRequest("POST", `/api/espn-credentials/validate`);
       return response.json();
     },
     onSuccess: (data) => {

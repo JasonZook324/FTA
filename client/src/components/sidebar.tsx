@@ -1,7 +1,54 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+// Safe theme hook with fallback
+const useThemeSafe = () => {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') {
+        return saved;
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    try {
+      localStorage.setItem('theme', newTheme);
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(newTheme);
+      
+      // Update meta theme-color for mobile browsers
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeColor) {
+        const color = newTheme === 'dark' ? '#0f172a' : '#ffffff';
+        metaThemeColor.setAttribute('content', color);
+      }
+    } catch (error) {
+      console.warn('Failed to save theme:', error);
+    }
+  };
+  
+  // Apply theme on mount and changes
+  useEffect(() => {
+    try {
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(theme);
+    } catch (error) {
+      console.warn('Failed to apply theme:', error);
+    }
+  }, [theme]);
+  
+  return { theme, toggleTheme };
+};
 
 const navigation = [
   { name: "Fantasy Manager", href: "/authentication", icon: Key },
@@ -17,6 +64,13 @@ const navigation = [
 export default function Sidebar() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { theme, toggleTheme } = useThemeSafe();
+  const { user, logoutMutation } = useAuth();
+  
+  const handleLogout = () => {
+    logoutMutation.mutate();
+    setIsOpen(false);
+  };
 
   return (
     <>
@@ -71,7 +125,7 @@ export default function Sidebar() {
                     "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
                     isActive 
                       ? "bg-primary text-primary-foreground" 
-                      : "text-foreground hover:bg-secondary"
+                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                   data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
                   onClick={() => setIsOpen(false)}
@@ -85,8 +139,49 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* API Status */}
+      {/* API Status and Actions */}
       <div className="p-4 border-t border-border">
+        {/* User Info */}
+        {user && (
+          <div className="mb-4 p-2 bg-accent rounded-md">
+            <p className="text-xs text-muted-foreground">Logged in as</p>
+            <p className="text-sm font-medium text-foreground truncate">{user.username}</p>
+          </div>
+        )}
+        
+        {/* Theme Toggle */}
+        <div className="mb-2">
+          <button
+            onClick={toggleTheme}
+            className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-foreground hover:bg-accent hover:text-accent-foreground"
+            data-testid="theme-toggle"
+          >
+            {theme === 'light' ? (
+              <Moon className="w-5 h-5" />
+            ) : (
+              <Sun className="w-5 h-5" />
+            )}
+            <span className="text-sm">
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </span>
+          </button>
+        </div>
+        
+        {/* Logout Button */}
+        <div className="mb-4">
+          <button
+            onClick={handleLogout}
+            disabled={logoutMutation.isPending}
+            className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm">
+              {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
+            </span>
+          </button>
+        </div>
+        
         <div className="flex items-center space-x-2 text-sm">
           <div className="w-2 h-2 bg-chart-2 rounded-full"></div>
           <span className="text-muted-foreground">API Connected</span>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAuth } from "@/hooks/use-auth";
 
 interface FantasyRecommendation {
   type: 'waiver_wire' | 'trade' | 'lineup' | 'general';
@@ -28,7 +29,7 @@ interface FantasyAnalysis {
 export default function AIRecommendations() {
   const { toast } = useToast();
   const { selectedTeam, setSelectedTeam } = useTeam();
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [question, setQuestion] = useState("");
   const [copiedAnalysis, setCopiedAnalysis] = useState(false);
@@ -36,7 +37,8 @@ export default function AIRecommendations() {
 
   // Query user leagues
   const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Query teams for selected league (use standings endpoint to get properly formatted team names)

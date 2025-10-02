@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import MatchupCard from "@/components/matchup-card";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Matchups() {
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
   const [selectedWeek, setSelectedWeek] = useState<string>("");
 
   // Query user leagues
   const { data: leagues } = useQuery<any[]>({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Auto-select the first (and only) league
