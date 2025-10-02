@@ -422,15 +422,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "League ID and season required" });
       }
 
-      console.log(`Deleting existing leagues for user: ${userId}`);
-      // Delete existing league and team data for this user
-      const existingLeagues = await storage.getLeagues(userId);
-      console.log(`Found ${existingLeagues.length} existing leagues to delete`);
-      for (const league of existingLeagues) {
-        console.log(`Deleting league: ${league.id} - ${league.name}`);
-        await storage.deleteLeague(league.id);
-      }
-
       console.log(`Fetching fresh league data from ESPN API...`);
       // Reload league data using the FIXED logic - get both league and roster data for complete team info
       const leagueData = await espnApiService.getLeagueData(
@@ -467,8 +458,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         settings: leagueData.settings || {}
       };
 
-      console.log(`Creating new league with ${leagueInfo.teamCount} teams`);
-      const league = await storage.createLeague(leagueInfo);
+      // Upsert logic: check if league exists, update or create
+      const existingLeague = await storage.getLeagueByEspnId(userId, credentials.testLeagueId, credentials.testSeason);
+      
+      let league;
+      if (existingLeague) {
+        console.log(`Updating existing league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
+        league = await storage.updateLeague(existingLeague.id, leagueInfo);
+      } else {
+        console.log(`Creating new league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
+        league = await storage.createLeague(leagueInfo);
+      }
 
       // Store teams using the FIXED logic with roster data for full team names
       if (leagueData.teams) {    
