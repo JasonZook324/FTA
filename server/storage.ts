@@ -10,8 +10,17 @@ import {
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import session from "express-session";
+import type { Store } from "express-session";
+import connectPg from "connect-pg-simple";
+import createMemoryStore from "memorystore";
+import { pool } from "./db";
 
+// Reference: blueprint:javascript_auth_all_persistance
 export interface IStorage {
+  // Session store for authentication
+  sessionStore: Store;
+
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -51,7 +60,11 @@ export interface IStorage {
   deletePlayer(id: string): Promise<boolean>;
 }
 
+const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
+
 export class MemStorage implements IStorage {
+  sessionStore: Store;
   private users: Map<string, User>;
   private espnCredentials: Map<string, EspnCredentials>;
   private leagues: Map<string, League>;
@@ -60,6 +73,9 @@ export class MemStorage implements IStorage {
   private players: Map<string, Player>;
 
   constructor() {
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // 24 hours
+    });
     this.users = new Map();
     this.espnCredentials = new Map();
     this.leagues = new Map();
@@ -81,7 +97,13 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, selectedLeagueId: null };
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      selectedLeagueId: null,
+      selectedTeamId: null,
+      createdAt: new Date()
+    };
     this.users.set(id, user);
     return user;
   }
@@ -109,7 +131,9 @@ export class MemStorage implements IStorage {
       id, 
       isValid: true,
       createdAt: new Date(),
-      lastValidated: null
+      lastValidated: null,
+      testLeagueId: credentials.testLeagueId ?? null,
+      testSeason: credentials.testSeason ?? null
     };
     this.espnCredentials.set(id, cred);
     return cred;
@@ -297,6 +321,15 @@ export class MemStorage implements IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  sessionStore: Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
+    });
+  }
+
   // User methods
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
