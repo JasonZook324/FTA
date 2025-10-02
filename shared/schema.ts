@@ -3,16 +3,19 @@ import { pgTable, text, varchar, integer, boolean, jsonb, timestamp } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Reference: blueprint:javascript_auth_all_persistance
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
+  selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const espnCredentials = pgTable("espn_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   espnS2: text("espn_s2").notNull(),
   swid: text("swid").notNull(),
   testLeagueId: text("test_league_id"),
@@ -25,7 +28,7 @@ export const espnCredentials = pgTable("espn_credentials", {
 export const leagues = pgTable("leagues", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   espnLeagueId: text("espn_league_id").notNull(),
-  userId: varchar("user_id").notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   sport: text("sport").notNull(), // ffl, fba, fhk, flb
   season: integer("season").notNull(),
@@ -79,6 +82,9 @@ export const players = pgTable("players", {
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  createdAt: true,
+  selectedLeagueId: true,
+  selectedTeamId: true,
 });
 
 export const insertEspnCredentialsSchema = createInsertSchema(espnCredentials).omit({
