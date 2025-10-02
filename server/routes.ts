@@ -1205,8 +1205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter to get only available waiver wire players (exclude FA players)
       const waiverWirePlayers = (Array.isArray(playersData) ? playersData : []).filter((playerData: any) => {
         const player = playerData.player || playerData;
-        // Exclude players without proTeamId (FA players) and taken players
-        return player?.id && player?.proTeamId && player.proTeamId > 0 && !takenPlayerIds.has(player.id);
+        // Exclude taken players
+        return player?.id && !takenPlayerIds.has(player.id);
       }).slice(0, 50); // Top 50 available
 
       // Find user's team (for now, use the first team as default)
@@ -1747,7 +1747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((playerData: any) => {
           const player = playerData.player || playerData;
           const playerId = player?.id;
-          return playerId && player?.proTeamId && player.proTeamId > 0 && !takenPlayerIds.has(playerId);
+          return playerId && !takenPlayerIds.has(playerId);
         })
         .sort((a: any, b: any) => {
           const projA = Number(getProjectedPoints(a)) || 0;
@@ -1994,7 +1994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((playerData: any) => {
           const player = playerData.player || playerData;
           const playerId = player?.id;
-          return playerId && player?.proTeamId && player.proTeamId > 0 && !takenPlayerIds.has(playerId);
+          return playerId && !takenPlayerIds.has(playerId);
         })
         .slice(0, 50)
         .map((playerData: any) => {
@@ -2449,10 +2449,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sample taken player IDs:', Array.from(takenPlayerIds).slice(0, 5));
       console.log('Sample player IDs from players list:', playersData.players?.slice(0, 5).map((p: any) => p.id));
 
-      // Filter out taken players and FA players to get waiver wire
+      // Filter out taken players to get waiver wire
       const playersList = playersData.players || playersData || [];
       const waiverWirePlayers = Array.isArray(playersList) ? playersList.filter((player: any) => 
-        !takenPlayerIds.has(player.id) && player?.proTeamId && player.proTeamId > 0
+        !takenPlayerIds.has(player.id)
       ) : [];
 
       console.log(`Waiver wire: ${waiverWirePlayers.length} available players out of ${takenPlayerIds.size} taken`);
