@@ -1,7 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 // Safe theme hook with fallback
 const useThemeSafe = () => {
@@ -64,6 +65,12 @@ export default function Sidebar() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const { theme, toggleTheme } = useThemeSafe();
+  const { user, logoutMutation } = useAuth();
+  
+  const handleLogout = () => {
+    logoutMutation.mutate();
+    setIsOpen(false);
+  };
 
   return (
     <>
@@ -132,10 +139,18 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* API Status */}
+      {/* API Status and Actions */}
       <div className="p-4 border-t border-border">
+        {/* User Info */}
+        {user && (
+          <div className="mb-4 p-2 bg-accent rounded-md">
+            <p className="text-xs text-muted-foreground">Logged in as</p>
+            <p className="text-sm font-medium text-foreground truncate">{user.username}</p>
+          </div>
+        )}
+        
         {/* Theme Toggle */}
-        <div className="mb-4">
+        <div className="mb-2">
           <button
             onClick={toggleTheme}
             className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-foreground hover:bg-accent hover:text-accent-foreground"
@@ -148,6 +163,21 @@ export default function Sidebar() {
             )}
             <span className="text-sm">
               {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </span>
+          </button>
+        </div>
+        
+        {/* Logout Button */}
+        <div className="mb-4">
+          <button
+            onClick={handleLogout}
+            disabled={logoutMutation.isPending}
+            className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm">
+              {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
             </span>
           </button>
         </div>
