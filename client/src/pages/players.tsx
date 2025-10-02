@@ -54,7 +54,7 @@ export default function Players() {
     enabled: !!selectedLeagueId && viewMode === "waiver",
   });
 
-  const currentData = viewMode === "waiver" ? waiverWireData : playersData;
+  const currentData = viewMode === "waiver" ? waiverWireData?.players : playersData;
   const currentLoading = viewMode === "waiver" ? waiverWireLoading : playersLoading;
 
   // Helper function to get player name from various possible fields
