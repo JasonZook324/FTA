@@ -1011,8 +1011,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nickname = nameParts[1] || '';
           }
         } else {
-          // For abbreviations like "JAZ1" or single names, use full name as location
-          location = storedTeam.abbreviation || teamName;
+          // For single names like "BaZOOKas", "Ridgeline", use full name as location
+          location = teamName;
           nickname = '';
         }
         
@@ -1043,6 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return {
           id: storedTeam.espnTeamId,
+          name: teamName, // Add the name field for frontend fallback
           location,
           nickname,
           owners: [{

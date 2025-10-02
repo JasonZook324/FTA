@@ -88,9 +88,18 @@ export default function Authentication() {
   useEffect(() => {
     if (teamsData?.teams && teamsData.teams.length > 0 && selectedLeagueId && !selectedTeam) {
       const firstTeam = teamsData.teams[0];
-      const teamName = firstTeam.location && firstTeam.nickname 
-        ? `${firstTeam.location} ${firstTeam.nickname}` 
-        : `Team ${firstTeam.id}`;
+      // Use the same logic as in the display to get the team name
+      let teamName;
+      if (firstTeam.location && firstTeam.nickname) {
+        teamName = `${firstTeam.location} ${firstTeam.nickname}`;
+      } else if (firstTeam.name) {
+        teamName = firstTeam.name;
+      } else if (firstTeam.owners && firstTeam.owners[0]?.displayName) {
+        teamName = `${firstTeam.owners[0].displayName}'s Team`;
+      } else {
+        teamName = `Team ${firstTeam.id}`;
+      }
+      
       setSelectedTeam({
         teamId: firstTeam.id,
         teamName,
@@ -260,9 +269,18 @@ export default function Authentication() {
                         const teamId = parseInt(value);
                         const team = teamsData?.teams?.find((t: any) => t.id === teamId);
                         if (team && selectedLeagueId) {
-                          const teamName = team.location && team.nickname 
-                            ? `${team.location} ${team.nickname}` 
-                            : `Team ${team.id}`;
+                          // Use the same logic as in the display to get the team name
+                          let teamName;
+                          if (team.location && team.nickname) {
+                            teamName = `${team.location} ${team.nickname}`;
+                          } else if (team.name) {
+                            teamName = team.name;
+                          } else if (team.owners && team.owners[0]?.displayName) {
+                            teamName = `${team.owners[0].displayName}'s Team`;
+                          } else {
+                            teamName = `Team ${team.id}`;
+                          }
+                          
                           setSelectedTeam({
                             teamId,
                             teamName,
@@ -291,9 +309,28 @@ export default function Authentication() {
                       </SelectTrigger>
                       <SelectContent>
                         {teamsData?.teams?.map((team: any) => {
-                          const teamName = team.location && team.nickname 
-                            ? `${team.location} ${team.nickname}` 
-                            : `Team ${team.id}`;
+                          // Debug: Log the team data to see what we're working with
+                          if ([9, 12, 14].includes(team.id)) {
+                            console.log(`Team ${team.id} data:`, {
+                              id: team.id,
+                              name: team.name,
+                              location: team.location,
+                              nickname: team.nickname,
+                              fullTeam: team
+                            });
+                          }
+                          
+                          // Try multiple sources for team name with fallbacks
+                          let teamName;
+                          if (team.location && team.nickname) {
+                            teamName = `${team.location} ${team.nickname}`;
+                          } else if (team.name) {
+                            teamName = team.name;
+                          } else if (team.owners && team.owners[0]?.displayName) {
+                            teamName = `${team.owners[0].displayName}'s Team`;
+                          } else {
+                            teamName = `Team ${team.id}`;
+                          }
                           return (
                             <SelectItem key={team.id} value={team.id.toString()}>
                               {teamName}
