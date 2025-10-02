@@ -547,9 +547,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          console.log(`Creating team ${team.id}: "${teamName}" owned by "${ownerName}"`);
+          // Upsert logic: check if team exists, update or create
+          const existingTeam = await storage.getTeamByEspnId(league.id, team.id);
           
-          await storage.createTeam({
+          const teamData = {
             espnTeamId: team.id,
             leagueId: league.id,
             name: teamName,
@@ -564,7 +565,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             streak: team.record?.overall?.streakType && team.record?.overall?.streakLength ? 
               `${team.record.overall.streakType}${team.record.overall.streakLength}` : null,
             rank: team.playoffSeed || team.draftDayProjectedRank || null
-          });
+          };
+
+          if (existingTeam) {
+            console.log(`Updating existing team ${team.id}: "${teamName}" owned by "${ownerName}"`);
+            await storage.updateTeam(existingTeam.id, teamData);
+          } else {
+            console.log(`Creating new team ${team.id}: "${teamName}" owned by "${ownerName}"`);
+            await storage.createTeam(teamData);
+          }
         }
       }
 
@@ -899,9 +908,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          console.log(`Creating team: ID=${team.id}, Name="${teamName}", Owner="${ownerName}"`);
-
-          await storage.createTeam({
+          // Upsert logic: check if team exists, update or create
+          const existingTeam = await storage.getTeamByEspnId(league.id, team.id);
+          
+          const teamData = {
             espnTeamId: team.id,
             leagueId: league.id,
             name: teamName,
@@ -916,7 +926,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             streak: team.record?.overall?.streakType && team.record?.overall?.streakLength ? 
               `${team.record.overall.streakType}${team.record.overall.streakLength}` : null,
             rank: team.playoffSeed || team.draftDayProjectedRank || null
-          });
+          };
+
+          if (existingTeam) {
+            console.log(`Updating existing team: ID=${team.id}, Name="${teamName}"`);
+            await storage.updateTeam(existingTeam.id, teamData);
+          } else {
+            console.log(`Creating new team: ID=${team.id}, Name="${teamName}"`);
+            await storage.createTeam(teamData);
+          }
         }
       }
 

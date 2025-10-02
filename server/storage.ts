@@ -42,6 +42,7 @@ export interface IStorage {
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
+  getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined>;
   createTeam(team: InsertTeam): Promise<Team>;
   updateTeam(id: string, team: Partial<Team>): Promise<Team | undefined>;
   deleteTeam(id: string): Promise<boolean>;
@@ -205,6 +206,12 @@ export class MemStorage implements IStorage {
   async getTeams(leagueId: string): Promise<Team[]> {
     return Array.from(this.teams.values()).filter(
       (team) => team.leagueId === leagueId,
+    );
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    return Array.from(this.teams.values()).find(
+      (team) => team.leagueId === leagueId && team.espnTeamId === espnTeamId,
     );
   }
 
@@ -451,6 +458,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(teams)
       .where(eq(teams.leagueId, leagueId));
+  }
+
+  async getTeamByEspnId(leagueId: string, espnTeamId: number): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.leagueId, leagueId), eq(teams.espnTeamId, espnTeamId)))
+      .limit(1);
+    return team || undefined;
   }
 
   async createTeam(team: InsertTeam): Promise<Team> {
