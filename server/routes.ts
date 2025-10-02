@@ -465,6 +465,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingLeague) {
         console.log(`Updating existing league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
         league = await storage.updateLeague(existingLeague.id, leagueInfo);
+        if (!league) {
+          throw new Error("Failed to update existing league");
+        }
       } else {
         console.log(`Creating new league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
         league = await storage.createLeague(leagueInfo);
@@ -870,6 +873,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingLeague) {
         console.log(`Updating existing league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
         league = await storage.updateLeague(existingLeague.id, leagueInfo);
+        if (!league) {
+          throw new Error("Failed to update existing league");
+        }
       } else {
         console.log(`Creating new league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
         league = await storage.createLeague(leagueInfo);
@@ -2129,7 +2135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }) || [];
 
       // Find the complete user team data with roster
-      const userTeamWithRoster = allTeams.find(team => team.id === userTeam.id) || {
+      const userTeamWithRoster = allTeams.find((team: any) => team.id === userTeam.id) || {
         id: userTeam.id,
         name: userTeam.location && userTeam.nickname ? `${userTeam.location} ${userTeam.nickname}` : 'Your Team',
         roster: [],
@@ -2240,7 +2246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }) || [];
 
       // Find the complete user team data with roster
-      const userTeamWithRoster = allTeams.find(team => team.id === userTeam.id) || {
+      const userTeamWithRoster = allTeams.find((team: any) => team.id === userTeam.id) || {
         id: userTeam.id,
         name: userTeam.location && userTeam.nickname ? `${userTeam.location} ${userTeam.nickname}` : 'Your Team',
         roster: [],
