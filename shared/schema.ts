@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -39,7 +39,9 @@ export const leagues = pgTable("leagues", {
   tradeDeadline: text("trade_deadline"),
   settings: jsonb("settings"),
   lastUpdated: timestamp("last_updated").defaultNow(),
-});
+}, (table) => ({
+  uniqueLeaguePerUser: uniqueIndex("leagues_user_espn_season").on(table.userId, table.espnLeagueId, table.season),
+}));
 
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -56,7 +58,9 @@ export const teams = pgTable("teams", {
   pointsAgainst: text("points_against"),
   streak: text("streak"),
   rank: integer("rank"),
-});
+}, (table) => ({
+  uniqueTeamPerLeague: uniqueIndex("teams_league_team").on(table.leagueId, table.espnTeamId),
+}));
 
 export const matchups = pgTable("matchups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
