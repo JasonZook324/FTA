@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -7,26 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw, Users } from "lucide-react";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LeagueHeader() {
   const { toast } = useToast();
   const { selectedTeam } = useTeam();
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
 
   // Query current leagues
   const { data: leagues, isLoading: leaguesLoading } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Query authentication status
   const { data: credentials } = useQuery({
-    queryKey: ["/api/espn-credentials", userId],
+    queryKey: ["/api/espn-credentials"],
+    enabled: !!user,
   });
 
   // Reload league data mutation
   const reloadLeagueMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/espn-credentials/${userId}/reload-league`);
+      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`);
       return response.json();
     },
     onSuccess: (data) => {
@@ -49,7 +51,7 @@ export default function LeagueHeader() {
   // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", `/api/espn-credentials/${userId}`);
+      const response = await apiRequest("DELETE", `/api/espn-credentials`);
       return response.json();
     },
     onSuccess: () => {
