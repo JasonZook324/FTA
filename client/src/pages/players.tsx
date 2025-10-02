@@ -438,7 +438,7 @@ export default function Players() {
     return positions[positionId] || `POS_${positionId}`;
   };
 
-  const filteredPlayers = currentData?.players?.filter((playerData: any) => {
+  const filteredPlayers = (Array.isArray(currentData) ? currentData : currentData?.players || []).filter((playerData: any) => {
     // Position filter
     if (selectedPosition !== "all") {
       const playerPosition = getPositionName(getPlayerPositionId(playerData));
