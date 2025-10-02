@@ -36,6 +36,7 @@ export interface IStorage {
   // League methods
   getLeagues(userId: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
+  getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
   updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
   deleteLeague(id: string): Promise<boolean>;
@@ -166,6 +167,12 @@ export class MemStorage implements IStorage {
 
   async getLeague(id: string): Promise<League | undefined> {
     return this.leagues.get(id);
+  }
+
+  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
+    return Array.from(this.leagues.values()).find(
+      (league) => league.userId === userId && league.espnLeagueId === espnLeagueId && league.season === season,
+    );
   }
 
   async createLeague(league: InsertLeague): Promise<League> {
@@ -419,6 +426,20 @@ export class DatabaseStorage implements IStorage {
 
   async getLeague(id: string): Promise<League | undefined> {
     const [league] = await db.select().from(leagues).where(eq(leagues.id, id));
+    return league || undefined;
+  }
+
+  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
+    const [league] = await db
+      .select()
+      .from(leagues)
+      .where(
+        and(
+          eq(leagues.userId, userId),
+          eq(leagues.espnLeagueId, espnLeagueId),
+          eq(leagues.season, season)
+        )
+      );
     return league || undefined;
   }
 
