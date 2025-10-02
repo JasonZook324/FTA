@@ -9,9 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Players() {
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
   const [selectedSport, setSelectedSport] = useState<string>("ffl");
   const [selectedSeason, setSelectedSeason] = useState<string>("2025");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -21,7 +22,8 @@ export default function Players() {
 
   // Query user leagues
   const { data: leagues } = useQuery<any[]>({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Auto-select the first league when leagues load
@@ -33,17 +35,17 @@ export default function Players() {
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
-    queryKey: ["/api/players", selectedSport, selectedSeason, userId, selectedLeagueId],
+    queryKey: ["/api/players", selectedSport, selectedSeason, selectedLeagueId],
     queryFn: async () => {
       const leagueParam = selectedLeagueId ? `&leagueId=${selectedLeagueId}` : '';
-      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?userId=${userId}${leagueParam}`);
+      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?${leagueParam}`);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch players: ${response.status} ${errorText}`);
       }
       return response.json();
     },
-    enabled: !!selectedSport && !!selectedSeason && viewMode === "all",
+    enabled: !!user && !!selectedSport && !!selectedSeason && viewMode === "all",
   });
 
   // Query waiver wire data

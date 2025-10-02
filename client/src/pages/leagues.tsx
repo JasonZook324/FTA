@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -9,19 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Download, RefreshCw, Trophy } from "lucide-react";
 import LeagueSelector from "@/components/league-selector";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Leagues() {
   const { toast } = useToast();
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
 
   // Query user leagues
   const { data: leagues, isLoading: leaguesLoading } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Query ESPN credentials status  
   const { data: credentials } = useQuery<{ isValid?: boolean }>({
-    queryKey: ["/api/espn-credentials", userId],
+    queryKey: ["/api/espn-credentials"],
+    enabled: !!user,
   });
 
   return (
@@ -64,7 +66,7 @@ export default function Leagues() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* League Selector */}
-          <LeagueSelector userId={userId} disabled={!credentials?.isValid} />
+          <LeagueSelector disabled={!credentials?.isValid} />
 
           {/* League Information */}
           <div className="xl:col-span-2">

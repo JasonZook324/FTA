@@ -1038,7 +1038,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(transformedData);
     } catch (error: any) {
       console.error('Standings API error:', error);
-      res.status(500).json({ message: error.message });
+      
+      // Handle ESPN API timeouts and connection errors
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message?.includes('terminated')) {
+        return res.status(503).json({ 
+          message: "ESPN API is currently unavailable. Please try again later." 
+        });
+      }
+      
+      // Handle ESPN API errors
+      if (error.message?.includes('ESPN') || error.message?.includes('API')) {
+        return res.status(503).json({ 
+          message: "Unable to fetch data from ESPN. Please try again later." 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to load standings data" });
     }
   });
 

@@ -48,8 +48,7 @@ const getPositionName = (positionId: number): string => {
 export default function TradeAnalyzer() {
   const { toast } = useToast();
   const { selectedTeam } = useTeam();
-  const [userId] = useState("default-user");
-  const { selectedLeagueId, setSelectedLeagueId, leagues, hasAutoSelected } = useSelectedLeague(userId);
+  const { selectedLeagueId, setSelectedLeagueId, leagues, hasAutoSelected } = useSelectedLeague();
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const [copied, setCopied] = useState(false);
 

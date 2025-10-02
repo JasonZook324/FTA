@@ -21,11 +21,12 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function PromptBuilder() {
   const { toast } = useToast();
   const { selectedTeam, setSelectedTeam } = useTeam();
-  const [userId] = useState("default-user");
+  const { user } = useAuth();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [copied, setCopied] = useState(false);
@@ -51,7 +52,8 @@ export default function PromptBuilder() {
 
   // Query user leagues
   const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues", userId],
+    queryKey: ["/api/leagues"],
+    enabled: !!user,
   });
 
   // Query teams for selected league
