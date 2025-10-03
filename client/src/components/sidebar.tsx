@@ -94,7 +94,7 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0",
+        "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )} data-testid="sidebar">
       {/* Logo and Header */}
@@ -111,7 +111,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation Menu */}
-      <nav className="flex-1 p-4" data-testid="navigation">
+      <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
           {navigation.map((item) => {
             const Icon = item.icon;
