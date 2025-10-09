@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -59,6 +59,8 @@ const navigation = [
   { name: "AI Recommendations", href: "/ai-recommendations", icon: Brain },
   { name: "Trade Analyzer", href: "/trade-analyzer", icon: TrendingUp },
   { name: "Prompt Builder", href: "/prompt-builder", icon: FileText },
+  { name: "Jobs", href: "/jobs", icon: Volleyball },
+  { name: "Streaming", href: "/streaming", icon: PlayCircle },
 ];
 
 export default function Sidebar() {
