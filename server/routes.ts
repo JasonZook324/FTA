@@ -3802,5 +3802,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+    // Jobs endpoints for refreshing data
+    app.post("/api/jobs/refresh-leagues", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshLeagues();
+        res.json({ message: "Leagues refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh leagues." });
+      }
+    });
+
+    app.post("/api/jobs/refresh-teams", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshTeams();
+        res.json({ message: "Teams refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh teams." });
+      }
+    });
+
+    app.post("/api/jobs/refresh-players", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshPlayers();
+        res.json({ message: "Players refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh players." });
+      }
+    });
   return httpServer;
 }
