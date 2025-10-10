@@ -35,8 +35,8 @@ export default function ApiPlayground() {
     defaultValues: {
       apiKey: "",
       method: "GET",
-      endpoint: "https://api.fantasypros.com/v2/json/nfl/",
-      queryParams: "",
+      endpoint: "https://api.fantasypros.com/public/v2/nfl/news",
+      queryParams: "limit=10",
       body: "",
     },
   });
@@ -323,28 +323,32 @@ export default function ApiPlayground() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Player Data</h4>
+              <h4 className="font-semibold text-sm">NFL News</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                /v2/json/nfl/projections.php?week=current&year=2025
+                https://api.fantasypros.com/public/v2/nfl/news
               </code>
+              <p className="text-xs text-muted-foreground">Query: limit=10</p>
             </div>
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Rankings</h4>
+              <h4 className="font-semibold text-sm">NFL Players</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                /v2/json/nfl/consensus-rankings.php?type=draft&position=all
+                https://api.fantasypros.com/public/v2/nfl/players
               </code>
+              <p className="text-xs text-muted-foreground">Query: (optional) player=PLAYER_ID</p>
             </div>
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Weekly Rankings</h4>
+              <h4 className="font-semibold text-sm">NFL Rankings</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                /v2/json/nfl/weekly-rankings.php?week=6&year=2025
+                https://api.fantasypros.com/public/v2/nfl/2025/consensus-rankings
               </code>
+              <p className="text-xs text-muted-foreground">Query: position=QB&scoring=PPR</p>
             </div>
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Player News</h4>
+              <h4 className="font-semibold text-sm">NFL Projections</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                /v2/json/nfl/news.php?playerId=PLAYER_ID
+                https://api.fantasypros.com/public/v2/nfl/2025/projections
               </code>
+              <p className="text-xs text-muted-foreground">Query: week=6&position=RB</p>
             </div>
           </div>
         </CardContent>
