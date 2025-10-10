@@ -1,0 +1,375 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Send, Copy, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+const apiRequestSchema = z.object({
+  apiKey: z.string().min(1, "API key is required"),
+  method: z.enum(["GET", "POST"]),
+  endpoint: z.string().min(1, "Endpoint is required"),
+  queryParams: z.string().optional(),
+  body: z.string().optional(),
+});
+
+type ApiRequestForm = z.infer<typeof apiRequestSchema>;
+
+export default function ApiPlayground() {
+  const [response, setResponse] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<ApiRequestForm>({
+    resolver: zodResolver(apiRequestSchema),
+    defaultValues: {
+      apiKey: "",
+      method: "GET",
+      endpoint: "https://api.fantasypros.com/v2/json/nfl/",
+      queryParams: "",
+      body: "",
+    },
+  });
+
+  const onSubmit = async (data: ApiRequestForm) => {
+    setIsLoading(true);
+    setResponse(null);
+
+    try {
+      // Build URL with query params
+      let url = data.endpoint;
+      if (data.queryParams) {
+        const params = new URLSearchParams();
+        // Parse query params (format: key1=value1&key2=value2)
+        data.queryParams.split('&').forEach(param => {
+          const [key, value] = param.split('=');
+          if (key && value) {
+            params.append(key.trim(), value.trim());
+          }
+        });
+        // Add API key to params
+        params.append('api-key', data.apiKey);
+        url += (url.includes('?') ? '&' : '?') + params.toString();
+      } else {
+        // Just add API key
+        url += (url.includes('?') ? '&' : '?') + `api-key=${data.apiKey}`;
+      }
+
+      const options: RequestInit = {
+        method: data.method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      };
+
+      if (data.method === 'POST' && data.body) {
+        options.body = data.body;
+      }
+
+      const res = await fetch(url, options);
+      const responseData = await res.json();
+
+      setResponse({
+        status: res.status,
+        statusText: res.statusText,
+        headers: Object.fromEntries(res.headers.entries()),
+        data: responseData,
+      });
+
+      if (!res.ok) {
+        toast({
+          title: "Request failed",
+          description: `Status: ${res.status} ${res.statusText}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Request successful",
+          description: "Response received",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error making request",
+        description: error.message,
+        variant: "destructive",
+      });
+      setResponse({
+        error: error.message,
+        stack: error.stack,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({
+      title: "Copied to clipboard",
+      description: "Response has been copied",
+    });
+  };
+
+  return (
+    <div className="container mx-auto p-4 lg:p-6 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-foreground mb-2">API Playground</h1>
+        <p className="text-muted-foreground">Test Fantasy Pros API endpoints and inspect responses</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Request Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Configuration</CardTitle>
+            <CardDescription>Configure your API request parameters</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="apiKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Key</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="Enter your Fantasy Pros API key" 
+                          {...field}
+                          data-testid="input-api-key"
+                        />
+                      </FormControl>
+                      <FormDescription>Your Fantasy Pros API key</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="method"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>HTTP Method</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-method">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endpoint"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endpoint URL</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="https://api.fantasypros.com/v2/json/nfl/..." 
+                          {...field}
+                          data-testid="input-endpoint"
+                        />
+                      </FormControl>
+                      <FormDescription>Full API endpoint URL</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="queryParams"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Query Parameters (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="param1=value1&param2=value2" 
+                          {...field}
+                          data-testid="input-query-params"
+                        />
+                      </FormControl>
+                      <FormDescription>Additional query parameters (API key will be added automatically)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("method") === "POST" && (
+                  <FormField
+                    control={form.control}
+                    name="body"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Request Body (JSON)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder='{"key": "value"}' 
+                            className="font-mono text-sm"
+                            rows={5}
+                            {...field}
+                            data-testid="input-body"
+                          />
+                        </FormControl>
+                        <FormDescription>JSON request body</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <Button 
+                  type="submit" 
+                  disabled={isLoading} 
+                  className="w-full"
+                  data-testid="button-send-request"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Request
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        {/* Response Display */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Response</CardTitle>
+              <CardDescription>API response details</CardDescription>
+            </div>
+            {response && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(JSON.stringify(response, null, 2))}
+                data-testid="button-copy-response"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {!response ? (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                <p>Send a request to see the response</p>
+              </div>
+            ) : (
+              <Tabs defaultValue="formatted" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                  <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                </TabsList>
+                <TabsContent value="formatted" className="mt-4">
+                  {response.status && (
+                    <div className="mb-4">
+                      <Badge 
+                        variant={response.status >= 200 && response.status < 300 ? "default" : "destructive"}
+                        data-testid="badge-status"
+                      >
+                        {response.status} {response.statusText}
+                      </Badge>
+                    </div>
+                  )}
+                  <ScrollArea className="h-[500px] w-full rounded-md border p-4">
+                    <pre className="text-sm" data-testid="text-formatted-response">
+                      {JSON.stringify(response.data || response, null, 2)}
+                    </pre>
+                  </ScrollArea>
+                </TabsContent>
+                <TabsContent value="raw" className="mt-4">
+                  <ScrollArea className="h-[500px] w-full rounded-md border p-4">
+                    <pre className="text-sm font-mono" data-testid="text-raw-response">
+                      {JSON.stringify(response, null, 2)}
+                    </pre>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Example Endpoints */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Example Endpoints</CardTitle>
+          <CardDescription>Common Fantasy Pros API endpoints to get you started</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Player Data</h4>
+              <code className="block text-xs bg-muted p-2 rounded">
+                /v2/json/nfl/projections.php?week=current&year=2025
+              </code>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Rankings</h4>
+              <code className="block text-xs bg-muted p-2 rounded">
+                /v2/json/nfl/consensus-rankings.php?type=draft&position=all
+              </code>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Weekly Rankings</h4>
+              <code className="block text-xs bg-muted p-2 rounded">
+                /v2/json/nfl/weekly-rankings.php?week=6&year=2025
+              </code>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Player News</h4>
+              <code className="block text-xs bg-muted p-2 rounded">
+                /v2/json/nfl/news.php?playerId=PLAYER_ID
+              </code>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

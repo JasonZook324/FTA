@@ -15,6 +15,7 @@ import TradeAnalyzer from "@/pages/trade-analyzer";
 import PromptBuilder from "@/pages/prompt-builder";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
+import ApiPlayground from "@/pages/api-playground";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -161,6 +162,17 @@ function App() {
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
                       <PromptBuilder />
+                    </main>
+                  </div>
+                </div>
+              )} />
+              
+              <ProtectedRoute path="/api-playground" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <main className="flex-1 overflow-y-auto">
+                      <ApiPlayground />
                     </main>
                   </div>
                 </div>
