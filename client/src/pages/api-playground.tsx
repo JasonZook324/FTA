@@ -46,50 +46,29 @@ export default function ApiPlayground() {
     setResponse(null);
 
     try {
-      // Build URL with query params
-      let url = data.endpoint;
-      if (data.queryParams) {
-        const params = new URLSearchParams();
-        // Parse query params (format: key1=value1&key2=value2)
-        data.queryParams.split('&').forEach(param => {
-          const [key, value] = param.split('=');
-          if (key && value) {
-            params.append(key.trim(), value.trim());
-          }
-        });
-        // Add API key to params
-        params.append('api-key', data.apiKey);
-        url += (url.includes('?') ? '&' : '?') + params.toString();
-      } else {
-        // Just add API key
-        url += (url.includes('?') ? '&' : '?') + `api-key=${data.apiKey}`;
-      }
-
-      const options: RequestInit = {
-        method: data.method,
+      // Use backend proxy to avoid CORS issues
+      const res = await fetch('/api/fantasy-pros-proxy', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-      };
+        body: JSON.stringify({
+          apiKey: data.apiKey,
+          method: data.method,
+          endpoint: data.endpoint,
+          queryParams: data.queryParams,
+          body: data.method === 'POST' ? data.body : undefined,
+        }),
+      });
 
-      if (data.method === 'POST' && data.body) {
-        options.body = data.body;
-      }
-
-      const res = await fetch(url, options);
       const responseData = await res.json();
 
-      setResponse({
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        data: responseData,
-      });
+      setResponse(responseData);
 
       if (!res.ok) {
         toast({
           title: "Request failed",
-          description: `Status: ${res.status} ${res.statusText}`,
+          description: responseData.message || `Status: ${res.status} ${res.statusText}`,
           variant: "destructive",
         });
       } else {

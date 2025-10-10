@@ -3832,5 +3832,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: "Failed to refresh players." });
       }
     });
+
+  // Fantasy Pros API proxy endpoint to avoid CORS issues
+  app.post("/api/fantasy-pros-proxy", requireAuth, async (req, res) => {
+    try {
+      const { apiKey, method, endpoint, queryParams, body } = req.body;
+
+      if (!apiKey || !endpoint) {
+        return res.status(400).json({ message: "API key and endpoint are required" });
+      }
+
+      // SECURITY: Validate endpoint is a Fantasy Pros URL to prevent SSRF
+      const allowedHosts = [
+        'api.fantasypros.com',
+        'fantasypros.com'
+      ];
+      
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(endpoint);
+      } catch {
+        return res.status(400).json({ message: "Invalid endpoint URL" });
+      }
+
+      if (!allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith('.' + host))) {
+        return res.status(403).json({ message: "Only Fantasy Pros API endpoints are allowed" });
+      }
+
+      // Validate HTTP method
+      const allowedMethods = ['GET', 'POST'];
+      const requestMethod = method || 'GET';
+      if (!allowedMethods.includes(requestMethod)) {
+        return res.status(400).json({ message: "Only GET and POST methods are allowed" });
+      }
+
+      // Build URL with query params
+      let url = endpoint;
+      const params = new URLSearchParams();
+
+      // Parse query params if provided
+      if (queryParams) {
+        queryParams.split('&').forEach((param: string) => {
+          const [key, value] = param.split('=');
+          if (key && value) {
+            params.append(key.trim(), value.trim());
+          }
+        });
+      }
+
+      // Add API key to params
+      params.append('api-key', apiKey);
+      url += (url.includes('?') ? '&' : '?') + params.toString();
+
+      const options: RequestInit = {
+        method: requestMethod,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      };
+
+      // Forward POST body as-is (don't double-encode)
+      if (requestMethod === 'POST' && body) {
+        options.body = typeof body === 'string' ? body : JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+      
+      // Try to parse as JSON, fallback to text
+      let responseData;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        responseData = await response.text();
+      }
+
+      res.status(response.status).json({
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data: responseData,
+      });
+    } catch (error: any) {
+      console.error('Fantasy Pros proxy error:', error);
+      res.status(500).json({ 
+        error: error.message,
+        message: 'Failed to fetch from Fantasy Pros API'
+      });
+    }
+  });
+
   return httpServer;
 }
