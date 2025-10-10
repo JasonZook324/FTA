@@ -3909,6 +3909,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
 
+      console.log('Fantasy Pros - Requesting URL:', url);
+      console.log('Fantasy Pros - Method:', requestMethod);
+      console.log('Fantasy Pros - Headers:', options.headers);
+
       const response = await fetch(url, options);
       
       // Try to parse as JSON, fallback to text
@@ -3920,6 +3924,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         responseData = await response.text();
       }
+
+      console.log('Fantasy Pros - Response status:', response.status);
+      console.log('Fantasy Pros - Response data:', responseData);
 
       res.status(response.status).json({
         status: response.status,
