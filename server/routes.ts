@@ -3838,7 +3838,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { apiKey, method, endpoint, queryParams, body } = req.body;
 
-      if (!apiKey || !endpoint) {
+      // Use provided API key or fallback to environment variable
+      const effectiveApiKey = apiKey || process.env.FantasyProsApiKey;
+      
+      console.log('Fantasy Pros Proxy - API Key provided:', !!apiKey);
+      console.log('Fantasy Pros Proxy - Using env API key:', !apiKey && !!process.env.FantasyProsApiKey);
+      console.log('Fantasy Pros Proxy - Effective API key exists:', !!effectiveApiKey);
+
+      if (!effectiveApiKey || !endpoint) {
         return res.status(400).json({ message: "API key and endpoint are required" });
       }
 
@@ -3881,7 +3888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Add API key to params
-      params.append('api-key', apiKey);
+      params.append('api-key', effectiveApiKey);
       url += (url.includes('?') ? '&' : '?') + params.toString();
 
       const options: RequestInit = {

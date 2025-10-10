@@ -15,7 +15,7 @@ import { Loader2, Send, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const apiRequestSchema = z.object({
-  apiKey: z.string().min(1, "API key is required"),
+  apiKey: z.string().optional(),
   method: z.enum(["GET", "POST"]),
   endpoint: z.string().min(1, "Endpoint is required"),
   queryParams: z.string().optional(),
@@ -124,16 +124,16 @@ export default function ApiPlayground() {
                   name="apiKey"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>API Key</FormLabel>
+                      <FormLabel>API Key (Optional)</FormLabel>
                       <FormControl>
                         <Input 
                           type="password" 
-                          placeholder="Enter your Fantasy Pros API key" 
+                          placeholder="Leave empty to use environment API key" 
                           {...field}
                           data-testid="input-api-key"
                         />
                       </FormControl>
-                      <FormDescription>Your Fantasy Pros API key</FormDescription>
+                      <FormDescription>Leave empty to use the API key from environment variables</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
