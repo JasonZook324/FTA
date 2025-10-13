@@ -3887,10 +3887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Add API key as query parameter (Fantasy Pros API expects this)
-      params.append('api-key', effectiveApiKey);
-
-      // Add query params to URL
+      // Add query params to URL (do NOT add api-key to query params, only use header)
       if (params.toString()) {
         url += (url.includes('?') ? '&' : '?') + params.toString();
       }
@@ -3900,7 +3897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'x-api-key': effectiveApiKey, // Also send as header for redundancy
+          'x-api-key': effectiveApiKey, // Send API key only as header
         },
       };
 
