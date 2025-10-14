@@ -3895,11 +3895,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const options: RequestInit = {
         method: requestMethod,
         headers: {
-          'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'x-api-key': effectiveApiKey,
-          'api-key': effectiveApiKey,
-          'Authorization': `Bearer ${effectiveApiKey}`,
         },
       };
 
