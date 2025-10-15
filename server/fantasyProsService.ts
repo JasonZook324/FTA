@@ -145,8 +145,15 @@ export async function refreshRankings(
 
     await db.delete(fantasyProsRankings).where(and(...deleteConditions));
 
-    // Fetch rankings for each position
-    for (const pos of positions) {
+    // Fetch rankings for each position (with delay to avoid rate limiting)
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      
+      // Add 500ms delay between requests to avoid rate limiting (except first request)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       let endpoint = `${BASE_URL}/${sport.toUpperCase()}/${season}/consensus-rankings?type=${rankType}&scoring=${scoringType}&position=${pos}`;
       if (week) endpoint += `&week=${week}`;
 
