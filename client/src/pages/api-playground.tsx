@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Send, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { JsonViewerWithSearch } from "@/components/json-viewer";
 
 const apiRequestSchema = z.object({
   apiKey: z.string().optional(),
@@ -281,7 +282,7 @@ export default function ApiPlayground() {
             ) : (
               <Tabs defaultValue="formatted" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                  <TabsTrigger value="formatted">Interactive</TabsTrigger>
                   <TabsTrigger value="raw">Raw JSON</TabsTrigger>
                 </TabsList>
                 <TabsContent value="formatted" className="mt-4">
@@ -295,11 +296,7 @@ export default function ApiPlayground() {
                       </Badge>
                     </div>
                   )}
-                  <ScrollArea className="h-[500px] w-full rounded-md border p-4">
-                    <pre className="text-sm" data-testid="text-formatted-response">
-                      {JSON.stringify(response.data || response, null, 2)}
-                    </pre>
-                  </ScrollArea>
+                  <JsonViewerWithSearch data={response.data || response} />
                 </TabsContent>
                 <TabsContent value="raw" className="mt-4">
                   <ScrollArea className="h-[500px] w-full rounded-md border p-4">
