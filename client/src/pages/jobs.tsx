@@ -13,7 +13,7 @@ export default function Jobs() {
   
   // Fantasy Pros parameters
   const [fpSport, setFpSport] = useState("NFL");
-  const [fpSeason, setFpSeason] = useState("2024");
+  const [fpSeason, setFpSeason] = useState("2025");
   const [fpWeek, setFpWeek] = useState("");
 
   async function runJob(endpoint: string, label: string, body?: any) {
@@ -91,7 +91,7 @@ export default function Jobs() {
                 type="number"
                 value={fpSeason}
                 onChange={(e) => setFpSeason(e.target.value)}
-                placeholder="2024"
+                placeholder="2025"
               />
             </div>
             

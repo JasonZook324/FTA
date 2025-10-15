@@ -170,7 +170,7 @@ export const fantasyProsProjections = pgTable("fantasy_pros_projections", {
   playerId: text("player_id").notNull(),
   playerName: text("player_name").notNull(),
   team: text("team"),
-  position: text("position").notNull(),
+  position: text("position"), // nullable - some projections don't include position
   opponent: text("opponent"),
   scoringType: text("scoring_type"), // PPR, HALF_PPR, STD
   projectedPoints: text("projected_points"), // decimal as text

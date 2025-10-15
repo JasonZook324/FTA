@@ -22,6 +22,8 @@ async function fetchFromFantasyPros(endpoint: string): Promise<any> {
     throw new Error("Fantasy Pros API key not configured");
   }
 
+  console.log(`Calling Fantasy Pros API: ${endpoint}`);
+
   const response = await fetch(endpoint, {
     method: 'GET',
     headers: {
@@ -31,10 +33,15 @@ async function fetchFromFantasyPros(endpoint: string): Promise<any> {
   });
 
   if (!response.ok) {
-    throw new Error(`Fantasy Pros API error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.error(`Fantasy Pros API error (${response.status}):`, errorText);
+    throw new Error(`Fantasy Pros API error: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  console.log(`Fantasy Pros API response keys:`, Object.keys(data));
+  console.log(`Fantasy Pros API response data count:`, Array.isArray(data.players) ? data.players.length : Array.isArray(data.news) ? data.news.length : 'N/A');
+  return data;
 }
 
 export async function refreshPlayers(sport: string, season: number): Promise<RefreshResult> {
@@ -55,17 +62,23 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
         eq(fantasyProsPlayers.season, season)
       ));
 
-    // Insert new players
-    const players = data.players.map((p: any) => ({
-      sport,
-      season,
-      playerId: String(p.player_id || p.id),
-      name: p.player_name || p.name,
-      team: p.team_abbr || p.team,
-      position: p.position,
-      status: p.status,
-      jerseyNumber: p.jersey_number,
-    }));
+    // Insert new players - skip players without required data
+    const players = data.players
+      .filter((p: any) => {
+        const hasId = p.player_id || p.id;
+        const hasName = p.player_name || p.name;
+        return hasId && hasName;
+      })
+      .map((p: any) => ({
+        sport,
+        season,
+        playerId: String(p.player_id || p.id),
+        name: p.player_name || p.name,
+        team: p.team_abbr || p.team,
+        position: p.position,
+        status: p.status,
+        jerseyNumber: p.jersey_number,
+      }));
 
     if (players.length > 0) {
       await db.insert(fantasyProsPlayers).values(players);
@@ -107,19 +120,13 @@ export async function refreshRankings(
   scoringType: string = 'PPR'
 ): Promise<RefreshResult> {
   try {
-    console.log(`Refreshing rankings for ${sport} ${season} week ${week || 'season'}...`);
+    console.log(`Refreshing rankings for ${sport} ${season} week ${week || 'season'} position ${position || 'ALL'}...`);
     
-    let endpoint = `${BASE_URL}/${sport.toUpperCase()}/${season}/consensus-rankings?type=${rankType}&scoring=${scoringType}`;
-    if (week) endpoint += `&week=${week}`;
-    if (position) endpoint += `&position=${position}`;
+    // If no position specified, fetch for all main positions
+    const positions = position ? [position] : ['QB', 'RB', 'WR', 'TE', 'K', 'DST'];
+    let totalRankings = 0;
 
-    const data = await fetchFromFantasyPros(endpoint);
-
-    if (!data?.players || !Array.isArray(data.players)) {
-      throw new Error("Invalid response format from Fantasy Pros API");
-    }
-
-    // Delete existing rankings for this criteria
+    // Delete existing rankings for this criteria first
     const deleteConditions = [
       eq(fantasyProsRankings.sport, sport),
       eq(fantasyProsRankings.season, season),
@@ -132,30 +139,49 @@ export async function refreshRankings(
     if (scoringType) {
       deleteConditions.push(eq(fantasyProsRankings.scoringType, scoringType));
     }
+    if (position) {
+      deleteConditions.push(eq(fantasyProsRankings.position, position));
+    }
 
     await db.delete(fantasyProsRankings).where(and(...deleteConditions));
 
-    // Insert new rankings
-    const rankings = data.players.map((p: any) => ({
-      sport,
-      season,
-      week: week || null,
-      playerId: String(p.player_id || p.id),
-      playerName: p.player_name || p.name,
-      team: p.team_abbr || p.team,
-      position: p.position,
-      rankType,
-      scoringType,
-      rank: p.rank || p.ecr_rank,
-      tier: p.tier,
-      bestRank: p.rank_min || p.best_rank,
-      worstRank: p.rank_max || p.worst_rank,
-      avgRank: String(p.rank_ave || p.avg_rank || ''),
-      stdDev: String(p.rank_std || p.std_dev || ''),
-    }));
+    // Fetch rankings for each position
+    for (const pos of positions) {
+      let endpoint = `${BASE_URL}/${sport.toUpperCase()}/${season}/consensus-rankings?type=${rankType}&scoring=${scoringType}&position=${pos}`;
+      if (week) endpoint += `&week=${week}`;
 
-    if (rankings.length > 0) {
-      await db.insert(fantasyProsRankings).values(rankings);
+      const data = await fetchFromFantasyPros(endpoint);
+
+      if (!data?.players || !Array.isArray(data.players)) {
+        console.warn(`No rankings data for position ${pos}`);
+        continue;
+      }
+
+      // Insert new rankings - filter out players without rank data
+      const rankings = data.players
+        .filter((p: any) => p.rank || p.ecr_rank) // Skip players without rank
+        .map((p: any) => ({
+          sport,
+          season,
+          week: week || null,
+          playerId: String(p.player_id || p.id),
+          playerName: p.player_name || p.name,
+          team: p.team_abbr || p.team,
+          position: p.position || pos,
+          rankType,
+          scoringType,
+          rank: p.rank || p.ecr_rank,
+          tier: p.tier,
+          bestRank: p.rank_min || p.best_rank,
+          worstRank: p.rank_max || p.worst_rank,
+          avgRank: String(p.rank_ave || p.avg_rank || ''),
+          stdDev: String(p.rank_std || p.std_dev || ''),
+        }));
+
+      if (rankings.length > 0) {
+        await db.insert(fantasyProsRankings).values(rankings);
+        totalRankings += rankings.length;
+      }
     }
 
     // Log refresh
@@ -164,12 +190,12 @@ export async function refreshRankings(
       sport,
       season,
       week: week || null,
-      recordCount: rankings.length,
+      recordCount: totalRankings,
       status: 'success',
     });
 
-    console.log(`Successfully refreshed ${rankings.length} rankings for ${sport} ${season}`);
-    return { success: true, recordCount: rankings.length };
+    console.log(`Successfully refreshed ${totalRankings} rankings for ${sport} ${season}`);
+    return { success: true, recordCount: totalRankings };
   } catch (error: any) {
     console.error('Error refreshing rankings:', error);
     
@@ -222,20 +248,27 @@ export async function refreshProjections(
 
     await db.delete(fantasyProsProjections).where(and(...deleteConditions));
 
-    // Insert new projections
-    const projections = data.players.map((p: any) => ({
-      sport,
-      season,
-      week: week || null,
-      playerId: String(p.player_id || p.id),
-      playerName: p.player_name || p.name,
-      team: p.team_abbr || p.team,
-      position: p.position,
-      opponent: p.opponent,
-      scoringType,
-      projectedPoints: String(p.fpts || p.projected_points || '0'),
-      stats: p.stats || p,
-    }));
+    // Insert new projections - skip players without required data
+    const projections = data.players
+      .filter((p: any) => {
+        const hasId = p.player_id || p.id;
+        const hasName = p.player_name || p.name;
+        const hasPoints = p.fpts || p.projected_points;
+        return hasId && hasName && hasPoints;
+      })
+      .map((p: any) => ({
+        sport,
+        season,
+        week: week || null,
+        playerId: String(p.player_id || p.id),
+        playerName: p.player_name || p.name,
+        team: p.team_abbr || p.team,
+        position: p.position,
+        opponent: p.opponent,
+        scoringType,
+        projectedPoints: String(p.fpts || p.projected_points),
+        stats: p.stats || p,
+      }));
 
     if (projections.length > 0) {
       await db.insert(fantasyProsProjections).values(projections);
@@ -281,9 +314,17 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
       throw new Error("Invalid response format from Fantasy Pros API");
     }
 
-    // Insert news (skip duplicates based on news_id unique constraint)
+    // Insert news - skip items without required data and duplicates
     let insertedCount = 0;
     for (const item of data.news) {
+      // Skip items without required fields
+      const hasNewsId = item.news_id || item.id;
+      const hasHeadline = item.headline || item.title;
+      
+      if (!hasNewsId || !hasHeadline) {
+        continue;
+      }
+
       try {
         await db.insert(fantasyProsNews).values({
           sport,
