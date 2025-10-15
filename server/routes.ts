@@ -2606,7 +2606,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       const getProjectedPoints = (playerData: any): string => {
@@ -2763,7 +2780,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       // Collect all roster data
@@ -2980,7 +3014,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       const getLineupSlotName = (slotId: number): string => {
@@ -3499,20 +3550,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const player = playerData.player || playerData;
         const entry = playerData.playerPoolEntry?.player || player;
         
-        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
-          return 'Injured';
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
         }
         if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
-          return 'Questionable';
+          return 'Q - "Questionable"';
         }
         if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
-          return 'Doubtful';
+          return 'D - "Doubtful"';
         }
         if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
-          return 'Out';
+          return 'O - "Out"';
         }
-        if (entry.injuryStatus === 'IR') {
-          return 'Injured Reserve';
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
         }
         return 'Active';
       };
