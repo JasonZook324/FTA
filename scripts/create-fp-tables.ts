@@ -1,13 +1,42 @@
 import { neon } from '@neondatabase/serverless';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
-dotenv.config();
+// Match the same DATABASE_URL logic as server/db.ts
+// Parse .env file directly to override Replit's auto-provisioned DATABASE_URL
+let DATABASE_URL = process.env.DATABASE_URL;
 
-const sql = neon(process.env.DATABASE_URL!);
+try {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const envConfig = dotenv.parse(fs.readFileSync(envPath));
+    if (envConfig.DATABASE_URL) {
+      DATABASE_URL = envConfig.DATABASE_URL;
+      console.log('Using DATABASE_URL from .env file');
+    }
+  }
+} catch (error) {
+  console.warn('Could not read .env file, using environment variable:', error);
+}
+
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL must be set');
+}
+
+console.log('DATABASE_URL:', DATABASE_URL.replace(/:[^:@]+@/, ':***@'));
+const sql = neon(DATABASE_URL);
 
 async function createFantasyProsTables() {
   try {
     console.log('Creating Fantasy Pros tables in Neon database...');
+    
+    // First, check what tables currently exist
+    const existingTables = await sql`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name LIKE 'fantasy_pros%'
+    `;
+    console.log('Existing FP tables before creation:', existingTables.map(t => t.table_name));
 
     // Create fantasy_pros_players table
     await sql`
@@ -129,7 +158,19 @@ async function createFantasyProsTables() {
     `;
     console.log('✓ Created fantasy_pros_refresh_log table');
 
-    console.log('\n✅ All Fantasy Pros tables created successfully!');
+    // Verify tables were created
+    const createdTables = await sql`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name LIKE 'fantasy_pros%'
+      ORDER BY table_name
+    `;
+    console.log('\n📋 Tables now in database:', createdTables.map(t => t.table_name));
+    
+    if (createdTables.length === 5) {
+      console.log('\n✅ All 5 Fantasy Pros tables created successfully!');
+    } else {
+      console.log(`\n⚠️  Warning: Expected 5 tables, but found ${createdTables.length}`);
+    }
   } catch (error) {
     console.error('Error creating tables:', error);
     process.exit(1);

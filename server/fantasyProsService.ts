@@ -41,7 +41,7 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
   try {
     console.log(`Refreshing players for ${sport} ${season}...`);
     
-    const endpoint = `${BASE_URL}/${sport}/players`;
+    const endpoint = `${BASE_URL}/${sport.toUpperCase()}/players`;
     const data = await fetchFromFantasyPros(endpoint);
 
     if (!data?.players || !Array.isArray(data.players)) {
@@ -109,7 +109,7 @@ export async function refreshRankings(
   try {
     console.log(`Refreshing rankings for ${sport} ${season} week ${week || 'season'}...`);
     
-    let endpoint = `${BASE_URL}/${sport}/${season}/consensus-rankings?type=${rankType}&scoring=${scoringType}`;
+    let endpoint = `${BASE_URL}/${sport.toUpperCase()}/${season}/consensus-rankings?type=${rankType}&scoring=${scoringType}`;
     if (week) endpoint += `&week=${week}`;
     if (position) endpoint += `&position=${position}`;
 
@@ -274,7 +274,7 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
   try {
     console.log(`Refreshing news for ${sport}...`);
     
-    const endpoint = `${BASE_URL}/${sport}/news?limit=${limit}`;
+    const endpoint = `${BASE_URL}/${sport.toUpperCase()}/news?limit=${limit}`;
     const data = await fetchFromFantasyPros(endpoint);
 
     if (!data?.news || !Array.isArray(data.news)) {
