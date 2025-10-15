@@ -282,13 +282,13 @@ export async function refreshProjections(
     // Insert new projections - skip players without required data
     const projections = data.players
       .filter((p: any) => {
-        const hasId = p.player_id || p.id || p.playerId;
-        const hasName = p.player_name || p.name || p.playerName;
-        const hasPoints = p.fpts || p.projected_points || p.projectedPoints || p.fantasy_points || p.fantasyPoints;
+        const hasId = p.fpid || p.player_id || p.id || p.playerId;
+        const hasName = p.name || p.player_name || p.playerName;
+        const hasPoints = p.stats?.points_ppr || p.stats?.points || p.fpts || p.projected_points;
         const isValid = hasId && hasName && hasPoints;
         
         if (!isValid) {
-          console.log(`Filtering out projection: id=${p.player_id || p.id || p.playerId}, name=${p.player_name || p.name || p.playerName}, points=${p.fpts || p.projected_points || p.projectedPoints}`);
+          console.log(`Filtering out projection: id=${p.fpid || p.player_id || p.id}, name=${p.name || p.player_name}, points=${p.stats?.points_ppr || p.stats?.points}`);
         }
         
         return isValid;
@@ -297,13 +297,13 @@ export async function refreshProjections(
         sport,
         season,
         week: week || null,
-        playerId: String(p.player_id || p.id || p.playerId),
-        playerName: p.player_name || p.name || p.playerName,
-        team: p.team_abbr || p.team || p.teamAbbr,
-        position: p.position,
+        playerId: String(p.fpid || p.player_id || p.id || p.playerId),
+        playerName: p.name || p.player_name || p.playerName,
+        team: p.team_id || p.team_abbr || p.team || p.teamAbbr,
+        position: p.position_id || p.position,
         opponent: p.opponent || p.opp,
         scoringType,
-        projectedPoints: String(p.fpts || p.projected_points || p.projectedPoints || p.fantasy_points || p.fantasyPoints),
+        projectedPoints: String(p.stats?.points_ppr || p.stats?.points || p.fpts || p.projected_points),
         stats: p.stats || p,
       }));
 
