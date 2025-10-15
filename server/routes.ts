@@ -3944,6 +3944,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+  // Fantasy Pros data refresh jobs
+  app.post("/api/jobs/fp-refresh-players", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024 } = req.body;
+      const { refreshPlayers } = await import("./fantasyProsService");
+      const result = await refreshPlayers(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} players for ${season} season`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh players' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros player refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh players' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-rankings", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week, position, rankType = 'weekly', scoringType = 'PPR' } = req.body;
+      const { refreshRankings } = await import("./fantasyProsService");
+      const result = await refreshRankings(sport, season, week, position, rankType, scoringType);
+      
+      if (result.success) {
+        const weekText = week ? `week ${week}` : 'season';
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} rankings for ${weekText}`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh rankings' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros rankings refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh rankings' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-projections", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week, position, scoringType = 'PPR' } = req.body;
+      const { refreshProjections } = await import("./fantasyProsService");
+      const result = await refreshProjections(sport, season, week, position, scoringType);
+      
+      if (result.success) {
+        const weekText = week ? `week ${week}` : 'season';
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} projections for ${weekText}`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh projections' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros projections refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh projections' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-news", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', limit = 50 } = req.body;
+      const { refreshNews } = await import("./fantasyProsService");
+      const result = await refreshNews(sport, limit);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} news items`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh news' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros news refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh news' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-all", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week } = req.body;
+      const { refreshAllData } = await import("./fantasyProsService");
+      const results = await refreshAllData(sport, season, week);
+      
+      const totalCount = results.players.recordCount + results.rankings.recordCount + 
+                         results.projections.recordCount + results.news.recordCount;
+      
+      res.json({ 
+        message: `Successfully refreshed ${totalCount} total records for ${sport} ${season}`,
+        results: {
+          players: results.players.recordCount,
+          rankings: results.rankings.recordCount,
+          projections: results.projections.recordCount,
+          news: results.news.recordCount,
+        }
+      });
+    } catch (error: any) {
+      console.error('Fantasy Pros all data refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh data' });
+    }
+  });
+
   // Fantasy Pros API proxy endpoint to avoid CORS issues
   app.post("/api/fantasy-pros-proxy", requireAuth, async (req, res) => {
     try {
