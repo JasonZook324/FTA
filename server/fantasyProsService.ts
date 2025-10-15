@@ -157,15 +157,21 @@ export async function refreshRankings(
         continue;
       }
 
+      // Log sample player to see actual structure
+      if (data.players.length > 0 && pos === 'QB') {
+        console.log(`Sample ${pos} player from API:`, JSON.stringify(data.players[0], null, 2));
+      }
+      
       // Insert new rankings - filter out players without required data
       const playersWithData = data.players.filter((p: any) => {
-        const hasId = p.player_id || p.id;
-        const hasName = p.player_name || p.name;
-        const hasRank = p.rank || p.ecr_rank;
+        // Check all possible field name variations
+        const hasId = p.player_id || p.id || p.playerId;
+        const hasName = p.player_name || p.name || p.playerName;
+        const hasRank = p.rank || p.ecr_rank || p.ecrRank || p.rank_ecr;
         const isValid = hasId && hasName && hasRank;
         
-        if (!isValid && data.players.length < 10) { // Log first few if debugging small dataset
-          console.log(`Filtering out player: id=${p.player_id || p.id}, name=${p.player_name || p.name}, rank=${p.rank || p.ecr_rank}`);
+        if (!isValid) {
+          console.log(`Filtering out player: id=${p.player_id || p.id || p.playerId}, name=${p.player_name || p.name || p.playerName}, rank=${p.rank || p.ecr_rank || p.ecrRank}`);
         }
         
         return isValid;
@@ -177,18 +183,18 @@ export async function refreshRankings(
           sport,
           season,
           week: week || null,
-          playerId: String(p.player_id || p.id),
-          playerName: p.player_name || p.name,
-          team: p.team_abbr || p.team,
+          playerId: String(p.player_id || p.id || p.playerId),
+          playerName: p.player_name || p.name || p.playerName,
+          team: p.team_abbr || p.team || p.teamAbbr,
           position: p.position || pos,
           rankType,
           scoringType,
-          rank: p.rank || p.ecr_rank,
+          rank: p.rank || p.ecr_rank || p.ecrRank || p.rank_ecr,
           tier: p.tier,
-          bestRank: p.rank_min || p.best_rank,
-          worstRank: p.rank_max || p.worst_rank,
-          avgRank: String(p.rank_ave || p.avg_rank || ''),
-          stdDev: String(p.rank_std || p.std_dev || ''),
+          bestRank: p.rank_min || p.best_rank || p.rankMin || p.bestRank,
+          worstRank: p.rank_max || p.worst_rank || p.rankMax || p.worstRank,
+          avgRank: String(p.rank_ave || p.avg_rank || p.rankAve || p.avgRank || ''),
+          stdDev: String(p.rank_std || p.std_dev || p.rankStd || p.stdDev || ''),
         }));
 
       if (rankings.length > 0) {
@@ -261,25 +267,36 @@ export async function refreshProjections(
 
     await db.delete(fantasyProsProjections).where(and(...deleteConditions));
 
+    // Log sample player to see actual structure
+    if (data.players.length > 0) {
+      console.log(`Sample projection player from API:`, JSON.stringify(data.players[0], null, 2));
+    }
+
     // Insert new projections - skip players without required data
     const projections = data.players
       .filter((p: any) => {
-        const hasId = p.player_id || p.id;
-        const hasName = p.player_name || p.name;
-        const hasPoints = p.fpts || p.projected_points;
-        return hasId && hasName && hasPoints;
+        const hasId = p.player_id || p.id || p.playerId;
+        const hasName = p.player_name || p.name || p.playerName;
+        const hasPoints = p.fpts || p.projected_points || p.projectedPoints || p.fantasy_points || p.fantasyPoints;
+        const isValid = hasId && hasName && hasPoints;
+        
+        if (!isValid) {
+          console.log(`Filtering out projection: id=${p.player_id || p.id || p.playerId}, name=${p.player_name || p.name || p.playerName}, points=${p.fpts || p.projected_points || p.projectedPoints}`);
+        }
+        
+        return isValid;
       })
       .map((p: any) => ({
         sport,
         season,
         week: week || null,
-        playerId: String(p.player_id || p.id),
-        playerName: p.player_name || p.name,
-        team: p.team_abbr || p.team,
+        playerId: String(p.player_id || p.id || p.playerId),
+        playerName: p.player_name || p.name || p.playerName,
+        team: p.team_abbr || p.team || p.teamAbbr,
         position: p.position,
-        opponent: p.opponent,
+        opponent: p.opponent || p.opp,
         scoringType,
-        projectedPoints: String(p.fpts || p.projected_points),
+        projectedPoints: String(p.fpts || p.projected_points || p.projectedPoints || p.fantasy_points || p.fantasyPoints),
         stats: p.stats || p,
       }));
 
@@ -323,13 +340,19 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
     const endpoint = `${BASE_URL}/${sport.toUpperCase()}/news?limit=${limit}`;
     const data = await fetchFromFantasyPros(endpoint);
 
-    if (!data?.news || !Array.isArray(data.news)) {
-      throw new Error("Invalid response format from Fantasy Pros API");
+    // News API uses 'items' array instead of 'news'
+    const newsItems = data.items || data.news;
+    
+    if (!newsItems || !Array.isArray(newsItems)) {
+      console.log('News API response structure:', Object.keys(data));
+      throw new Error("Invalid response format from Fantasy Pros API - expected items or news array");
     }
+
+    console.log(`Sample news item from API:`, JSON.stringify(newsItems[0], null, 2));
 
     // Insert news - skip items without required data and duplicates
     let insertedCount = 0;
-    for (const item of data.news) {
+    for (const item of newsItems) {
       // Skip items without required fields
       const hasNewsId = item.news_id || item.id;
       const hasHeadline = item.headline || item.title;
