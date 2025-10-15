@@ -157,10 +157,23 @@ export async function refreshRankings(
         continue;
       }
 
-      // Insert new rankings - filter out players without rank data
-      const rankings = data.players
-        .filter((p: any) => p.rank || p.ecr_rank) // Skip players without rank
-        .map((p: any) => ({
+      // Insert new rankings - filter out players without required data
+      const playersWithData = data.players.filter((p: any) => {
+        const hasId = p.player_id || p.id;
+        const hasName = p.player_name || p.name;
+        const hasRank = p.rank || p.ecr_rank;
+        const isValid = hasId && hasName && hasRank;
+        
+        if (!isValid && data.players.length < 10) { // Log first few if debugging small dataset
+          console.log(`Filtering out player: id=${p.player_id || p.id}, name=${p.player_name || p.name}, rank=${p.rank || p.ecr_rank}`);
+        }
+        
+        return isValid;
+      });
+      
+      console.log(`Position ${pos}: ${data.players.length} players from API, ${playersWithData.length} passed validation`);
+      
+      const rankings = playersWithData.map((p: any) => ({
           sport,
           season,
           week: week || null,

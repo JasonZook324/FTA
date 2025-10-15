@@ -8,6 +8,17 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 
 ## Recent Changes
 
+**October 15, 2025** - Fantasy Pros API Integration for Contextual Data Refresh
+- Designed and implemented comprehensive Fantasy Pros database schema with tables: fantasy_pros_players, fantasy_pros_rankings, fantasy_pros_projections, fantasy_pros_news, fantasy_pros_refresh_log
+- Created Fantasy Pros service (fantasyProsService.ts) with strict data validation - no fallback values, skips records missing required fields
+- Implemented refresh endpoints for players, rankings, projections, and news with proper API normalization (UPPERCASE for players/rankings/news, lowercase for projections)
+- Rankings endpoint automatically fetches all main positions (QB, RB, WR, TE, K, DST) when no position specified
+- Made position field nullable in projections table to handle API responses without position data
+- Added comprehensive logging for API calls and data validation to aid debugging
+- Updated Jobs page with Fantasy Pros data refresh UI - default season updated to 2025
+- All data validated before insertion: players require id/name, rankings require id/name/rank, projections require id/name/points, news requires newsId/headline
+- Database schema pushed to Neon database successfully using .env DATABASE_URL
+
 **October 2, 2025** - Multi-User Authentication System Implementation
 - Implemented complete username/password authentication system using passport-local strategy
 - Replaced hardcoded "default-user" with session-based authentication for true multi-user support
