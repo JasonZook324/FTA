@@ -3495,6 +3495,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return player.proTeamId;
       };
 
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Questionable';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'Doubtful';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'Out';
+        }
+        if (entry.injuryStatus === 'IR') {
+          return 'Injured Reserve';
+        }
+        return 'Active';
+      };
+
       let promptSections = [];
 
       // Add custom prompt first
@@ -3745,7 +3767,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const positionId = player?.defaultPositionId;
                 const position = positionId ? getPositionName(positionId) : 'FLEX';
                 const ownership = player?.ownership?.percentOwned || 0;
-                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned`;
+                const injuryStatus = getInjuryStatus(playerData);
+                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned - Status: ${injuryStatus}`;
               })
               .join('\n') + '\n'
           );
