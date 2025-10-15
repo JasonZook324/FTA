@@ -35,7 +35,7 @@ export default function ApiPlayground() {
     defaultValues: {
       apiKey: "",
       method: "GET",
-      endpoint: "https://api.fantasypros.com/v2/json/nfl/2024/players",
+      endpoint: "https://api.fantasypros.com/public/v2/json/NFL/players",
       queryParams: "",
       body: "",
     },
@@ -325,30 +325,30 @@ export default function ApiPlayground() {
             <div className="space-y-2">
               <h4 className="font-semibold text-sm">NFL Players</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                https://api.fantasypros.com/v2/json/nfl/2024/players
+                https://api.fantasypros.com/public/v2/json/NFL/players
               </code>
               <p className="text-xs text-muted-foreground">Returns all NFL players</p>
             </div>
             <div className="space-y-2">
+              <h4 className="font-semibold text-sm">NFL News</h4>
+              <code className="block text-xs bg-muted p-2 rounded">
+                https://api.fantasypros.com/public/v2/json/NFL/news
+              </code>
+              <p className="text-xs text-muted-foreground">Query: limit=10</p>
+            </div>
+            <div className="space-y-2">
               <h4 className="font-semibold text-sm">NFL Projections</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                https://api.fantasypros.com/v2/json/nfl/2024/week/6/projections
+                https://api.fantasypros.com/public/v2/json/nfl/2024/projections
               </code>
-              <p className="text-xs text-muted-foreground">Weekly projections</p>
+              <p className="text-xs text-muted-foreground">Query: position=QB&week=6</p>
             </div>
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">NFL Rankings</h4>
+              <h4 className="font-semibold text-sm">Consensus Rankings</h4>
               <code className="block text-xs bg-muted p-2 rounded">
-                https://api.fantasypros.com/v2/json/nfl/2024/consensus-rankings
+                https://api.fantasypros.com/public/v2/json/NFL/2024/consensus-rankings
               </code>
-              <p className="text-xs text-muted-foreground">Consensus rankings</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold text-sm">NBA Players</h4>
-              <code className="block text-xs bg-muted p-2 rounded">
-                https://api.fantasypros.com/v2/json/nba/2024/players
-              </code>
-              <p className="text-xs text-muted-foreground">Works for other sports too</p>
+              <p className="text-xs text-muted-foreground">Query: position=QB&type=draft</p>
             </div>
           </div>
         </CardContent>
