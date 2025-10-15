@@ -60,6 +60,31 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
       console.log(`Sample player from API:`, JSON.stringify(data.players[0], null, 2));
     }
 
+    // Get injury data if available
+    let injuryMap = new Map<string, any>();
+    try {
+      const injuryEndpoint = `${BASE_URL}/${sport.toUpperCase()}/injuries?year=${season}`;
+      const injuryData = await fetchFromFantasyPros(injuryEndpoint);
+      
+      if (injuryData?.players && Array.isArray(injuryData.players)) {
+        console.log(`Found ${injuryData.players.length} players with injury data`);
+        if (injuryData.players.length > 0) {
+          console.log(`Sample injury data:`, JSON.stringify(injuryData.players[0], null, 2));
+        }
+        
+        // Create map of player_id to injury status
+        injuryData.players.forEach((p: any) => {
+          const playerId = String(p.player_id || p.id || p.fpid);
+          injuryMap.set(playerId, {
+            status: p.injury_status || p.status || p.injury_short,
+            jerseyNumber: p.jersey || p.jersey_number || p.number,
+          });
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch injury data:', err);
+    }
+
     // Delete existing players for this sport/season
     await db.delete(fantasyProsPlayers)
       .where(and(
@@ -74,16 +99,21 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
         const hasName = p.player_name || p.name;
         return hasId && hasName;
       })
-      .map((p: any) => ({
-        sport,
-        season,
-        playerId: String(p.player_id || p.id || p.fpid),
-        name: p.player_name || p.name,
-        team: p.player_team_id || p.team_id || p.team_abbr || p.team,
-        position: p.player_position_id || p.position_id || p.position || p.player_positions,
-        status: p.injury_status || p.status,
-        jerseyNumber: p.jersey || p.jersey_number,
-      }));
+      .map((p: any) => {
+        const playerId = String(p.player_id || p.id || p.fpid);
+        const injuryInfo = injuryMap.get(playerId);
+        
+        return {
+          sport,
+          season,
+          playerId,
+          name: p.player_name || p.name,
+          team: p.player_team_id || p.team_id || p.team_abbr || p.team,
+          position: p.player_position_id || p.position_id || p.position || p.player_positions,
+          status: injuryInfo?.status || p.injury_status || p.status,
+          jerseyNumber: injuryInfo?.jerseyNumber || p.jersey || p.jersey_number,
+        };
+      });
 
     if (players.length > 0) {
       await db.insert(fantasyProsPlayers).values(players);
