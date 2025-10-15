@@ -8,7 +8,7 @@ import {
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
-const FANTASY_PROS_API_KEY = process.env.FANTASYPROS_API_KEY;
+const FANTASY_PROS_API_KEY = process.env.FantasyProsApiKey;
 const BASE_URL = "https://api.fantasypros.com/public/v2/json";
 
 interface RefreshResult {
