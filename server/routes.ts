@@ -3791,6 +3791,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Filter out Out players if requested
+        if (options.excludeOutPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'OUT' && entry.injuryStatus !== 'O';
+          });
+        }
+
+        // Filter out Doubtful players if requested
+        if (options.excludeDoubtfulPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'DOUBTFUL' && entry.injuryStatus !== 'D';
+          });
+        }
+
+        // Filter out Questionable players if requested
+        if (options.excludeQuestionablePlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'QUESTIONABLE' && entry.injuryStatus !== 'Q';
+          });
+        }
+
         // Sort by ownership percentage (most owned first) and limit results
         const limit = options.includeWaiverWire === 'top50' ? 50 : 100;
         availablePlayers = availablePlayers
