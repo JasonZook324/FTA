@@ -55,6 +55,11 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
       throw new Error("Invalid response format from Fantasy Pros API");
     }
 
+    // Log a sample player to see available fields
+    if (data.players.length > 0) {
+      console.log(`Sample player from API:`, JSON.stringify(data.players[0], null, 2));
+    }
+
     // Delete existing players for this sport/season
     await db.delete(fantasyProsPlayers)
       .where(and(
@@ -65,19 +70,19 @@ export async function refreshPlayers(sport: string, season: number): Promise<Ref
     // Insert new players - skip players without required data
     const players = data.players
       .filter((p: any) => {
-        const hasId = p.player_id || p.id;
+        const hasId = p.player_id || p.id || p.fpid;
         const hasName = p.player_name || p.name;
         return hasId && hasName;
       })
       .map((p: any) => ({
         sport,
         season,
-        playerId: String(p.player_id || p.id),
+        playerId: String(p.player_id || p.id || p.fpid),
         name: p.player_name || p.name,
-        team: p.team_abbr || p.team,
-        position: p.position,
-        status: p.status,
-        jerseyNumber: p.jersey_number,
+        team: p.player_team_id || p.team_id || p.team_abbr || p.team,
+        position: p.player_position_id || p.position_id || p.position || p.player_positions,
+        status: p.injury_status || p.status,
+        jerseyNumber: p.jersey || p.jersey_number,
       }));
 
     if (players.length > 0) {
@@ -192,8 +197,8 @@ export async function refreshRankings(
           week: week || null,
           playerId: String(p.player_id || p.id || p.playerId),
           playerName: p.player_name || p.name || p.playerName,
-          team: p.team_abbr || p.team || p.teamAbbr,
-          position: p.position || pos,
+          team: p.player_team_id || p.team_id || p.team_abbr || p.team || p.teamAbbr,
+          position: p.player_position_id || p.position_id || p.player_positions || p.position || pos,
           rankType,
           scoringType,
           rank: p.rank || p.ecr_rank || p.ecrRank || p.rank_ecr,
