@@ -3781,6 +3781,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Filter out IR players if requested
+        if (options.excludeIRPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            // Exclude players with IR/INJURY_RESERVE status
+            return entry.injuryStatus !== 'INJURY_RESERVE' && entry.injuryStatus !== 'IR';
+          });
+        }
+
         // Sort by ownership percentage (most owned first) and limit results
         const limit = options.includeWaiverWire === 'top50' ? 50 : 100;
         availablePlayers = availablePlayers

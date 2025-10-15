@@ -40,6 +40,7 @@ export default function PromptBuilder() {
   const [includeWaiverWire, setIncludeWaiverWire] = useState("none"); // "none", "top50", "position", "team"
   const [waiverWirePosition, setWaiverWirePosition] = useState("");
   const [waiverWireTeam, setWaiverWireTeam] = useState("");
+  const [excludeIRPlayers, setExcludeIRPlayers] = useState(false);
   const [includeLeagueSettings, setIncludeLeagueSettings] = useState(true);
 
   // Context data options
@@ -109,6 +110,7 @@ export default function PromptBuilder() {
             includeWaiverWire,
             waiverWirePosition,
             waiverWireTeam,
+            excludeIRPlayers,
             includeLeagueSettings,
             // Context data options
             includeFantasyPros,
@@ -383,6 +385,19 @@ export default function PromptBuilder() {
                           ))}
                         </SelectContent>
                       </Select>
+                    )}
+
+                    {includeWaiverWire !== "none" && (
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Checkbox 
+                          id="exclude-ir-players" 
+                          checked={excludeIRPlayers}
+                          onCheckedChange={(checked) => setExcludeIRPlayers(checked as boolean)}
+                        />
+                        <label htmlFor="exclude-ir-players" className="text-sm">
+                          Exclude IR Players
+                        </label>
+                      </div>
                     )}
                   </div>
 
