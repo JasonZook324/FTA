@@ -115,12 +115,23 @@ The application also integrates with Neon Database for PostgreSQL hosting and in
 - **External API**: ESPN Fantasy Sports API v3 for league and player data
 - **Development Tools**: Vite plugins for development environment integration
 
-## Database Viewer (API Playground)
+## API Playground
 
-**October 16, 2025** - Database Table Viewer Feature
+**October 16, 2025** - Enhanced Fantasy Pros API Tester
+- Simplified endpoint configuration with dropdown-based interface
+- Predefined endpoints: Players, Injuries, Consensus Rankings, Projections, News
+- Dynamic parameter inputs based on selected endpoint (Season, Week, Position, Scoring Type, Rank Type)
+- Auto-generates complete Fantasy Pros API URL from selections
+- Base URL fixed as `https://api.fantasypros.com/public/v2/json/NFL`
+- Endpoint parameters include: season (2025 default), scoring type (PPR/HALF_PPR/STD), position (QB/RB/WR/TE/K/DST), week (optional), rank type (draft/weekly/ros)
+- Generated endpoint URL displayed as read-only field for verification before making request
+
+**October 16, 2025** - Database Table Viewer Feature  
 - Added Database Viewer tab to API Playground page for browsing Neon database tables
 - Backend endpoints: GET /api/db/tables (list tables), GET /api/db/tables/:tableName/columns (get schema), POST /api/db/tables/:tableName/query (query with filters and pagination)
 - Frontend UI: Table selector dropdown, column-based filtering inputs, paginated data table (50 rows/page)
 - Security: SQL injection protection via escaped single quotes, ILIKE case-insensitive search on all columns
 - Query optimization: Try ORDER BY id DESC, fallback to unordered if id column doesn't exist
-- Fully functional for viewing and filtering all database tables including Fantasy Pros data tables
+- JSON data properly formatted: Stats column displays JSON.stringify() instead of "[object Object]"
+- "More Info" button with dialog overlay for viewing complete record details with pretty-printed JSON
+- Horizontal scrolling enabled to view all table columns including Actions column

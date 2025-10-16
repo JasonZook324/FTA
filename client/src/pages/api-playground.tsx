@@ -19,6 +19,65 @@ import { JsonViewerWithSearch } from "@/components/json-viewer";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+// Fantasy Pros API endpoint definitions
+type EndpointParam = {
+  name: string;
+  label: string;
+  type: "number" | "select";
+  required: boolean;
+  defaultValue?: string;
+  options?: readonly string[];
+};
+
+type EndpointConfig = {
+  name: string;
+  path: string;
+  params: EndpointParam[];
+};
+
+const FANTASY_PROS_ENDPOINTS: Record<string, EndpointConfig> = {
+  players: {
+    name: "Players",
+    path: "/players",
+    params: []
+  },
+  injuries: {
+    name: "Injuries",
+    path: "/injuries",
+    params: [
+      { name: "year", label: "Season", type: "number", required: true, defaultValue: "2025" }
+    ]
+  },
+  rankings: {
+    name: "Consensus Rankings",
+    path: "/{season}/consensus-rankings",
+    params: [
+      { name: "season", label: "Season", type: "number", required: true, defaultValue: "2025" },
+      { name: "type", label: "Rank Type", type: "select", required: true, options: ["draft", "weekly", "ros"], defaultValue: "weekly" },
+      { name: "scoring", label: "Scoring", type: "select", required: true, options: ["PPR", "HALF_PPR", "STD"], defaultValue: "PPR" },
+      { name: "position", label: "Position", type: "select", required: true, options: ["QB", "RB", "WR", "TE", "K", "DST"], defaultValue: "QB" },
+      { name: "week", label: "Week", type: "number", required: false }
+    ]
+  },
+  projections: {
+    name: "Projections",
+    path: "/{season}/projections",
+    params: [
+      { name: "season", label: "Season", type: "number", required: true, defaultValue: "2025" },
+      { name: "scoring", label: "Scoring", type: "select", required: true, options: ["PPR", "HALF_PPR", "STD"], defaultValue: "PPR" },
+      { name: "week", label: "Week", type: "number", required: false },
+      { name: "position", label: "Position", type: "select", required: false, options: ["QB", "RB", "WR", "TE", "K", "DST"] }
+    ]
+  },
+  news: {
+    name: "News",
+    path: "/news",
+    params: [
+      { name: "limit", label: "Limit", type: "number", required: false, defaultValue: "50" }
+    ]
+  }
+};
+
 const apiRequestSchema = z.object({
   apiKey: z.string().optional(),
   method: z.enum(["GET", "POST"]),
@@ -33,6 +92,8 @@ export default function ApiPlayground() {
   const [response, setResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<string>("players");
+  const [endpointParams, setEndpointParams] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   // Database viewer state
@@ -51,6 +112,75 @@ export default function ApiPlayground() {
       body: "",
     },
   });
+
+  // Build endpoint URL from selected endpoint and parameters
+  const buildEndpointUrl = () => {
+    const endpointConfig = FANTASY_PROS_ENDPOINTS[selectedEndpoint];
+    let path = endpointConfig.path;
+    const queryParts: string[] = [];
+
+    // Replace path parameters (e.g., {season})
+    endpointConfig.params.forEach(param => {
+      const value = endpointParams[param.name] || param.defaultValue || "";
+      if (path.includes(`{${param.name}}`)) {
+        path = path.replace(`{${param.name}}`, value);
+      } else if (value && param.type !== "number" || (param.type === "number" && value)) {
+        queryParts.push(`${param.name}=${encodeURIComponent(value)}`);
+      }
+    });
+
+    const baseUrl = "https://api.fantasypros.com/public/v2/json/NFL";
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return `${baseUrl}${path}${queryString}`;
+  };
+
+  // Initialize endpoint parameters with defaults when endpoint changes
+  const handleEndpointChange = (endpoint: string) => {
+    setSelectedEndpoint(endpoint);
+    const config = FANTASY_PROS_ENDPOINTS[endpoint];
+    if (!config) return;
+    
+    const defaultParams: Record<string, string> = {};
+    config.params.forEach(param => {
+      if (param.defaultValue) {
+        defaultParams[param.name] = param.defaultValue;
+      }
+    });
+    setEndpointParams(defaultParams);
+    
+    // Update form endpoint value
+    const url = buildEndpointUrlFor(endpoint, defaultParams);
+    form.setValue("endpoint", url);
+  };
+
+  const buildEndpointUrlFor = (endpoint: string, params: Record<string, string>) => {
+    const endpointConfig = FANTASY_PROS_ENDPOINTS[endpoint];
+    if (!endpointConfig) return "";
+    
+    let path = endpointConfig.path;
+    const queryParts: string[] = [];
+
+    endpointConfig.params.forEach(param => {
+      const value = params[param.name] || param.defaultValue || "";
+      if (path.includes(`{${param.name}}`)) {
+        path = path.replace(`{${param.name}}`, value);
+      } else if (value) {
+        queryParts.push(`${param.name}=${encodeURIComponent(value)}`);
+      }
+    });
+
+    const baseUrl = "https://api.fantasypros.com/public/v2/json/NFL";
+    const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+    return `${baseUrl}${path}${queryString}`;
+  };
+
+  // Update endpoint URL when parameters change
+  const handleParamChange = (paramName: string, value: string) => {
+    const newParams = { ...endpointParams, [paramName]: value };
+    setEndpointParams(newParams);
+    const url = buildEndpointUrlFor(selectedEndpoint, newParams);
+    form.setValue("endpoint", url);
+  };
 
   const onSubmit = async (data: ApiRequestForm) => {
     setIsLoading(true);
@@ -227,20 +357,84 @@ export default function ApiPlayground() {
                       )}
                     />
 
+                    <div>
+                      <FormLabel>Select Endpoint</FormLabel>
+                      <Select 
+                        value={selectedEndpoint} 
+                        onValueChange={handleEndpointChange}
+                      >
+                        <SelectTrigger data-testid="select-endpoint" className="mt-2">
+                          <SelectValue placeholder="Select an endpoint" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(FANTASY_PROS_ENDPOINTS).map(([key, config]) => (
+                            <SelectItem key={key} value={key}>
+                              {config.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Choose an API endpoint to test
+                      </p>
+                    </div>
+
+                    {/* Dynamic endpoint parameters */}
+                    {FANTASY_PROS_ENDPOINTS[selectedEndpoint].params.length > 0 && (
+                      <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                        <h4 className="text-sm font-semibold">Endpoint Parameters</h4>
+                        {FANTASY_PROS_ENDPOINTS[selectedEndpoint].params.map((param) => (
+                          <div key={param.name}>
+                            <FormLabel>
+                              {param.label}
+                              {param.required && <span className="text-destructive ml-1">*</span>}
+                            </FormLabel>
+                            {param.type === "select" ? (
+                              <Select
+                                value={endpointParams[param.name] || param.defaultValue || ""}
+                                onValueChange={(value) => handleParamChange(param.name, value)}
+                              >
+                                <SelectTrigger data-testid={`select-param-${param.name}`} className="mt-2">
+                                  <SelectValue placeholder={`Select ${param.label}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {param.options?.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                type={param.type}
+                                value={endpointParams[param.name] || ""}
+                                onChange={(e) => handleParamChange(param.name, e.target.value)}
+                                placeholder={param.defaultValue || ""}
+                                data-testid={`input-param-${param.name}`}
+                                className="mt-2"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <FormField
                       control={form.control}
                       name="endpoint"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Endpoint URL</FormLabel>
+                          <FormLabel>Generated Endpoint URL</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="https://api.fantasypros.com/v2/json/nfl/..." 
                               {...field}
                               data-testid="input-endpoint"
+                              className="font-mono text-sm"
+                              readOnly
                             />
                           </FormControl>
-                          <FormDescription>Full API endpoint URL</FormDescription>
+                          <FormDescription>Auto-generated from selected endpoint and parameters</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -251,7 +445,7 @@ export default function ApiPlayground() {
                       name="queryParams"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Query Parameters (Optional)</FormLabel>
+                          <FormLabel>Additional Query Parameters (Optional)</FormLabel>
                           <FormControl>
                             <Input 
                               placeholder="param1=value1&param2=value2" 
@@ -259,7 +453,7 @@ export default function ApiPlayground() {
                               data-testid="input-query-params"
                             />
                           </FormControl>
-                          <FormDescription>Additional query parameters (API key will be added automatically)</FormDescription>
+                          <FormDescription>Extra query parameters if needed (API key will be added automatically)</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
