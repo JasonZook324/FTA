@@ -422,6 +422,9 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
           playerName = player.name;
           team = player.team || team; // Use player's team if available, otherwise use team_id from news
           position = player.position;
+          console.log(`✓ Found player data for ID ${item.player_id}: ${playerName} (${position}, ${team})`);
+        } else {
+          console.log(`✗ No player found for ID ${item.player_id} - will have NULL values`);
         }
       }
 
