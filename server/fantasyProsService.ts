@@ -403,19 +403,41 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
         continue;
       }
 
+      // News API only provides player_id and team_id, not player_name/position
+      // Look up player details from fantasy_pros_players table if we have a player_id
+      let playerName = null;
+      let team = item.team_id || item.team_abbr || item.team;
+      let position = null;
+
+      if (item.player_id) {
+        const { eq } = await import('drizzle-orm');
+        const playerLookup = await db
+          .select()
+          .from(fantasyProsPlayers)
+          .where(eq(fantasyProsPlayers.playerId, String(item.player_id)))
+          .limit(1);
+
+        if (playerLookup.length > 0) {
+          const player = playerLookup[0];
+          playerName = player.name;
+          team = player.team || team; // Use player's team if available, otherwise use team_id from news
+          position = player.position;
+        }
+      }
+
       try {
         await db.insert(fantasyProsNews).values({
           sport,
           newsId: String(item.news_id || item.id),
           playerId: item.player_id ? String(item.player_id) : null,
-          playerName: item.player_name,
-          team: item.team_abbr || item.team,
-          position: item.position,
+          playerName,
+          team,
+          position,
           headline: item.headline || item.title,
-          description: item.description || item.news,
-          analysis: item.analysis,
+          description: item.description || item.desc || item.news,
+          analysis: item.analysis || item.impact,
           source: item.source,
-          newsDate: item.updated ? new Date(item.updated) : null,
+          newsDate: item.updated || item.created ? new Date(item.updated || item.created) : null,
         });
         insertedCount++;
       } catch (err: any) {
