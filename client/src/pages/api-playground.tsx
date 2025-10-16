@@ -468,8 +468,8 @@ export default function ApiPlayground() {
                     </div>
                   ) : tableData?.data && tableData.data.length > 0 ? (
                     <>
-                      <div className="border rounded-lg overflow-auto">
-                        <ScrollArea className="h-[500px] w-full">
+                      <div className="border rounded-lg overflow-x-auto">
+                        <div className="overflow-y-auto max-h-[500px]">
                           <Table>
                             <TableHeader className="sticky top-0 bg-background z-10">
                               <TableRow>
@@ -538,7 +538,7 @@ export default function ApiPlayground() {
                               ))}
                             </TableBody>
                           </Table>
-                        </ScrollArea>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between">
