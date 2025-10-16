@@ -426,7 +426,7 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
       }
 
       try {
-        await db.insert(fantasyProsNews).values({
+        const newsData = {
           sport,
           newsId: String(item.news_id || item.id),
           playerId: item.player_id ? String(item.player_id) : null,
@@ -438,13 +438,28 @@ export async function refreshNews(sport: string, limit: number = 50): Promise<Re
           analysis: item.analysis || item.impact,
           source: item.source,
           newsDate: item.updated || item.created ? new Date(item.updated || item.created) : null,
-        });
+        };
+
+        // Use upsert to update existing records with new player data
+        await db.insert(fantasyProsNews)
+          .values(newsData)
+          .onConflictDoUpdate({
+            target: fantasyProsNews.newsId,
+            set: {
+              playerName,
+              team,
+              position,
+              headline: newsData.headline,
+              description: newsData.description,
+              analysis: newsData.analysis,
+              source: newsData.source,
+              newsDate: newsData.newsDate,
+            },
+          });
         insertedCount++;
       } catch (err: any) {
-        // Skip duplicates (unique constraint violation)
-        if (!err.message?.includes('unique') && !err.message?.includes('duplicate')) {
-          throw err;
-        }
+        console.error('Error inserting/updating news item:', err);
+        throw err;
       }
     }
 
