@@ -19,6 +19,14 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - All data validated before insertion: players require id/name, rankings require id/name/rank, projections require id/name/points, news requires newsId/headline
 - Database schema pushed to Neon database successfully using .env DATABASE_URL
 
+**October 16, 2025** - Fixed News Refresh to Populate Player Details
+- Root Cause: Fantasy Pros news API only returns player_id and team_id, NOT player_name, team name, or position
+- Solution: Updated refreshNews() to lookup player details from fantasy_pros_players table using player_id
+- When news item has player_id, queries players table to get: player_name, team (full name), position
+- Correct Workflow: Must refresh Players FIRST, then refresh News (news depends on having player data for lookups)
+- Also fixed field mappings: news API uses 'desc' not 'description', 'impact' not 'analysis', 'created' not 'updated'
+- News items without player_id or where player isn't found in players table will have null for player_name/position
+
 **October 2, 2025** - Multi-User Authentication System Implementation
 - Implemented complete username/password authentication system using passport-local strategy
 - Replaced hardcoded "default-user" with session-based authentication for true multi-user support
