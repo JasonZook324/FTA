@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,10 +12,23 @@ export default function Jobs() {
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
   
+  // Fetch leagues to get current week
+  const { data: leagues } = useQuery<any[]>({
+    queryKey: ['/api/leagues'],
+  });
+  const currentLeague = leagues?.[0];
+  
   // Fantasy Pros parameters
   const [fpSport, setFpSport] = useState("NFL");
   const [fpSeason, setFpSeason] = useState("2025");
   const [fpWeek, setFpWeek] = useState("");
+
+  // Set default week to current week when league data loads
+  useEffect(() => {
+    if (currentLeague?.currentWeek && !fpWeek) {
+      setFpWeek(currentLeague.currentWeek.toString());
+    }
+  }, [currentLeague?.currentWeek, fpWeek]);
 
   async function runJob(endpoint: string, label: string, body?: any) {
     setLoading(true);
