@@ -169,6 +169,24 @@ export default function Jobs() {
 
           <Separator />
 
+          {/* Clear and Refresh News Button */}
+          <Button
+            data-testid="button-fp-clear-refresh-news"
+            disabled={loading}
+            onClick={() => runJob(
+              "/api/jobs/fp-clear-and-refresh-news",
+              "Clear and Refresh News",
+              { sport: fpSport, limit: 50 }
+            )}
+            variant="destructive"
+            className="w-full"
+          >
+            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Clear and Refresh News (Fixes old records with missing player data)
+          </Button>
+
+          <Separator />
+
           {/* Refresh All Button */}
           <Button
             data-testid="button-fp-refresh-all"

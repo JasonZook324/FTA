@@ -4027,6 +4027,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/jobs/fp-clear-and-refresh-news", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', limit = 50 } = req.body;
+      const { db } = await import('./db');
+      const { fantasyProsNews } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      // Delete all news for this sport
+      await db.delete(fantasyProsNews).where(eq(fantasyProsNews.sport, sport));
+      console.log(`Deleted all ${sport} news records`);
+      
+      // Refresh news (will now have player data since players table is populated)
+      const { refreshNews } = await import("./fantasyProsService");
+      const result = await refreshNews(sport, limit);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Cleared old news and refreshed ${result.recordCount} ${sport} news items with complete player data`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh news after clearing' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros clear and refresh news error:', error);
+      res.status(500).json({ message: error.message || 'Failed to clear and refresh news' });
+    }
+  });
+
   app.post("/api/jobs/fp-refresh-all", requireAuth, async (req, res) => {
     try {
       const { sport = 'NFL', season = 2024, week } = req.body;
