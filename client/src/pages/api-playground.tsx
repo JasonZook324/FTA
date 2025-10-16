@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Send, Copy, Check, Database, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Send, Copy, Check, Database, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { JsonViewerWithSearch } from "@/components/json-viewer";
 import { useQuery } from "@tanstack/react-query";
@@ -467,26 +468,72 @@ export default function ApiPlayground() {
                     </div>
                   ) : tableData?.data && tableData.data.length > 0 ? (
                     <>
-                      <div className="border rounded-lg">
-                        <ScrollArea className="h-[500px]">
+                      <div className="border rounded-lg overflow-auto">
+                        <ScrollArea className="h-[500px] w-full">
                           <Table>
-                            <TableHeader className="sticky top-0 bg-background">
+                            <TableHeader className="sticky top-0 bg-background z-10">
                               <TableRow>
                                 {columnsData.columns.map((column: any) => (
-                                  <TableHead key={column.column_name} className="whitespace-nowrap">
+                                  <TableHead key={column.column_name} className="whitespace-nowrap min-w-[120px]">
                                     {column.column_name}
                                   </TableHead>
                                 ))}
+                                <TableHead className="w-20">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {tableData.data.map((row: any, idx: number) => (
                                 <TableRow key={idx} data-testid={`row-data-${idx}`}>
-                                  {columnsData.columns.map((column: any) => (
-                                    <TableCell key={column.column_name} className="max-w-xs truncate">
-                                      {row[column.column_name]?.toString() || '-'}
-                                    </TableCell>
-                                  ))}
+                                  {columnsData.columns.map((column: any, colIdx: number) => {
+                                    const cellValue = row[column.column_name]?.toString() || '-';
+                                    
+                                    return (
+                                      <TableCell 
+                                        key={column.column_name} 
+                                        className="max-w-xs"
+                                      >
+                                        <div className="truncate">
+                                          {cellValue}
+                                        </div>
+                                      </TableCell>
+                                    );
+                                  })}
+                                  <TableCell className="w-20">
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          data-testid={`button-more-info-${idx}`}
+                                        >
+                                          <Info className="h-4 w-4" />
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                                        <DialogHeader>
+                                          <DialogTitle>Record Details</DialogTitle>
+                                          <DialogDescription>
+                                            Complete data for this record
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-3">
+                                          {columnsData.columns.map((column: any) => {
+                                            const value = row[column.column_name];
+                                            return (
+                                              <div key={column.column_name} className="border-b pb-3 last:border-b-0">
+                                                <div className="text-sm font-semibold text-muted-foreground mb-1">
+                                                  {column.column_name}
+                                                </div>
+                                                <div className="text-sm break-words whitespace-pre-wrap">
+                                                  {value?.toString() || <span className="text-muted-foreground">-</span>}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
