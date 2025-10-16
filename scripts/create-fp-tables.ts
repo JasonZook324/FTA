@@ -3,8 +3,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Match the same DATABASE_URL logic as server/db.ts
-// Parse .env file directly to override Replit's auto-provisioned DATABASE_URL
+// Load DATABASE_URL from .env file (Neon database)
 let DATABASE_URL = process.env.DATABASE_URL;
 
 try {

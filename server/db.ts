@@ -8,7 +8,7 @@ import * as path from 'path';
 
 neonConfig.webSocketConstructor = ws;
 
-// Parse .env file directly to override Replit's auto-provisioned DATABASE_URL
+// Load DATABASE_URL from .env file (Neon database)
 let databaseUrl = process.env.DATABASE_URL;
 
 try {

@@ -37,7 +37,7 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Session management: PostgreSQL-backed session store with 7-day cookie expiration
 - Frontend: useAuth hook, AuthProvider context, ProtectedRoute wrapper, and authentication page at /auth
 - Sidebar now shows logged-in username and includes logout button with user context
-- Application now portable - can deploy anywhere (not tied to Replit Auth infrastructure)
+- Application now portable - can deploy anywhere using standard username/password authentication
 - End-to-end tested: registration, login, logout, protected route access, and session persistence
 
 **September 30, 2025** - Mobile Responsiveness Improvements
@@ -76,9 +76,11 @@ The server is built on Express.js with TypeScript, following a RESTful API desig
 The backend includes middleware for request logging, error handling, and development-specific features like Vite integration for hot module replacement during development.
 
 ### Data Storage Solutions
-The application uses PostgreSQL as the primary database with Drizzle ORM for type-safe database operations and migrations. The database schema includes tables for users, ESPN credentials, leagues, teams, matchups, and players with proper foreign key relationships.
+The application uses **Neon PostgreSQL** as the ONLY database for all data storage. The DATABASE_URL is loaded from the `.env` file and uses Drizzle ORM for type-safe database operations and migrations. The database schema includes tables for users, ESPN credentials, leagues, teams, matchups, players, and Fantasy Pros data (players, rankings, projections, news).
 
-For development flexibility, the system includes an in-memory storage implementation that mirrors the database interface, allowing for rapid prototyping and testing without database dependencies.
+**IMPORTANT**: This application ONLY uses the Neon database specified in `.env`. Never use any other database for data storage.
+
+For development flexibility, the system includes an in-memory storage implementation that mirrors the database interface, allowing for rapid prototyping and testing without database dependencies (though this is not currently used).
 
 ### Authentication and Authorization
 The application implements a dual-layer authentication system:
@@ -111,7 +113,7 @@ The application also integrates with Neon Database for PostgreSQL hosting and in
 - **Form Handling**: React Hook Form with Zod validation
 - **Build Tools**: Vite for fast development and optimized production builds
 - **External API**: ESPN Fantasy Sports API v3 for league and player data
-- **Development Tools**: Replit-specific plugins for development environment integration
+- **Development Tools**: Vite plugins for development environment integration
 
 ## Database Viewer (API Playground)
 
