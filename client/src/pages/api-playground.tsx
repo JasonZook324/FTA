@@ -485,7 +485,17 @@ export default function ApiPlayground() {
                               {tableData.data.map((row: any, idx: number) => (
                                 <TableRow key={idx} data-testid={`row-data-${idx}`}>
                                   {columnsData.columns.map((column: any, colIdx: number) => {
-                                    const cellValue = row[column.column_name]?.toString() || '-';
+                                    const value = row[column.column_name];
+                                    let cellValue = '-';
+                                    
+                                    if (value !== null && value !== undefined) {
+                                      // Check if it's a JSON object
+                                      if (typeof value === 'object') {
+                                        cellValue = JSON.stringify(value);
+                                      } else {
+                                        cellValue = value.toString();
+                                      }
+                                    }
                                     
                                     return (
                                       <TableCell 
@@ -519,13 +529,24 @@ export default function ApiPlayground() {
                                         <div className="space-y-3">
                                           {columnsData.columns.map((column: any) => {
                                             const value = row[column.column_name];
+                                            let displayValue = '-';
+                                            
+                                            if (value !== null && value !== undefined) {
+                                              // Check if it's a JSON object
+                                              if (typeof value === 'object') {
+                                                displayValue = JSON.stringify(value, null, 2);
+                                              } else {
+                                                displayValue = value.toString();
+                                              }
+                                            }
+                                            
                                             return (
                                               <div key={column.column_name} className="border-b pb-3 last:border-b-0">
                                                 <div className="text-sm font-semibold text-muted-foreground mb-1">
                                                   {column.column_name}
                                                 </div>
-                                                <div className="text-sm break-words whitespace-pre-wrap">
-                                                  {value?.toString() || <span className="text-muted-foreground">-</span>}
+                                                <div className="text-sm break-words whitespace-pre-wrap font-mono">
+                                                  {displayValue !== '-' ? displayValue : <span className="text-muted-foreground">-</span>}
                                                 </div>
                                               </div>
                                             );

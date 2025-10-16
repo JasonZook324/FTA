@@ -336,7 +336,7 @@ export async function refreshProjections(
         playerName: p.name || p.player_name || p.playerName,
         team: p.team_id || p.team_abbr || p.team || p.teamAbbr,
         position: p.position_id || p.position,
-        opponent: p.opponent || p.opp,
+        opponent: p.opponent || p.opp || p.opponent_id || p.opponent_abbr || null,
         scoringType,
         projectedPoints: String(p.stats?.points_ppr || p.stats?.points || p.fpts || p.projected_points),
         stats: p.stats || p,
