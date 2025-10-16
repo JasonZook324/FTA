@@ -4051,6 +4051,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Database viewer endpoints
+  app.get("/api/db/tables", requireAuth, async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db.execute(sql`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `);
+      
+      res.json({ tables: result.rows });
+    } catch (error: any) {
+      console.error('Error fetching tables:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch tables' });
+    }
+  });
+
+  app.get("/api/db/tables/:tableName/columns", requireAuth, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db.execute(sql`
+        SELECT 
+          column_name,
+          data_type,
+          is_nullable,
+          column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+        ORDER BY ordinal_position
+      `);
+      
+      res.json({ columns: result.rows });
+    } catch (error: any) {
+      console.error('Error fetching columns:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch columns' });
+    }
+  });
+
+  app.post("/api/db/tables/:tableName/query", requireAuth, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      const { filters = {}, limit = 100, offset = 0 } = req.body;
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      // Build WHERE clause from filters
+      const whereConditions: string[] = [];
+      
+      Object.entries(filters).forEach(([column, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          whereConditions.push(`${column}::text ILIKE '%${String(value).replace(/'/g, "''")}%'`);
+        }
+      });
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      // Get total count with filters
+      const countQuery = `SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`;
+      const countResult = await db.execute(sql.raw(countQuery));
+      const total = parseInt(countResult.rows[0]?.total || '0');
+      
+      // Get data with pagination - try to order by id, fallback to first column
+      let dataQuery: string;
+      try {
+        // Try ordering by id first
+        dataQuery = `SELECT * FROM ${tableName} ${whereClause} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
+        const dataResult = await db.execute(sql.raw(dataQuery));
+        
+        res.json({ 
+          data: dataResult.rows,
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total
+        });
+        return;
+      } catch (err) {
+        // If id column doesn't exist, just get data without specific ordering
+        dataQuery = `SELECT * FROM ${tableName} ${whereClause} LIMIT ${limit} OFFSET ${offset}`;
+      }
+      
+      const dataResult = await db.execute(sql.raw(dataQuery));
+      
+      res.json({ 
+        data: dataResult.rows,
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total
+      });
+    } catch (error: any) {
+      console.error('Error querying table:', error);
+      res.status(500).json({ message: error.message || 'Failed to query table' });
+    }
+  });
+
   // Fantasy Pros API proxy endpoint to avoid CORS issues
   app.post("/api/fantasy-pros-proxy", requireAuth, async (req, res) => {
     try {

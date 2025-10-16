@@ -104,3 +104,13 @@ The application also integrates with Neon Database for PostgreSQL hosting and in
 - **Build Tools**: Vite for fast development and optimized production builds
 - **External API**: ESPN Fantasy Sports API v3 for league and player data
 - **Development Tools**: Replit-specific plugins for development environment integration
+
+## Database Viewer (API Playground)
+
+**October 16, 2025** - Database Table Viewer Feature
+- Added Database Viewer tab to API Playground page for browsing Neon database tables
+- Backend endpoints: GET /api/db/tables (list tables), GET /api/db/tables/:tableName/columns (get schema), POST /api/db/tables/:tableName/query (query with filters and pagination)
+- Frontend UI: Table selector dropdown, column-based filtering inputs, paginated data table (50 rows/page)
+- Security: SQL injection protection via escaped single quotes, ILIKE case-insensitive search on all columns
+- Query optimization: Try ORDER BY id DESC, fallback to unordered if id column doesn't exist
+- Fully functional for viewing and filtering all database tables including Fantasy Pros data tables
