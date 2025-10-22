@@ -49,6 +49,18 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Added iOS-specific fixes (16px input font size to prevent zoom, proper touch targets)
 - All screen elements now visible and accessible on mobile devices
 
+**October 22, 2025** - Fantasy Pros Database Integration in AI Prompts
+- Added optional Fantasy Pros data inclusion in AI analysis and question prompts
+- Three checkboxes allow users to select which data to include: News, Projections, Rankings
+- Backend fetches requested data from Neon database tables (fantasy_pros_news, fantasy_pros_projections, fantasy_pros_rankings)
+- News: Latest 50 items with player names, positions, teams, headlines, and descriptions
+- Projections: Top 100 players by projected points, grouped by position, includes opponent matchups and scoring type
+- Rankings: Top 100 expert consensus rankings, grouped by position, includes rank tiers and average rankings
+- Prompt builder formats Fantasy Pros data into organized sections with position grouping for better AI analysis
+- Data is season-aware for projections and rankings, ensuring relevance to current league season
+- Checkbox options appear in header after league and team selection
+- All Fantasy Pros data sections are optional - unchecking all boxes generates prompts without external data
+
 **September 30, 2025** - Enhanced Generate Analysis Prompt Feature
 - Updated the Generate Analysis Prompt to use real ESPN API data instead of mock data
 - Integrated live team roster data (starters/bench/injured reserve) using TeamContext for selected team
