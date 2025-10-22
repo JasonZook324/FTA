@@ -57,12 +57,12 @@ export interface LineupOptimization {
 
 export class FantasyGeminiService {
   // Public method to get the prompt without calling AI
-  getAnalysisPrompt(leagueData: any, teamData?: any): string {
-    return this.buildAnalysisPrompt(leagueData, teamData);
+  getAnalysisPrompt(leagueData: any, fantasyProsData?: any): string {
+    return this.buildAnalysisPrompt(leagueData, fantasyProsData);
   }
 
   // Public method to get the question prompt without calling AI
-  getQuestionPrompt(question: string, leagueData: any): string {
+  getQuestionPrompt(question: string, leagueData: any, fantasyProsData?: any): string {
     const userTeam = leagueData.userTeam || {};
     const scoringSettings = leagueData.scoringSettings || {};
     const weekContext = leagueData.weekContext || {};
@@ -87,14 +87,14 @@ Bench: ${userTeam.roster?.filter((p: any) => p.isBench).map((p: any) => p.name).
 Scoring: ${scoringFormat} (${scoringSettings.receptionPoints || 0} points per reception)
 Current Week: ${weekContext.currentWeek} (${weekContext.seasonType})
 Season: ${weekContext.season}
-
+${this.buildFantasyProsDataSection(fantasyProsData)}
 User Question: ${question}
 
 Provide a detailed, specific response that considers:
 - The user's actual roster and team situation
 - The league's scoring format and how it affects strategy
 - The current week and season context
-- Specific actionable advice based on the data above
+- Specific actionable advice based on the data above${fantasyProsData ? '\n- Fantasy Pros news, rankings, and projections data provided above' : ''}
 `;
   }
 
@@ -248,7 +248,84 @@ Provide a detailed, specific response that considers:
     throw new Error("Unexpected error in askQuestion");
   }
 
-  private buildAnalysisPrompt(leagueData: any, teamData?: any): string {
+  private buildFantasyProsDataSection(fantasyProsData?: any): string {
+    if (!fantasyProsData) return '';
+    
+    let sections = '';
+    
+    // Add News Section
+    if (fantasyProsData.news && fantasyProsData.news.length > 0) {
+      sections += `\n\n==== FANTASY PROS PLAYER NEWS (Latest ${fantasyProsData.news.length} Items) ====\n`;
+      fantasyProsData.news.slice(0, 30).forEach((newsItem: any) => {
+        const playerInfo = newsItem.playerName ? `${newsItem.playerName} (${newsItem.position || 'N/A'}, ${newsItem.team || 'N/A'})` : 'General News';
+        sections += `- ${playerInfo}: ${newsItem.headline}\n`;
+        if (newsItem.description) {
+          sections += `  ${newsItem.description}\n`;
+        }
+      });
+    }
+    
+    // Add Rankings Section
+    if (fantasyProsData.rankings && fantasyProsData.rankings.length > 0) {
+      sections += `\n\n==== FANTASY PROS EXPERT CONSENSUS RANKINGS (Top ${Math.min(50, fantasyProsData.rankings.length)} Players) ====\n`;
+      const positionGroups: Record<string, any[]> = {};
+      
+      // Group by position
+      fantasyProsData.rankings.forEach((player: any) => {
+        if (!positionGroups[player.position]) {
+          positionGroups[player.position] = [];
+        }
+        positionGroups[player.position].push(player);
+      });
+      
+      // Display by position
+      Object.keys(positionGroups).sort().forEach(position => {
+        const players = positionGroups[position].slice(0, 15);
+        if (players.length > 0) {
+          sections += `\n${position} Rankings (${players[0].rankType || 'weekly'}, ${players[0].scoringType || 'PPR'}):\n`;
+          players.forEach((player: any) => {
+            sections += `  ${player.rank}. ${player.playerName} (${player.team || 'FA'})`;
+            if (player.avgRank) sections += ` - Avg: ${player.avgRank}`;
+            if (player.tier) sections += ` - Tier ${player.tier}`;
+            sections += '\n';
+          });
+        }
+      });
+    }
+    
+    // Add Projections Section
+    if (fantasyProsData.projections && fantasyProsData.projections.length > 0) {
+      sections += `\n\n==== FANTASY PROS PROJECTIONS (Top ${Math.min(50, fantasyProsData.projections.length)} Players) ====\n`;
+      const positionGroups: Record<string, any[]> = {};
+      
+      // Group by position
+      fantasyProsData.projections.forEach((player: any) => {
+        const pos = player.position || 'FLEX';
+        if (!positionGroups[pos]) {
+          positionGroups[pos] = [];
+        }
+        positionGroups[pos].push(player);
+      });
+      
+      // Display by position
+      Object.keys(positionGroups).sort().forEach(position => {
+        const players = positionGroups[position].slice(0, 15);
+        if (players.length > 0) {
+          sections += `\n${position} Projections (${players[0].scoringType || 'PPR'}${players[0].week ? `, Week ${players[0].week}` : ', Season'}):\n`;
+          players.forEach((player: any) => {
+            sections += `  ${player.playerName} (${player.team || 'FA'})`;
+            if (player.opponent) sections += ` vs ${player.opponent}`;
+            sections += ` - Proj: ${player.projectedPoints || '0.0'} pts`;
+            sections += '\n';
+          });
+        }
+      });
+    }
+    
+    return sections;
+  }
+
+  private buildAnalysisPrompt(leagueData: any, fantasyProsData?: any): string {
     const userTeam = leagueData.userTeam || {};
     const waiverWire = leagueData.waiverWire || {};
     const scoringSettings = leagueData.scoringSettings || {};
@@ -299,7 +376,7 @@ ${ir.map((p: any) =>
 ${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => 
   `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`
 ).join('\n') : '- No waiver wire data available'}
-
+${this.buildFantasyProsDataSection(fantasyProsData)}
 ==== REQUESTED ANALYSIS ====
 Please provide a comprehensive fantasy football analysis with the following sections:
 

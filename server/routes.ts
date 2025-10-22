@@ -9,6 +9,9 @@ import {
 import { z } from "zod";
 import { geminiService } from './geminiService';
 import { setupAuth } from "./auth";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 // ESPN API service
 class EspnApiService {
@@ -1577,7 +1580,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Recommendations Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-recommendations-prompt", requireAuth, async (req: any, res) => {
     try {
-      const { teamId } = req.body;
+      const { teamId, includeFantasyProsData } = req.body;
+      const fpOptions = includeFantasyProsData || { news: false, projections: false, rankings: false };
       
       // Helper functions for roster data formatting (local to this endpoint)
       const getNFLTeamName = (teamId: number): string => {
@@ -1791,8 +1795,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Prepared analysis data: Team ${leagueAnalysisData.userTeam.name}, ${userRoster.length} players, ${availablePlayers.length} waiver options`);
 
+      // Fetch Fantasy Pros data if requested
+      let fantasyProsData: any = null;
+      if (fpOptions.news || fpOptions.projections || fpOptions.rankings) {
+        fantasyProsData = {};
+        
+        if (fpOptions.news) {
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          fantasyProsData.news = newsResult;
+          console.log(`Fetched ${newsResult.length} Fantasy Pros news items`);
+        }
+        
+        if (fpOptions.projections) {
+          const projectionsResult = await db
+            .select()
+            .from(schema.fantasyProsProjections)
+            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL' AND ${schema.fantasyProsProjections.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC NULLS LAST`)
+            .limit(100);
+          fantasyProsData.projections = projectionsResult;
+          console.log(`Fetched ${projectionsResult.length} Fantasy Pros projections`);
+        }
+        
+        if (fpOptions.rankings) {
+          const rankingsResult = await db
+            .select()
+            .from(schema.fantasyProsRankings)
+            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL' AND ${schema.fantasyProsRankings.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
+            .limit(100);
+          fantasyProsData.rankings = rankingsResult;
+          console.log(`Fetched ${rankingsResult.length} Fantasy Pros rankings`);
+        }
+      }
+
       // Get the HTML-formatted prompt without calling AI
-      const prompt = geminiService.getAnalysisPrompt(leagueAnalysisData);
+      const prompt = geminiService.getAnalysisPrompt(leagueAnalysisData, fantasyProsData);
       res.json({ prompt });
     } catch (error: any) {
       console.error('Prompt Generation Error:', error);
@@ -1803,7 +1846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Question Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-question-prompt", requireAuth, async (req: any, res) => {
     try {
-      const { question, teamId } = req.body;
+      const { question, teamId, includeFantasyProsData } = req.body;
+      const fpOptions = includeFantasyProsData || { news: false, projections: false, rankings: false };
+      
       if (!question) {
         return res.status(400).json({ message: "Question is required" });
       }
@@ -2040,8 +2085,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoringType: contextData.scoringSettings.isFullPPR ? 'Full PPR' : contextData.scoringSettings.isHalfPPR ? 'Half PPR' : 'Standard'
       });
 
+      // Fetch Fantasy Pros data if requested
+      let fantasyProsData: any = null;
+      if (fpOptions.news || fpOptions.projections || fpOptions.rankings) {
+        fantasyProsData = {};
+        
+        if (fpOptions.news) {
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          fantasyProsData.news = newsResult;
+          console.log(`Fetched ${newsResult.length} Fantasy Pros news items for question prompt`);
+        }
+        
+        if (fpOptions.projections) {
+          const projectionsResult = await db
+            .select()
+            .from(schema.fantasyProsProjections)
+            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL' AND ${schema.fantasyProsProjections.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC NULLS LAST`)
+            .limit(100);
+          fantasyProsData.projections = projectionsResult;
+          console.log(`Fetched ${projectionsResult.length} Fantasy Pros projections for question prompt`);
+        }
+        
+        if (fpOptions.rankings) {
+          const rankingsResult = await db
+            .select()
+            .from(schema.fantasyProsRankings)
+            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL' AND ${schema.fantasyProsRankings.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
+            .limit(100);
+          fantasyProsData.rankings = rankingsResult;
+          console.log(`Fetched ${rankingsResult.length} Fantasy Pros rankings for question prompt`);
+        }
+      }
+
       // Get the prompt with comprehensive live data
-      const prompt = geminiService.getQuestionPrompt(question, contextData);
+      const prompt = geminiService.getQuestionPrompt(question, contextData, fantasyProsData);
       res.json({ prompt });
     } catch (error: any) {
       console.error('Question Prompt Generation Error:', error);
