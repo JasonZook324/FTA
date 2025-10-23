@@ -13,6 +13,9 @@ import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
 import TradeAnalyzer from "@/pages/trade-analyzer";
 import PromptBuilder from "@/pages/prompt-builder";
+import Jobs from "@/pages/jobs";
+import Streaming from "@/pages/streaming";
+import ApiPlayground from "@/pages/api-playground";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -103,6 +106,30 @@ function App() {
                   </div>
                 </div>
               )} />
+
+                <ProtectedRoute path="/jobs" component={() => (
+                  <div className="flex min-h-screen">
+                    <Sidebar />
+                    <div className="flex-1 flex flex-col lg:ml-0">
+                      <LeagueHeader />
+                      <main className="flex-1 overflow-y-auto">
+                        <Jobs />
+                      </main>
+                    </div>
+                  </div>
+                )} />
+
+                  <ProtectedRoute path="/streaming" component={() => (
+                    <div className="flex min-h-screen">
+                      <Sidebar />
+                      <div className="flex-1 flex flex-col lg:ml-0">
+                        <LeagueHeader />
+                        <main className="flex-1 overflow-y-auto">
+                          <Streaming />
+                        </main>
+                      </div>
+                    </div>
+                  )} />
               
               <ProtectedRoute path="/ai-recommendations" component={() => (
                 <div className="flex min-h-screen">
@@ -135,6 +162,17 @@ function App() {
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
                       <PromptBuilder />
+                    </main>
+                  </div>
+                </div>
+              )} />
+              
+              <ProtectedRoute path="/api-playground" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <main className="flex-1 overflow-y-auto">
+                      <ApiPlayground />
                     </main>
                   </div>
                 </div>

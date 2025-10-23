@@ -8,6 +8,25 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 
 ## Recent Changes
 
+**October 15, 2025** - Fantasy Pros API Integration for Contextual Data Refresh
+- Designed and implemented comprehensive Fantasy Pros database schema with tables: fantasy_pros_players, fantasy_pros_rankings, fantasy_pros_projections, fantasy_pros_news, fantasy_pros_refresh_log
+- Created Fantasy Pros service (fantasyProsService.ts) with strict data validation - no fallback values, skips records missing required fields
+- Implemented refresh endpoints for players, rankings, projections, and news with proper API normalization (UPPERCASE for players/rankings/news, lowercase for projections)
+- Rankings endpoint automatically fetches all main positions (QB, RB, WR, TE, K, DST) when no position specified
+- Made position field nullable in projections table to handle API responses without position data
+- Added comprehensive logging for API calls and data validation to aid debugging
+- Updated Jobs page with Fantasy Pros data refresh UI - default season updated to 2025
+- All data validated before insertion: players require id/name, rankings require id/name/rank, projections require id/name/points, news requires newsId/headline
+- Database schema pushed to Neon database successfully using .env DATABASE_URL
+
+**October 16, 2025** - Fixed News Refresh to Populate Player Details
+- Root Cause: Fantasy Pros news API only returns player_id and team_id, NOT player_name, team name, or position
+- Solution: Updated refreshNews() to lookup player details from fantasy_pros_players table using player_id
+- When news item has player_id, queries players table to get: player_name, team (full name), position
+- Correct Workflow: Must refresh Players FIRST, then refresh News (news depends on having player data for lookups)
+- Also fixed field mappings: news API uses 'desc' not 'description', 'impact' not 'analysis', 'created' not 'updated'
+- News items without player_id or where player isn't found in players table will have null for player_name/position
+
 **October 2, 2025** - Multi-User Authentication System Implementation
 - Implemented complete username/password authentication system using passport-local strategy
 - Replaced hardcoded "default-user" with session-based authentication for true multi-user support
@@ -18,7 +37,7 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Session management: PostgreSQL-backed session store with 7-day cookie expiration
 - Frontend: useAuth hook, AuthProvider context, ProtectedRoute wrapper, and authentication page at /auth
 - Sidebar now shows logged-in username and includes logout button with user context
-- Application now portable - can deploy anywhere (not tied to Replit Auth infrastructure)
+- Application now portable - can deploy anywhere using standard username/password authentication
 - End-to-end tested: registration, login, logout, protected route access, and session persistence
 
 **September 30, 2025** - Mobile Responsiveness Improvements
@@ -29,6 +48,27 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Enhanced page headers (standings, rosters, etc.) to stack content on small screens
 - Added iOS-specific fixes (16px input font size to prevent zoom, proper touch targets)
 - All screen elements now visible and accessible on mobile devices
+
+**October 23, 2025** - Inline Player News Display in AI Prompts
+- Player news now appears directly alongside each player in the roster and waiver wire sections
+- When News checkbox is enabled, news is matched by player name and displayed inline with player stats
+- Format: Each player with news shows "📰 NEWS: [headline] - [description]" beneath their stats
+- Applies to starters, bench players, injured reserve, and waiver wire players in analysis prompts
+- Question prompts also include inline news in compact format: "PlayerName (📰 headline - description)"
+- News is fetched once from database and mapped to players for efficient lookups
+- Separate Fantasy Pros data sections (rankings, projections) still appear at end of prompt for additional context
+
+**October 22, 2025** - Fantasy Pros Database Integration in AI Prompts
+- Added optional Fantasy Pros data inclusion in AI analysis and question prompts
+- Three checkboxes allow users to select which data to include: News, Projections, Rankings
+- Backend fetches requested data from Neon database tables (fantasy_pros_news, fantasy_pros_projections, fantasy_pros_rankings)
+- News: Latest 50 items with player names, positions, teams, headlines, and descriptions
+- Projections: Top 100 players by projected points, grouped by position, includes opponent matchups and scoring type
+- Rankings: Top 100 expert consensus rankings, grouped by position, includes rank tiers and average rankings
+- Prompt builder formats Fantasy Pros data into organized sections with position grouping for better AI analysis
+- Data is season-aware for projections and rankings, ensuring relevance to current league season
+- Checkbox options appear in header after league and team selection
+- All Fantasy Pros data sections are optional - unchecking all boxes generates prompts without external data
 
 **September 30, 2025** - Enhanced Generate Analysis Prompt Feature
 - Updated the Generate Analysis Prompt to use real ESPN API data instead of mock data
@@ -57,9 +97,11 @@ The server is built on Express.js with TypeScript, following a RESTful API desig
 The backend includes middleware for request logging, error handling, and development-specific features like Vite integration for hot module replacement during development.
 
 ### Data Storage Solutions
-The application uses PostgreSQL as the primary database with Drizzle ORM for type-safe database operations and migrations. The database schema includes tables for users, ESPN credentials, leagues, teams, matchups, and players with proper foreign key relationships.
+The application uses **Neon PostgreSQL** as the ONLY database for all data storage. The DATABASE_URL is loaded from the `.env` file and uses Drizzle ORM for type-safe database operations and migrations. The database schema includes tables for users, ESPN credentials, leagues, teams, matchups, players, and Fantasy Pros data (players, rankings, projections, news).
 
-For development flexibility, the system includes an in-memory storage implementation that mirrors the database interface, allowing for rapid prototyping and testing without database dependencies.
+**IMPORTANT**: This application ONLY uses the Neon database specified in `.env`. Never use any other database for data storage.
+
+For development flexibility, the system includes an in-memory storage implementation that mirrors the database interface, allowing for rapid prototyping and testing without database dependencies (though this is not currently used).
 
 ### Authentication and Authorization
 The application implements a dual-layer authentication system:
@@ -92,4 +134,25 @@ The application also integrates with Neon Database for PostgreSQL hosting and in
 - **Form Handling**: React Hook Form with Zod validation
 - **Build Tools**: Vite for fast development and optimized production builds
 - **External API**: ESPN Fantasy Sports API v3 for league and player data
-- **Development Tools**: Replit-specific plugins for development environment integration
+- **Development Tools**: Vite plugins for development environment integration
+
+## API Playground
+
+**October 16, 2025** - Enhanced Fantasy Pros API Tester
+- Simplified endpoint configuration with dropdown-based interface
+- Predefined endpoints: Players, Injuries, Consensus Rankings, Projections, News
+- Dynamic parameter inputs based on selected endpoint (Season, Week, Position, Scoring Type, Rank Type)
+- Auto-generates complete Fantasy Pros API URL from selections
+- Base URL fixed as `https://api.fantasypros.com/public/v2/json/NFL`
+- Endpoint parameters include: season (2025 default), scoring type (PPR/HALF_PPR/STD), position (QB/RB/WR/TE/K/DST), week (optional), rank type (draft/weekly/ros)
+- Generated endpoint URL displayed as read-only field for verification before making request
+
+**October 16, 2025** - Database Table Viewer Feature  
+- Added Database Viewer tab to API Playground page for browsing Neon database tables
+- Backend endpoints: GET /api/db/tables (list tables), GET /api/db/tables/:tableName/columns (get schema), POST /api/db/tables/:tableName/query (query with filters and pagination)
+- Frontend UI: Table selector dropdown, column-based filtering inputs, paginated data table (50 rows/page)
+- Security: SQL injection protection via escaped single quotes, ILIKE case-insensitive search on all columns
+- Query optimization: Try ORDER BY id DESC, fallback to unordered if id column doesn't exist
+- JSON data properly formatted: Stats column displays JSON.stringify() instead of "[object Object]"
+- "More Info" button with dialog overlay for viewing complete record details with pretty-printed JSON
+- Horizontal scrolling enabled to view all table columns including Actions column

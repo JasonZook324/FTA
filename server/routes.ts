@@ -9,6 +9,9 @@ import {
 import { z } from "zod";
 import { geminiService } from './geminiService';
 import { setupAuth } from "./auth";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 // ESPN API service
 class EspnApiService {
@@ -1577,7 +1580,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Recommendations Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-recommendations-prompt", requireAuth, async (req: any, res) => {
     try {
-      const { teamId } = req.body;
+      const { teamId, includeFantasyProsData } = req.body;
+      const fpOptions = includeFantasyProsData || { news: false, projections: false, rankings: false };
       
       // Helper functions for roster data formatting (local to this endpoint)
       const getNFLTeamName = (teamId: number): string => {
@@ -1791,8 +1795,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Prepared analysis data: Team ${leagueAnalysisData.userTeam.name}, ${userRoster.length} players, ${availablePlayers.length} waiver options`);
 
+      // Fetch Fantasy Pros data if requested
+      let fantasyProsData: any = null;
+      if (fpOptions.news || fpOptions.projections || fpOptions.rankings) {
+        fantasyProsData = {};
+        
+        if (fpOptions.news) {
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          fantasyProsData.news = newsResult;
+          console.log(`Fetched ${newsResult.length} Fantasy Pros news items`);
+        }
+        
+        if (fpOptions.projections) {
+          const projectionsResult = await db
+            .select()
+            .from(schema.fantasyProsProjections)
+            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL' AND ${schema.fantasyProsProjections.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC NULLS LAST`)
+            .limit(100);
+          fantasyProsData.projections = projectionsResult;
+          console.log(`Fetched ${projectionsResult.length} Fantasy Pros projections`);
+        }
+        
+        if (fpOptions.rankings) {
+          const rankingsResult = await db
+            .select()
+            .from(schema.fantasyProsRankings)
+            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL' AND ${schema.fantasyProsRankings.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
+            .limit(100);
+          fantasyProsData.rankings = rankingsResult;
+          console.log(`Fetched ${rankingsResult.length} Fantasy Pros rankings`);
+        }
+      }
+
       // Get the HTML-formatted prompt without calling AI
-      const prompt = geminiService.getAnalysisPrompt(leagueAnalysisData);
+      const prompt = geminiService.getAnalysisPrompt(leagueAnalysisData, fantasyProsData);
       res.json({ prompt });
     } catch (error: any) {
       console.error('Prompt Generation Error:', error);
@@ -1803,7 +1846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Question Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-question-prompt", requireAuth, async (req: any, res) => {
     try {
-      const { question, teamId } = req.body;
+      const { question, teamId, includeFantasyProsData } = req.body;
+      const fpOptions = includeFantasyProsData || { news: false, projections: false, rankings: false };
+      
       if (!question) {
         return res.status(400).json({ message: "Question is required" });
       }
@@ -2040,8 +2085,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scoringType: contextData.scoringSettings.isFullPPR ? 'Full PPR' : contextData.scoringSettings.isHalfPPR ? 'Half PPR' : 'Standard'
       });
 
+      // Fetch Fantasy Pros data if requested
+      let fantasyProsData: any = null;
+      if (fpOptions.news || fpOptions.projections || fpOptions.rankings) {
+        fantasyProsData = {};
+        
+        if (fpOptions.news) {
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          fantasyProsData.news = newsResult;
+          console.log(`Fetched ${newsResult.length} Fantasy Pros news items for question prompt`);
+        }
+        
+        if (fpOptions.projections) {
+          const projectionsResult = await db
+            .select()
+            .from(schema.fantasyProsProjections)
+            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL' AND ${schema.fantasyProsProjections.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC NULLS LAST`)
+            .limit(100);
+          fantasyProsData.projections = projectionsResult;
+          console.log(`Fetched ${projectionsResult.length} Fantasy Pros projections for question prompt`);
+        }
+        
+        if (fpOptions.rankings) {
+          const rankingsResult = await db
+            .select()
+            .from(schema.fantasyProsRankings)
+            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL' AND ${schema.fantasyProsRankings.season} = ${league.season}`)
+            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
+            .limit(100);
+          fantasyProsData.rankings = rankingsResult;
+          console.log(`Fetched ${rankingsResult.length} Fantasy Pros rankings for question prompt`);
+        }
+      }
+
       // Get the prompt with comprehensive live data
-      const prompt = geminiService.getQuestionPrompt(question, contextData);
+      const prompt = geminiService.getQuestionPrompt(question, contextData, fantasyProsData);
       res.json({ prompt });
     } catch (error: any) {
       console.error('Question Prompt Generation Error:', error);
@@ -2606,7 +2690,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       const getProjectedPoints = (playerData: any): string => {
@@ -2763,7 +2864,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       // Collect all roster data
@@ -2980,7 +3098,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getInjuryStatus = (playerData: any): string => {
         const player = playerData.player || playerData;
-        return player.injured || player.injuryStatus === 'INJURED' ? 'Injured' : 'Active';
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
       };
 
       const getLineupSlotName = (slotId: number): string => {
@@ -3495,6 +3630,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return player.proTeamId;
       };
 
+      const getInjuryStatus = (playerData: any): string => {
+        const player = playerData.player || playerData;
+        const entry = playerData.playerPoolEntry?.player || player;
+        
+        if (entry.injuryStatus === 'INJURY_RESERVE' || entry.injuryStatus === 'IR') {
+          return 'IR - "Injured Reserve"';
+        }
+        if (entry.injuryStatus === 'QUESTIONABLE' || entry.injuryStatus === 'Q') {
+          return 'Q - "Questionable"';
+        }
+        if (entry.injuryStatus === 'DOUBTFUL' || entry.injuryStatus === 'D') {
+          return 'D - "Doubtful"';
+        }
+        if (entry.injuryStatus === 'OUT' || entry.injuryStatus === 'O') {
+          return 'O - "Out"';
+        }
+        if (entry.injured || entry.injuryStatus === 'INJURED' || player.injured) {
+          return 'Injured';
+        }
+        return 'Active';
+      };
+
+      // Fetch Fantasy Pros news if requested
+      const newsMap = new Map<string, any[]>();
+      if (options.includeNewsUpdates) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          
+          // Create news map for quick lookup (player name -> news items)
+          newsResult.forEach((newsItem: any) => {
+            if (newsItem.playerName) {
+              const existing = newsMap.get(newsItem.playerName) || [];
+              existing.push(newsItem);
+              newsMap.set(newsItem.playerName, existing);
+            }
+          });
+          
+          console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
+        } catch (error: any) {
+          console.error('Error fetching Fantasy Pros news for custom prompt:', error);
+        }
+      }
+
       let promptSections = [];
 
       // Add custom prompt first
@@ -3708,6 +3893,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Filter out IR players if requested
+        if (options.excludeIRPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            // Exclude players with IR/INJURY_RESERVE status
+            return entry.injuryStatus !== 'INJURY_RESERVE' && entry.injuryStatus !== 'IR';
+          });
+        }
+
+        // Filter out Out players if requested
+        if (options.excludeOutPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'OUT' && entry.injuryStatus !== 'O';
+          });
+        }
+
+        // Filter out Doubtful players if requested
+        if (options.excludeDoubtfulPlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'DOUBTFUL' && entry.injuryStatus !== 'D';
+          });
+        }
+
+        // Filter out Questionable players if requested
+        if (options.excludeQuestionablePlayers) {
+          availablePlayers = availablePlayers.filter((playerData: any) => {
+            const player = playerData.player || playerData;
+            const entry = playerData.playerPoolEntry?.player || player;
+            return entry.injuryStatus !== 'QUESTIONABLE' && entry.injuryStatus !== 'Q';
+          });
+        }
+
         // Sort by ownership percentage (most owned first) and limit results
         const limit = options.includeWaiverWire === 'top50' ? 50 : 100;
         availablePlayers = availablePlayers
@@ -3745,7 +3967,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const positionId = player?.defaultPositionId;
                 const position = positionId ? getPositionName(positionId) : 'FLEX';
                 const ownership = player?.ownership?.percentOwned || 0;
-                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned`;
+                const injuryStatus = getInjuryStatus(playerData);
+                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned - Status: ${injuryStatus}`;
               })
               .join('\n') + '\n'
           );
@@ -3802,5 +4025,382 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+    // Jobs endpoints for refreshing data
+    app.post("/api/jobs/refresh-leagues", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshLeagues();
+        res.json({ message: "Leagues refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh leagues." });
+      }
+    });
+
+    app.post("/api/jobs/refresh-teams", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshTeams();
+        res.json({ message: "Teams refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh teams." });
+      }
+    });
+
+    app.post("/api/jobs/refresh-players", async (req, res) => {
+      try {
+        // TODO: Replace with actual refresh logic
+        // await storage.refreshPlayers();
+        res.json({ message: "Players refreshed." });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to refresh players." });
+      }
+    });
+
+  // Fantasy Pros data refresh jobs
+  app.post("/api/jobs/fp-refresh-players", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024 } = req.body;
+      const { refreshPlayers } = await import("./fantasyProsService");
+      const result = await refreshPlayers(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} players for ${season} season`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh players' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros player refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh players' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-rankings", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week, position, rankType = 'weekly', scoringType = 'PPR' } = req.body;
+      const { refreshRankings } = await import("./fantasyProsService");
+      const result = await refreshRankings(sport, season, week, position, rankType, scoringType);
+      
+      if (result.success) {
+        const weekText = week ? `week ${week}` : 'season';
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} rankings for ${weekText}`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh rankings' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros rankings refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh rankings' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-projections", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week, position, scoringType = 'PPR' } = req.body;
+      const { refreshProjections } = await import("./fantasyProsService");
+      const result = await refreshProjections(sport, season, week, position, scoringType);
+      
+      if (result.success) {
+        const weekText = week ? `week ${week}` : 'season';
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} projections for ${weekText}`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh projections' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros projections refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh projections' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-news", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', limit = 50 } = req.body;
+      const { refreshNews } = await import("./fantasyProsService");
+      const result = await refreshNews(sport, limit);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ${sport} news items`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh news' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros news refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh news' });
+    }
+  });
+
+  app.post("/api/jobs/fp-clear-and-refresh-news", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', limit = 50 } = req.body;
+      const { db } = await import('./db');
+      const { fantasyProsNews } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      // Delete all news for this sport
+      await db.delete(fantasyProsNews).where(eq(fantasyProsNews.sport, sport));
+      console.log(`Deleted all ${sport} news records`);
+      
+      // Refresh news (will now have player data since players table is populated)
+      const { refreshNews } = await import("./fantasyProsService");
+      const result = await refreshNews(sport, limit);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Cleared old news and refreshed ${result.recordCount} ${sport} news items with complete player data`,
+          count: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh news after clearing' });
+      }
+    } catch (error: any) {
+      console.error('Fantasy Pros clear and refresh news error:', error);
+      res.status(500).json({ message: error.message || 'Failed to clear and refresh news' });
+    }
+  });
+
+  app.post("/api/jobs/fp-refresh-all", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, week } = req.body;
+      const { refreshAllData } = await import("./fantasyProsService");
+      const results = await refreshAllData(sport, season, week);
+      
+      const totalCount = results.players.recordCount + results.rankings.recordCount + 
+                         results.projections.recordCount + results.news.recordCount;
+      
+      res.json({ 
+        message: `Successfully refreshed ${totalCount} total records for ${sport} ${season}`,
+        results: {
+          players: results.players.recordCount,
+          rankings: results.rankings.recordCount,
+          projections: results.projections.recordCount,
+          news: results.news.recordCount,
+        }
+      });
+    } catch (error: any) {
+      console.error('Fantasy Pros all data refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh data' });
+    }
+  });
+
+  // Database viewer endpoints
+  app.get("/api/db/tables", requireAuth, async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db.execute(sql`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `);
+      
+      res.json({ tables: result.rows });
+    } catch (error: any) {
+      console.error('Error fetching tables:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch tables' });
+    }
+  });
+
+  app.get("/api/db/tables/:tableName/columns", requireAuth, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const result = await db.execute(sql`
+        SELECT 
+          column_name,
+          data_type,
+          is_nullable,
+          column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+        ORDER BY ordinal_position
+      `);
+      
+      res.json({ columns: result.rows });
+    } catch (error: any) {
+      console.error('Error fetching columns:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch columns' });
+    }
+  });
+
+  app.post("/api/db/tables/:tableName/query", requireAuth, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      const { filters = {}, limit = 100, offset = 0 } = req.body;
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      // Build WHERE clause from filters
+      const whereConditions: string[] = [];
+      
+      Object.entries(filters).forEach(([column, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          whereConditions.push(`${column}::text ILIKE '%${String(value).replace(/'/g, "''")}%'`);
+        }
+      });
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      // Get total count with filters
+      const countQuery = `SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`;
+      const countResult = await db.execute(sql.raw(countQuery));
+      const total = parseInt(countResult.rows[0]?.total || '0');
+      
+      // Get data with pagination - try to order by id, fallback to first column
+      let dataQuery: string;
+      try {
+        // Try ordering by id first
+        dataQuery = `SELECT * FROM ${tableName} ${whereClause} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`;
+        const dataResult = await db.execute(sql.raw(dataQuery));
+        
+        res.json({ 
+          data: dataResult.rows,
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total
+        });
+        return;
+      } catch (err) {
+        // If id column doesn't exist, just get data without specific ordering
+        dataQuery = `SELECT * FROM ${tableName} ${whereClause} LIMIT ${limit} OFFSET ${offset}`;
+      }
+      
+      const dataResult = await db.execute(sql.raw(dataQuery));
+      
+      res.json({ 
+        data: dataResult.rows,
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total
+      });
+    } catch (error: any) {
+      console.error('Error querying table:', error);
+      res.status(500).json({ message: error.message || 'Failed to query table' });
+    }
+  });
+
+  // Fantasy Pros API proxy endpoint to avoid CORS issues
+  app.post("/api/fantasy-pros-proxy", requireAuth, async (req, res) => {
+    try {
+      const { apiKey, method, endpoint, queryParams, body } = req.body;
+
+      // Use provided API key or fallback to environment variable
+      const effectiveApiKey = apiKey || process.env.FantasyProsApiKey;
+      
+      console.log('Fantasy Pros Proxy - API Key provided:', !!apiKey);
+      console.log('Fantasy Pros Proxy - Using env API key:', !apiKey && !!process.env.FantasyProsApiKey);
+      console.log('Fantasy Pros Proxy - Effective API key exists:', !!effectiveApiKey);
+
+      if (!effectiveApiKey || !endpoint) {
+        return res.status(400).json({ message: "API key and endpoint are required" });
+      }
+
+      // SECURITY: Validate endpoint is a Fantasy Pros URL to prevent SSRF
+      const allowedHosts = [
+        'api.fantasypros.com',
+        'fantasypros.com'
+      ];
+      
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(endpoint);
+      } catch {
+        return res.status(400).json({ message: "Invalid endpoint URL" });
+      }
+
+      if (!allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith('.' + host))) {
+        return res.status(403).json({ message: "Only Fantasy Pros API endpoints are allowed" });
+      }
+
+      // Validate HTTP method
+      const allowedMethods = ['GET', 'POST'];
+      const requestMethod = method || 'GET';
+      if (!allowedMethods.includes(requestMethod)) {
+        return res.status(400).json({ message: "Only GET and POST methods are allowed" });
+      }
+
+      // Build URL with query params
+      let url = endpoint;
+      const params = new URLSearchParams();
+
+      // Parse query params if provided
+      if (queryParams) {
+        queryParams.split('&').forEach((param: string) => {
+          const [key, value] = param.split('=');
+          if (key && value) {
+            params.append(key.trim(), value.trim());
+          }
+        });
+      }
+
+      // Add query params to URL (do NOT add api-key to query params, only use header)
+      if (params.toString()) {
+        url += (url.includes('?') ? '&' : '?') + params.toString();
+      }
+
+      const options: RequestInit = {
+        method: requestMethod,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'x-api-key': effectiveApiKey,
+        },
+      };
+
+      // Forward POST body as-is (don't double-encode)
+      if (requestMethod === 'POST' && body) {
+        options.body = typeof body === 'string' ? body : JSON.stringify(body);
+      }
+
+      console.log('Fantasy Pros - Requesting URL:', url);
+      console.log('Fantasy Pros - Method:', requestMethod);
+      console.log('Fantasy Pros - Headers:', options.headers);
+
+      const response = await fetch(url, options);
+      
+      // Try to parse as JSON, fallback to text
+      let responseData;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        responseData = await response.text();
+      }
+
+      console.log('Fantasy Pros - Response status:', response.status);
+      console.log('Fantasy Pros - Response data:', responseData);
+
+      res.status(response.status).json({
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data: responseData,
+      });
+    } catch (error: any) {
+      console.error('Fantasy Pros proxy error:', error);
+      res.status(500).json({ 
+        error: error.message,
+        message: 'Failed to fetch from Fantasy Pros API'
+      });
+    }
+  });
+
   return httpServer;
 }

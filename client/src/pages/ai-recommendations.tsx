@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Brain, Lightbulb, TrendingUp, Users, MessageSquare, Loader2, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
@@ -34,6 +36,9 @@ export default function AIRecommendations() {
   const [question, setQuestion] = useState("");
   const [copiedAnalysis, setCopiedAnalysis] = useState(false);
   const [copiedQuestion, setCopiedQuestion] = useState(false);
+  const [includeNews, setIncludeNews] = useState(false);
+  const [includeProjections, setIncludeProjections] = useState(false);
+  const [includeRankings, setIncludeRankings] = useState(false);
 
   // Query user leagues
   const { data: leagues } = useQuery({
@@ -78,7 +83,14 @@ export default function AIRecommendations() {
       const response = await fetch(`/api/leagues/${leagueId}/ai-recommendations-prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: selectedTeam.teamId })
+        body: JSON.stringify({ 
+          teamId: selectedTeam.teamId,
+          includeFantasyProsData: {
+            news: includeNews,
+            projections: includeProjections,
+            rankings: includeRankings
+          }
+        })
       });
       if (!response.ok) throw new Error('Failed to generate prompt');
       return response.json();
@@ -103,7 +115,15 @@ export default function AIRecommendations() {
       }
       const response = await fetch(`/api/leagues/${leagueId}/ai-question-prompt`, {
         method: 'POST',
-        body: JSON.stringify({ question, teamId: selectedTeam.teamId }),
+        body: JSON.stringify({ 
+          question, 
+          teamId: selectedTeam.teamId,
+          includeFantasyProsData: {
+            news: includeNews,
+            projections: includeProjections,
+            rankings: includeRankings
+          }
+        }),
         headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to generate prompt');
@@ -225,18 +245,53 @@ export default function AIRecommendations() {
             )}
             
             {selectedLeagueId && selectedTeam && (
-              <Button 
-                onClick={handleAnalyze}
-                disabled={analysisMutation.isPending}
-                data-testid="button-analyze"
-              >
-                {analysisMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Brain className="h-4 w-4 mr-2" />
-                )}
-                Generate Analysis Prompt
-              </Button>
+              <>
+                <div className="flex flex-col gap-2 bg-muted px-3 py-2 rounded-md border border-border">
+                  <Label className="text-xs font-semibold text-muted-foreground">Include Fantasy Pros Data:</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-news" 
+                        checked={includeNews} 
+                        onCheckedChange={(checked) => setIncludeNews(checked as boolean)}
+                        data-testid="checkbox-news"
+                      />
+                      <Label htmlFor="include-news" className="text-sm cursor-pointer">News</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-projections" 
+                        checked={includeProjections} 
+                        onCheckedChange={(checked) => setIncludeProjections(checked as boolean)}
+                        data-testid="checkbox-projections"
+                      />
+                      <Label htmlFor="include-projections" className="text-sm cursor-pointer">Projections</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-rankings" 
+                        checked={includeRankings} 
+                        onCheckedChange={(checked) => setIncludeRankings(checked as boolean)}
+                        data-testid="checkbox-rankings"
+                      />
+                      <Label htmlFor="include-rankings" className="text-sm cursor-pointer">Rankings</Label>
+                    </div>
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={handleAnalyze}
+                  disabled={analysisMutation.isPending}
+                  data-testid="button-analyze"
+                >
+                  {analysisMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Brain className="h-4 w-4 mr-2" />
+                  )}
+                  Generate Analysis Prompt
+                </Button>
+              </>
             )}
           </div>
         </div>

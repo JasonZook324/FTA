@@ -1,0 +1,196 @@
+Fantasy Pros API response data count: 30
+Position DST: 30 players from API, 30 passed validation
+Successfully refreshed 418 rankings for NFL 2025
+Refreshing projections for NFL 2025 week 7...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/nfl/2025/projections?scoring=PPR&week=7
+Fantasy Pros API error (429): {"message":"Too Many Requests"}
+Error refreshing projections: Error: Fantasy Pros API error: 429  - {"message":"Too Many Requests"}
+    at fetchFromFantasyPros (/home/runner/workspace/server/fantasyProsService.ts:38:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async refreshProjections (/home/runner/workspace/server/fantasyProsService.ts:249:18)
+    at async refreshAllData (/home/runner/workspace/server/fantasyProsService.ts:422:18)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:4034:23)
+Refreshing news for NFL...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/news?limit=50
+Fantasy Pros API error (429): {"message":"Too Many Requests"}
+Error refreshing news: Error: Fantasy Pros API error: 429  - {"message":"Too Many Requests"}
+    at fetchFromFantasyPros (/home/runner/workspace/server/fantasyProsService.ts:38:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async refreshNews (/home/runner/workspace/server/fantasyProsService.ts:341:18)
+    at async refreshAllData (/home/runner/workspace/server/fantasyProsService.ts:423:11)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:4034:23)
+8:21:06 PM [express] POST /api/jobs/fp-refresh-all 200 in 2778ms :: {"message":"Successfully refresh…
+Refreshing projections for NFL 2025 week 7...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/nfl/2025/projections?scoring=PPR&week=7
+Fantasy Pros API response keys: [ 'season', 'week', 'count', 'positions', 'scoring', 'players' ]
+Fantasy Pros API response data count: 140
+Sample projection player from API: {
+  "fpid": 19217,
+  "mflid": 14802,
+  "name": "Jonathan Taylor",
+  "position_id": "RB",
+  "team_id": "IND",
+  "filename": "jonathan-taylor.php",
+  "stats": {
+    "points": 18.11,
+    "points_ppr": 21.03,
+    "points_half": 19.57,
+    "rush_att": 19.9,
+    "rush_yds": 99.66,
+    "rush_tds": 0.92,
+    "rush_yds_100": 0,
+    "rush_yds_200": 0,
+    "scrimage_yards_100": 0,
+    "scrimage_yards_200": 0,
+    "rec_rec": 2.91,
+    "rec_yds": 20.08,
+    "rec_tds": 0.13,
+    "rec_yds_100": 0,
+    "rec_yds_200": 0,
+    "fumbles": 0.09,
+    "ret_tds": 0,
+    "2pt_tds": 0
+  }
+}
+Filtering out projection: id=undefined, name=Jonathan Taylor, points=undefined
+Filtering out projection: id=undefined, name=Christian McCaffrey, points=undefined
+Filtering out projection: id=undefined, name=Bijan Robinson, points=undefined
+Filtering out projection: id=undefined, name=Josh Jacobs, points=undefined
+Filtering out projection: id=undefined, name=De'Von Achane, points=undefined
+Filtering out projection: id=undefined, name=Jahmyr Gibbs, points=undefined
+Filtering out projection: id=undefined, name=Quinshon Judkins, points=undefined
+Filtering out projection: id=undefined, name=Kyren Williams, points=undefined
+Filtering out projection: id=undefined, name=Saquon Barkley, points=undefined
+Filtering out projection: id=undefined, name=Javonte Williams, points=undefined
+Filtering out projection: id=undefined, name=Breece Hall, points=undefined
+Filtering out projection: id=undefined, name=Rachaad White, points=undefined
+Filtering out projection: id=undefined, name=Ashton Jeanty, points=undefined
+Filtering out projection: id=undefined, name=Rico Dowdle, points=undefined
+Filtering out projection: id=undefined, name=Jacory Croskey-Merritt, points=undefined
+Filtering out projection: id=undefined, name=J.K. Dobbins, points=undefined
+Filtering out projection: id=undefined, name=D'Andre Swift, points=undefined
+Filtering out projection: id=undefined, name=Cam Skattebo, points=undefined
+Filtering out projection: id=undefined, name=Jordan Mason, points=undefined
+Filtering out projection: id=undefined, name=Jaylen Warren, points=undefined
+Filtering out projection: id=undefined, name=Travis Etienne Jr., points=undefined
+Filtering out projection: id=undefined, name=Kimani Vidal, points=undefined
+Filtering out projection: id=undefined, name=Kenneth Walker III, points=undefined
+Filtering out projection: id=undefined, name=Alvin Kamara, points=undefined
+Filtering out projection: id=undefined, name=David Montgomery, points=undefined
+Filtering out projection: id=undefined, name=Rhamondre Stevenson, points=undefined
+Filtering out projection: id=undefined, name=Chase Brown, points=undefined
+Filtering out projection: id=undefined, name=Tony Pollard, points=undefined
+Filtering out projection: id=undefined, name=Chuba Hubbard, points=undefined
+Filtering out projection: id=undefined, name=Isiah Pacheco, points=undefined
+Filtering out projection: id=undefined, name=TreVeyon Henderson, points=undefined
+Filtering out projection: id=undefined, name=Kenneth Gainwell, points=undefined
+Filtering out projection: id=undefined, name=Woody Marks, points=undefined
+Filtering out projection: id=undefined, name=Zach Charbonnet, points=undefined
+Filtering out projection: id=undefined, name=Nick Chubb, points=undefined
+Filtering out projection: id=undefined, name=Zonovan Knight, points=undefined
+Filtering out projection: id=undefined, name=Kareem Hunt, points=undefined
+Filtering out projection: id=undefined, name=Tyler Allgeier, points=undefined
+Filtering out projection: id=undefined, name=RJ Harvey, points=undefined
+Filtering out projection: id=undefined, name=Kendre Miller, points=undefined
+Filtering out projection: id=undefined, name=Michael Carter, points=undefined
+Filtering out projection: id=undefined, name=Sean Tucker, points=undefined
+Filtering out projection: id=undefined, name=Tyjae Spears, points=undefined
+Filtering out projection: id=undefined, name=Blake Corum, points=undefined
+Filtering out projection: id=undefined, name=Hassan Haskins, points=undefined
+Filtering out projection: id=undefined, name=Jeremy McNichols, points=undefined
+Filtering out projection: id=undefined, name=Bhayshul Tuten, points=undefined
+Filtering out projection: id=undefined, name=Kyle Monangai, points=undefined
+Filtering out projection: id=undefined, name=Jaydon Blue, points=undefined
+Filtering out projection: id=undefined, name=Samaje Perine, points=undefined
+Filtering out projection: id=undefined, name=Zavier Scott, points=undefined
+Filtering out projection: id=undefined, name=Isaiah Davis, points=undefined
+Filtering out projection: id=undefined, name=Brian Robinson Jr., points=undefined
+Filtering out projection: id=undefined, name=Jerome Ford, points=undefined
+Filtering out projection: id=undefined, name=Raheem Mostert, points=undefined
+Filtering out projection: id=undefined, name=Emanuel Wilson, points=undefined
+Filtering out projection: id=undefined, name=Tyrone Tracy Jr., points=undefined
+Filtering out projection: id=undefined, name=Ollie Gordon II, points=undefined
+Filtering out projection: id=undefined, name=Kaleb Johnson, points=undefined
+Filtering out projection: id=undefined, name=Emari Demercado, points=undefined
+Filtering out projection: id=undefined, name=Brashard Smith, points=undefined
+Filtering out projection: id=undefined, name=Chris Rodriguez Jr., points=undefined
+Filtering out projection: id=undefined, name=Dylan Sampson, points=undefined
+Filtering out projection: id=undefined, name=Chris Brooks, points=undefined
+Filtering out projection: id=undefined, name=Trevor Etienne, points=undefined
+Filtering out projection: id=undefined, name=Phil Mafah, points=undefined
+Filtering out projection: id=undefined, name=Tyler Badie, points=undefined
+Filtering out projection: id=undefined, name=Kyle Juszczyk, points=undefined
+Filtering out projection: id=undefined, name=LeQuint Allen Jr., points=undefined
+Filtering out projection: id=undefined, name=DJ Giddens, points=undefined
+Filtering out projection: id=undefined, name=Will Shipley, points=undefined
+Filtering out projection: id=undefined, name=A.J. Dillon, points=undefined
+Filtering out projection: id=undefined, name=Jaleel McLaughlin, points=undefined
+Filtering out projection: id=undefined, name=Craig Reynolds, points=undefined
+Filtering out projection: id=undefined, name=Devin Singletary, points=undefined
+Filtering out projection: id=undefined, name=Hunter Luepke, points=undefined
+Filtering out projection: id=undefined, name=Isaac Guerendo, points=undefined
+Filtering out projection: id=undefined, name=Roschon Johnson, points=undefined
+Filtering out projection: id=undefined, name=Cam Akers, points=undefined
+Filtering out projection: id=undefined, name=Ty Chandler, points=undefined
+Filtering out projection: id=undefined, name=Devin Neal, points=undefined
+Filtering out projection: id=undefined, name=MarShawn Lloyd, points=undefined
+Filtering out projection: id=undefined, name=Tyler Goodson, points=undefined
+Filtering out projection: id=undefined, name=Jarquez Hunter, points=undefined
+Filtering out projection: id=undefined, name=Nathan Carter, points=undefined
+Filtering out projection: id=undefined, name=Elijah Mitchell, points=undefined
+Filtering out projection: id=undefined, name=George Holani, points=undefined
+Filtering out projection: id=undefined, name=Tank Bigsby, points=undefined
+Filtering out projection: id=undefined, name=Alec Ingold, points=undefined
+Filtering out projection: id=undefined, name=Jordan James, points=undefined
+Filtering out projection: id=undefined, name=C.J. Ham, points=undefined
+Filtering out projection: id=undefined, name=Tahj Brooks, points=undefined
+Filtering out projection: id=undefined, name=Julius Chestnut, points=undefined
+Filtering out projection: id=undefined, name=British Brooks, points=undefined
+Filtering out projection: id=undefined, name=Zamir White, points=undefined
+Filtering out projection: id=undefined, name=Dylan Laube, points=undefined
+Filtering out projection: id=undefined, name=Adam Prentice, points=undefined
+Filtering out projection: id=undefined, name=Dameon Pierce, points=undefined
+Filtering out projection: id=undefined, name=Dare Ogunbowale, points=undefined
+Filtering out projection: id=undefined, name=Eric Gray, points=undefined
+Filtering out projection: id=undefined, name=Jaylen Wright, points=undefined
+Filtering out projection: id=undefined, name=DeeJay Dallas, points=undefined
+Filtering out projection: id=undefined, name=Sione Vaki, points=undefined
+Filtering out projection: id=undefined, name=Carlos Washington Jr., points=undefined
+Filtering out projection: id=undefined, name=Kene Nwangwu, points=undefined
+Filtering out projection: id=undefined, name=Avery Williams, points=undefined
+Filtering out projection: id=undefined, name=Pierre Strong Jr., points=undefined
+Filtering out projection: id=undefined, name=Raheim Sanders, points=undefined
+Filtering out projection: id=undefined, name=Xazavian Valladay, points=undefined
+Filtering out projection: id=undefined, name=Keaton Mitchell, points=undefined
+Filtering out projection: id=undefined, name=Ray Davis, points=undefined
+Filtering out projection: id=undefined, name=Jacob Saylors, points=undefined
+Filtering out projection: id=undefined, name=Damien Martinez, points=undefined
+Filtering out projection: id=undefined, name=Rasheen Ali, points=undefined
+Filtering out projection: id=undefined, name=Carson Steele, points=undefined
+Filtering out projection: id=undefined, name=Terrell Jennings, points=undefined
+Filtering out projection: id=undefined, name=Audric Estime, points=undefined
+Filtering out projection: id=undefined, name=Kalel Mullings, points=undefined
+Filtering out projection: id=undefined, name=Josh Williams, points=undefined
+Filtering out projection: id=undefined, name=Sincere McCormick, points=undefined
+Filtering out projection: id=undefined, name=Derrick Henry, points=undefined
+Filtering out projection: id=undefined, name=Deuce Vaughn, points=undefined
+Filtering out projection: id=undefined, name=Zack Moss, points=undefined
+Filtering out projection: id=undefined, name=Cordarrelle Patterson, points=undefined
+Filtering out projection: id=undefined, name=Michael Burton, points=undefined
+Filtering out projection: id=undefined, name=Patrick Ricard, points=undefined
+Filtering out projection: id=undefined, name=Justice Hill, points=undefined
+Filtering out projection: id=undefined, name=Miles Sanders, points=undefined
+Filtering out projection: id=undefined, name=Ty Johnson, points=undefined
+Filtering out projection: id=undefined, name=Travis Homer, points=undefined
+Filtering out projection: id=undefined, name=Clyde Edwards-Helaire, points=undefined
+Filtering out projection: id=undefined, name=James Cook III, points=undefined
+Filtering out projection: id=undefined, name=Trey Sermon, points=undefined
+Filtering out projection: id=undefined, name=Raheem Blackshear, points=undefined
+Filtering out projection: id=undefined, name=Khalil Herbert, points=undefined
+Filtering out projection: id=undefined, name=Jase McClellan, points=undefined
+Filtering out projection: id=undefined, name=Keilan Robinson, points=undefined
+Filtering out projection: id=undefined, name=D.J. Williams, points=undefined
+Filtering out projection: id=undefined, name=Jashaun Corbin, points=undefined
+Filtering out projection: id=undefined, name=Amar Johnson, points=undefined
+Successfully refreshed 0 projections for NFL 2025
+8:23:08 PM [express] POST /api/jobs/fp-refresh-projections 200 in 499ms :: {"message":"Successfully …

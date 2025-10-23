@@ -57,12 +57,12 @@ export interface LineupOptimization {
 
 export class FantasyGeminiService {
   // Public method to get the prompt without calling AI
-  getAnalysisPrompt(leagueData: any, teamData?: any): string {
-    return this.buildAnalysisPrompt(leagueData, teamData);
+  getAnalysisPrompt(leagueData: any, fantasyProsData?: any): string {
+    return this.buildAnalysisPrompt(leagueData, fantasyProsData);
   }
 
   // Public method to get the question prompt without calling AI
-  getQuestionPrompt(question: string, leagueData: any): string {
+  getQuestionPrompt(question: string, leagueData: any, fantasyProsData?: any): string {
     const userTeam = leagueData.userTeam || {};
     const scoringSettings = leagueData.scoringSettings || {};
     const weekContext = leagueData.weekContext || {};
@@ -75,26 +75,57 @@ export class FantasyGeminiService {
       scoringFormat = 'Half PPR';
     }
 
+    // Create news map for quick lookup (player name -> news items)
+    const newsMap = new Map<string, any[]>();
+    if (fantasyProsData?.news) {
+      fantasyProsData.news.forEach((newsItem: any) => {
+        if (newsItem.playerName) {
+          const existing = newsMap.get(newsItem.playerName) || [];
+          existing.push(newsItem);
+          newsMap.set(newsItem.playerName, existing);
+        }
+      });
+    }
+
+    // Format roster with inline news
+    const starters = userTeam.roster?.filter((p: any) => p.isStarter) || [];
+    const bench = userTeam.roster?.filter((p: any) => p.isBench) || [];
+
+    const formatRosterWithNews = (players: any[]) => {
+      return players.map((p: any) => {
+        const news = newsMap.get(p.name);
+        if (news && news.length > 0) {
+          const latestNews = news[0];
+          let newsText = `📰 ${latestNews.headline}`;
+          if (latestNews.description) {
+            newsText += ` - ${latestNews.description}`;
+          }
+          return `${p.name} (${newsText})`;
+        }
+        return p.name;
+      }).join(', ');
+    };
+
     return `
 You are a fantasy football expert assistant. Answer the user's question using this comprehensive league context:
 
 ==== YOUR TEAM ROSTER ====
 Team: ${userTeam.name}
-Starters: ${userTeam.roster?.filter((p: any) => p.isStarter).map((p: any) => p.name).join(', ') || 'Unknown'}
-Bench: ${userTeam.roster?.filter((p: any) => p.isBench).map((p: any) => p.name).join(', ') || 'Unknown'}
+Starters: ${formatRosterWithNews(starters) || 'Unknown'}
+Bench: ${formatRosterWithNews(bench) || 'Unknown'}
 
 ==== LEAGUE SETTINGS ====
 Scoring: ${scoringFormat} (${scoringSettings.receptionPoints || 0} points per reception)
 Current Week: ${weekContext.currentWeek} (${weekContext.seasonType})
 Season: ${weekContext.season}
-
+${this.buildFantasyProsDataSection(fantasyProsData)}
 User Question: ${question}
 
 Provide a detailed, specific response that considers:
 - The user's actual roster and team situation
 - The league's scoring format and how it affects strategy
 - The current week and season context
-- Specific actionable advice based on the data above
+- Specific actionable advice based on the data above${fantasyProsData ? '\n- Fantasy Pros news, rankings, and projections data provided above' : ''}
 `;
   }
 
@@ -248,7 +279,84 @@ Provide a detailed, specific response that considers:
     throw new Error("Unexpected error in askQuestion");
   }
 
-  private buildAnalysisPrompt(leagueData: any, teamData?: any): string {
+  private buildFantasyProsDataSection(fantasyProsData?: any): string {
+    if (!fantasyProsData) return '';
+    
+    let sections = '';
+    
+    // Add News Section
+    if (fantasyProsData.news && fantasyProsData.news.length > 0) {
+      sections += `\n\n==== FANTASY PROS PLAYER NEWS (Latest ${fantasyProsData.news.length} Items) ====\n`;
+      fantasyProsData.news.slice(0, 30).forEach((newsItem: any) => {
+        const playerInfo = newsItem.playerName ? `${newsItem.playerName} (${newsItem.position || 'N/A'}, ${newsItem.team || 'N/A'})` : 'General News';
+        sections += `- ${playerInfo}: ${newsItem.headline}\n`;
+        if (newsItem.description) {
+          sections += `  ${newsItem.description}\n`;
+        }
+      });
+    }
+    
+    // Add Rankings Section
+    if (fantasyProsData.rankings && fantasyProsData.rankings.length > 0) {
+      sections += `\n\n==== FANTASY PROS EXPERT CONSENSUS RANKINGS (Top ${Math.min(50, fantasyProsData.rankings.length)} Players) ====\n`;
+      const positionGroups: Record<string, any[]> = {};
+      
+      // Group by position
+      fantasyProsData.rankings.forEach((player: any) => {
+        if (!positionGroups[player.position]) {
+          positionGroups[player.position] = [];
+        }
+        positionGroups[player.position].push(player);
+      });
+      
+      // Display by position
+      Object.keys(positionGroups).sort().forEach(position => {
+        const players = positionGroups[position].slice(0, 15);
+        if (players.length > 0) {
+          sections += `\n${position} Rankings (${players[0].rankType || 'weekly'}, ${players[0].scoringType || 'PPR'}):\n`;
+          players.forEach((player: any) => {
+            sections += `  ${player.rank}. ${player.playerName} (${player.team || 'FA'})`;
+            if (player.avgRank) sections += ` - Avg: ${player.avgRank}`;
+            if (player.tier) sections += ` - Tier ${player.tier}`;
+            sections += '\n';
+          });
+        }
+      });
+    }
+    
+    // Add Projections Section
+    if (fantasyProsData.projections && fantasyProsData.projections.length > 0) {
+      sections += `\n\n==== FANTASY PROS PROJECTIONS (Top ${Math.min(50, fantasyProsData.projections.length)} Players) ====\n`;
+      const positionGroups: Record<string, any[]> = {};
+      
+      // Group by position
+      fantasyProsData.projections.forEach((player: any) => {
+        const pos = player.position || 'FLEX';
+        if (!positionGroups[pos]) {
+          positionGroups[pos] = [];
+        }
+        positionGroups[pos].push(player);
+      });
+      
+      // Display by position
+      Object.keys(positionGroups).sort().forEach(position => {
+        const players = positionGroups[position].slice(0, 15);
+        if (players.length > 0) {
+          sections += `\n${position} Projections (${players[0].scoringType || 'PPR'}${players[0].week ? `, Week ${players[0].week}` : ', Season'}):\n`;
+          players.forEach((player: any) => {
+            sections += `  ${player.playerName} (${player.team || 'FA'})`;
+            if (player.opponent) sections += ` vs ${player.opponent}`;
+            sections += ` - Proj: ${player.projectedPoints || '0.0'} pts`;
+            sections += '\n';
+          });
+        }
+      });
+    }
+    
+    return sections;
+  }
+
+  private buildAnalysisPrompt(leagueData: any, fantasyProsData?: any): string {
     const userTeam = leagueData.userTeam || {};
     const waiverWire = leagueData.waiverWire || {};
     const scoringSettings = leagueData.scoringSettings || {};
@@ -268,6 +376,35 @@ Provide a detailed, specific response that considers:
     const bench = userTeam.roster?.filter((p: any) => p.isBench) || [];
     const ir = userTeam.roster?.filter((p: any) => p.isIR) || [];
 
+    // Create news map for quick lookup (player name -> news items)
+    const newsMap = new Map<string, any[]>();
+    if (fantasyProsData?.news) {
+      fantasyProsData.news.forEach((newsItem: any) => {
+        if (newsItem.playerName) {
+          const existing = newsMap.get(newsItem.playerName) || [];
+          existing.push(newsItem);
+          newsMap.set(newsItem.playerName, existing);
+        }
+      });
+    }
+
+    // Helper to format player with inline news
+    const formatPlayerWithNews = (p: any, prefix: string) => {
+      let playerLine = `- ${prefix} ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`;
+      
+      // Add inline news if available
+      const news = newsMap.get(p.name);
+      if (news && news.length > 0) {
+        const latestNews = news[0]; // Show most recent news
+        playerLine += `\n  📰 NEWS: ${latestNews.headline}`;
+        if (latestNews.description) {
+          playerLine += `\n      ${latestNews.description}`;
+        }
+      }
+      
+      return playerLine;
+    };
+
     // Build plain text prompt that requests HTML response
     return `You are a fantasy football expert. Analyze the following ESPN Fantasy Football data and provide comprehensive recommendations.
 
@@ -282,24 +419,36 @@ Teams in League: ${league.teamCount || 'Unknown'}
 
 STARTERS:
 ${starters.length > 0 ? starters.map((p: any) => 
-  `- [${p.lineupSlot || 'FLEX'}] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  formatPlayerWithNews(p, `[${p.lineupSlot || 'FLEX'}]`)
 ).join('\n') : '- No starters found'}
 
 BENCH:
 ${bench.length > 0 ? bench.map((p: any) => 
-  `- [Bench] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  formatPlayerWithNews(p, '[Bench]')
 ).join('\n') : '- No bench players'}
 
 ${ir.length > 0 ? `INJURED RESERVE:
 ${ir.map((p: any) => 
-  `- [I.R.] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Injured'}`
+  formatPlayerWithNews(p, '[I.R.]')
 ).join('\n')}` : ''}
 
 ==== TOP AVAILABLE WAIVER WIRE PLAYERS ====
-${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => 
-  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`
-).join('\n') : '- No waiver wire data available'}
-
+${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => {
+  let playerLine = `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`;
+  
+  // Add inline news for waiver wire players
+  const news = newsMap.get(p.name);
+  if (news && news.length > 0) {
+    const latestNews = news[0];
+    playerLine += `\n  📰 NEWS: ${latestNews.headline}`;
+    if (latestNews.description) {
+      playerLine += `\n      ${latestNews.description}`;
+    }
+  }
+  
+  return playerLine;
+}).join('\n') : '- No waiver wire data available'}
+${this.buildFantasyProsDataSection(fantasyProsData)}
 ==== REQUESTED ANALYSIS ====
 Please provide a comprehensive fantasy football analysis with the following sections:
 

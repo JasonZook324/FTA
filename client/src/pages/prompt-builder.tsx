@@ -40,6 +40,10 @@ export default function PromptBuilder() {
   const [includeWaiverWire, setIncludeWaiverWire] = useState("none"); // "none", "top50", "position", "team"
   const [waiverWirePosition, setWaiverWirePosition] = useState("");
   const [waiverWireTeam, setWaiverWireTeam] = useState("");
+  const [excludeIRPlayers, setExcludeIRPlayers] = useState(false);
+  const [excludeOutPlayers, setExcludeOutPlayers] = useState(false);
+  const [excludeDoubtfulPlayers, setExcludeDoubtfulPlayers] = useState(false);
+  const [excludeQuestionablePlayers, setExcludeQuestionablePlayers] = useState(false);
   const [includeLeagueSettings, setIncludeLeagueSettings] = useState(true);
 
   // Context data options
@@ -109,6 +113,10 @@ export default function PromptBuilder() {
             includeWaiverWire,
             waiverWirePosition,
             waiverWireTeam,
+            excludeIRPlayers,
+            excludeOutPlayers,
+            excludeDoubtfulPlayers,
+            excludeQuestionablePlayers,
             includeLeagueSettings,
             // Context data options
             includeFantasyPros,
@@ -383,6 +391,51 @@ export default function PromptBuilder() {
                           ))}
                         </SelectContent>
                       </Select>
+                    )}
+
+                    {includeWaiverWire !== "none" && (
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="exclude-ir-players" 
+                            checked={excludeIRPlayers}
+                            onCheckedChange={(checked) => setExcludeIRPlayers(checked as boolean)}
+                          />
+                          <label htmlFor="exclude-ir-players" className="text-sm">
+                            Exclude IR Players
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="exclude-out-players" 
+                            checked={excludeOutPlayers}
+                            onCheckedChange={(checked) => setExcludeOutPlayers(checked as boolean)}
+                          />
+                          <label htmlFor="exclude-out-players" className="text-sm">
+                            Exclude Out Players
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="exclude-doubtful-players" 
+                            checked={excludeDoubtfulPlayers}
+                            onCheckedChange={(checked) => setExcludeDoubtfulPlayers(checked as boolean)}
+                          />
+                          <label htmlFor="exclude-doubtful-players" className="text-sm">
+                            Exclude Doubtful Players
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="exclude-questionable-players" 
+                            checked={excludeQuestionablePlayers}
+                            onCheckedChange={(checked) => setExcludeQuestionablePlayers(checked as boolean)}
+                          />
+                          <label htmlFor="exclude-questionable-players" className="text-sm">
+                            Exclude Questionable Players
+                          </label>
+                        </div>
+                      </div>
                     )}
                   </div>
 

@@ -1,0 +1,200 @@
+Using DATABASE_URL from .env file
+Gemini API Key exists: true
+Gemini API Key length: 39
+Development mode: SSL certificate validation disabled for ESPN API calls
+8:18:41 PM [express] serving on port 5000 (localhost)
+(node:15197) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Browserslist: browsers data (caniuse-lite) is 12 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+8:18:47 PM [express] GET /api/user 304 in 99ms :: {"id":"a45e0b26-44ca-42bd-8e5f-38fb0f450559","user…
+8:18:47 PM [express] GET /api/leagues 304 in 126ms :: [{"id":"7e784349-b7b7-4399-be86-9ae7add009b0",…
+8:18:47 PM [express] GET /api/espn-credentials 304 in 138ms :: {"id":"438dd674-12db-462c-a486-108f14…
+Fetching live roster data with team stats...
+Attempting to get roster data with multiple methods...
+Main roster API URL: https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1713644125?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=7&nocache=1760559527376
+Main API returned keys: [
+  'draftDetail',
+  'gameId',
+  'id',
+  'members',
+  'schedule',
+  'scoringPeriodId',
+  'seasonId',
+  'segmentId',
+  'status',
+  'teams'
+]
+Found 14 stored teams, 14 live teams
+Transformed 14 teams with live stats
+8:18:47 PM [express] GET /api/leagues/7e784349-b7b7-4399-be86-9ae7add009b0/standings 304 in 614ms ::…
+Refreshing players for NFL 2025...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/players
+Fantasy Pros API response keys: [ 'sport', 'count', 'season', 'week', 'players' ]
+Fantasy Pros API response data count: 8088
+Successfully refreshed 8088 players for NFL 2025
+Refreshing rankings for NFL 2025 week 7 position ALL...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=QB&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 57
+Sample QB player from API: {
+  "player_id": 22902,
+  "player_name": "Jayden Daniels",
+  "sportsdata_id": "bab8c65a-9fff-410d-8e34-dc2f636d890e",
+  "player_team_id": "WAS",
+  "player_position_id": "QB",
+  "player_positions": "QB",
+  "player_short_name": "J. Daniels",
+  "player_eligibility": "QB",
+  "player_yahoo_positions": "QB",
+  "player_page_url": "https://www.fantasypros.com/nfl/players/jayden-daniels.php",
+  "player_filename": "jayden-daniels.php",
+  "player_square_image_url": "https://images.fantasypros.com/images/players/nfl/22902/headshot/210x210.png",
+  "player_image_url": "https://images.fantasypros.com/images/players/nfl/22902/headshot/210x210.png",
+  "player_yahoo_id": "40896",
+  "cbs_player_id": "3123337",
+  "player_bye_week": "12",
+  "player_owned_avg": 99.3,
+  "player_owned_espn": 99.8,
+  "player_owned_yahoo": 100,
+  "player_opponent": "at DAL",
+  "player_opponent_id": "DAL",
+  "player_ecr_delta": null,
+  "rank_ecr": 1,
+  "rank_min": "1",
+  "rank_max": "2",
+  "rank_ave": "1.06",
+  "rank_std": "0.24",
+  "note": null,
+  "tag": null,
+  "recommendation": null,
+  "pos_rank": "QB1",
+  "start_sit_grade": "A+",
+  "r2p_pts": "24.0"
+}
+Position QB: 57 players from API, 57 passed validation
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=RB&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 99
+Position RB: 99 players from API, 99 passed validation
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=WR&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 135
+Position WR: 135 players from API, 135 passed validation
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=TE&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 65
+Position TE: 65 players from API, 65 passed validation
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=K&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 32
+Position K: 32 players from API, 32 passed validation
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/2025/consensus-rankings?type=weekly&scoring=PPR&position=DST&week=7
+Fantasy Pros API response keys: [
+  'sport',
+  'type',
+  'ranking_type_name',
+  'year',
+  'week',
+  'position_id',
+  'scoring',
+  'filters',
+  'count',
+  'total_experts',
+  'last_updated',
+  'players',
+  'last_updated_ts'
+]
+Fantasy Pros API response data count: 30
+Position DST: 30 players from API, 30 passed validation
+Successfully refreshed 418 rankings for NFL 2025
+Refreshing projections for NFL 2025 week 7...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/nfl/2025/projections?scoring=PPR&week=7
+Fantasy Pros API error (429): {"message":"Too Many Requests"}
+Error refreshing projections: Error: Fantasy Pros API error: 429  - {"message":"Too Many Requests"}
+    at fetchFromFantasyPros (/home/runner/workspace/server/fantasyProsService.ts:38:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async refreshProjections (/home/runner/workspace/server/fantasyProsService.ts:249:18)
+    at async refreshAllData (/home/runner/workspace/server/fantasyProsService.ts:422:18)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:4034:23)
+Refreshing news for NFL...
+Calling Fantasy Pros API: https://api.fantasypros.com/public/v2/json/NFL/news?limit=50
+Fantasy Pros API error (429): {"message":"Too Many Requests"}
+Error refreshing news: Error: Fantasy Pros API error: 429  - {"message":"Too Many Requests"}
+    at fetchFromFantasyPros (/home/runner/workspace/server/fantasyProsService.ts:38:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async refreshNews (/home/runner/workspace/server/fantasyProsService.ts:341:18)
+    at async refreshAllData (/home/runner/workspace/server/fantasyProsService.ts:423:11)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:4034:23)
+8:21:06 PM [express] POST /api/jobs/fp-refresh-all 200 in 2778ms :: {"message":"Successfully refresh…
