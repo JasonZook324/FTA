@@ -49,6 +49,15 @@ The system acts as a bridge between ESPN's Fantasy API and users, providing a cl
 - Added iOS-specific fixes (16px input font size to prevent zoom, proper touch targets)
 - All screen elements now visible and accessible on mobile devices
 
+**October 23, 2025** - Inline Player News Display in AI Prompts
+- Player news now appears directly alongside each player in the roster and waiver wire sections
+- When News checkbox is enabled, news is matched by player name and displayed inline with player stats
+- Format: Each player with news shows "📰 NEWS: [headline] - [description]" beneath their stats
+- Applies to starters, bench players, injured reserve, and waiver wire players in analysis prompts
+- Question prompts also include inline news in compact format: "PlayerName (📰 headline - description)"
+- News is fetched once from database and mapped to players for efficient lookups
+- Separate Fantasy Pros data sections (rankings, projections) still appear at end of prompt for additional context
+
 **October 22, 2025** - Fantasy Pros Database Integration in AI Prompts
 - Added optional Fantasy Pros data inclusion in AI analysis and question prompts
 - Three checkboxes allow users to select which data to include: News, Projections, Rankings
