@@ -54,6 +54,11 @@ export default function PromptBuilder() {
   const [includeNewsUpdates, setIncludeNewsUpdates] = useState(false);
   const [includeMatchupAnalysis, setIncludeMatchupAnalysis] = useState(false);
 
+  // Player-level data options
+  const [includePlayerNews, setIncludePlayerNews] = useState(false);
+  const [includePlayerProjections, setIncludePlayerProjections] = useState(false);
+  const [includePlayerRankings, setIncludePlayerRankings] = useState(false);
+
   // Query user leagues
   const { data: leagues } = useQuery({
     queryKey: ["/api/leagues"],
@@ -124,7 +129,11 @@ export default function PromptBuilder() {
             includeInjuryReports,
             includeWeatherData,
             includeNewsUpdates,
-            includeMatchupAnalysis
+            includeMatchupAnalysis,
+            // Player-level data options
+            includePlayerNews,
+            includePlayerProjections,
+            includePlayerRankings
           }
         })
       });
@@ -530,6 +539,54 @@ export default function PromptBuilder() {
                         />
                         <label htmlFor="include-matchup-analysis" className="text-sm">
                           Defensive Matchup Analysis & Target Data
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Player-Level Data Options */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium">
+                      <Users className="h-4 w-4" />
+                      Player-Level Data
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Include detailed player data from FantasyPros database for players in your prompt
+                    </p>
+                    
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-player-news" 
+                          checked={includePlayerNews}
+                          onCheckedChange={(checked) => setIncludePlayerNews(checked as boolean)}
+                        />
+                        <label htmlFor="include-player-news" className="text-sm">
+                          Player News & Updates
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-player-projections" 
+                          checked={includePlayerProjections}
+                          onCheckedChange={(checked) => setIncludePlayerProjections(checked as boolean)}
+                        />
+                        <label htmlFor="include-player-projections" className="text-sm">
+                          Player Projections
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-player-rankings" 
+                          checked={includePlayerRankings}
+                          onCheckedChange={(checked) => setIncludePlayerRankings(checked as boolean)}
+                        />
+                        <label htmlFor="include-player-rankings" className="text-sm">
+                          Expert Consensus Rankings
                         </label>
                       </div>
                     </div>

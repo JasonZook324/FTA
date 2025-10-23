@@ -3652,9 +3652,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Active';
       };
 
-      // Fetch Fantasy Pros news if requested
+      // Fetch Fantasy Pros data if requested
       const newsMap = new Map<string, any[]>();
-      if (options.includeNewsUpdates) {
+      const projectionsMap = new Map<string, any>();
+      const rankingsMap = new Map<string, any>();
+      
+      // Fetch news if requested
+      if (options.includePlayerNews) {
         try {
           const { db } = await import('./db');
           const { sql } = await import('drizzle-orm');
@@ -3663,7 +3667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(schema.fantasyProsNews)
             .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
             .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
-            .limit(50);
+            .limit(100);
           
           // Create news map for quick lookup (player name -> news items)
           newsResult.forEach((newsItem: any) => {
@@ -3679,6 +3683,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Error fetching Fantasy Pros news for custom prompt:', error);
         }
       }
+      
+      // Fetch projections if requested
+      if (options.includePlayerProjections) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          const projectionsResult = await db
+            .select()
+            .from(schema.fantasyProsProjections)
+            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC`)
+            .limit(200);
+          
+          // Create projections map for quick lookup (player name -> projection)
+          projectionsResult.forEach((projection: any) => {
+            if (projection.playerName) {
+              projectionsMap.set(projection.playerName, projection);
+            }
+          });
+          
+          console.log(`Loaded ${projectionsResult.length} projections into map`);
+        } catch (error: any) {
+          console.error('Error fetching Fantasy Pros projections for custom prompt:', error);
+        }
+      }
+      
+      // Fetch rankings if requested
+      if (options.includePlayerRankings) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          const rankingsResult = await db
+            .select()
+            .from(schema.fantasyProsRankings)
+            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
+            .limit(200);
+          
+          // Create rankings map for quick lookup (player name -> ranking)
+          rankingsResult.forEach((ranking: any) => {
+            if (ranking.playerName) {
+              rankingsMap.set(ranking.playerName, ranking);
+            }
+          });
+          
+          console.log(`Loaded ${rankingsResult.length} rankings into map`);
+        } catch (error: any) {
+          console.error('Error fetching Fantasy Pros rankings for custom prompt:', error);
+        }
+      }
+
+      // Helper function to enrich player display with FantasyPros data
+      const enrichPlayerData = (playerName: string): string => {
+        let enrichment = '';
+        
+        // Add news if available
+        if (newsMap.size > 0) {
+          const news = newsMap.get(playerName);
+          if (news && news.length > 0) {
+            const latestNews = news[0];
+            enrichment += `\n  📰 NEWS: ${latestNews.headline}`;
+          }
+        }
+        
+        // Add projections if available
+        if (projectionsMap.size > 0) {
+          const projection = projectionsMap.get(playerName);
+          if (projection) {
+            enrichment += `\n  📊 PROJ: ${projection.projectedPoints} pts`;
+            if (projection.stats) {
+              // Add relevant stats based on position
+              const stats = projection.stats;
+              if (stats.pass_yds) enrichment += ` (${stats.pass_yds} pass yds, ${stats.pass_tds || 0} TDs)`;
+              else if (stats.rush_yds) enrichment += ` (${stats.rush_yds} rush yds, ${stats.rush_tds || 0} TDs)`;
+              else if (stats.rec) enrichment += ` (${stats.rec} rec, ${stats.rec_yds || 0} yds, ${stats.rec_tds || 0} TDs)`;
+            }
+          }
+        }
+        
+        // Add rankings if available
+        if (rankingsMap.size > 0) {
+          const ranking = rankingsMap.get(playerName);
+          if (ranking) {
+            enrichment += `\n  🏆 RANK: #${ranking.rank} ${ranking.position || ''} (${ranking.rankType || 'weekly'}, ${ranking.scoringType || 'PPR'})`;
+            if (ranking.tier) enrichment += ` Tier ${ranking.tier}`;
+          }
+        }
+        
+        return enrichment;
+      };
 
       let promptSections = [];
 
@@ -3717,7 +3811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const team = getPlayerTeam(getProTeamId(entry.playerPoolEntry));
                 const position = getPositionName(getPlayerPositionId(entry.playerPoolEntry));
                 const slotName = getSlotName(entry.lineupSlotId);
-                return `${name} (${position}, ${team}) - ${slotName}`;
+                const enrichment = enrichPlayerData(name);
+                return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
               })
               .join('\n') + '\n'
           );
@@ -3740,7 +3835,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
-                  return `${name} (${position}, ${team}) - ${slotName}`;
+                  const enrichment = enrichPlayerData(name);
+                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
@@ -3761,7 +3857,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
-                  return `${name} (${position}, ${team}) - ${slotName}`;
+                  const enrichment = enrichPlayerData(name);
+                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
@@ -3968,7 +4065,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const position = positionId ? getPositionName(positionId) : 'FLEX';
                 const ownership = player?.ownership?.percentOwned || 0;
                 const injuryStatus = getInjuryStatus(playerData);
-                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned - Status: ${injuryStatus}`;
+                const enrichment = enrichPlayerData(name);
+                return `${name} (${position}, ${team}) - ${ownership.toFixed(1)}% owned - Status: ${injuryStatus}${enrichment}`;
               })
               .join('\n') + '\n'
           );
