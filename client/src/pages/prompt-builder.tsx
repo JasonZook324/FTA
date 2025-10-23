@@ -560,6 +560,7 @@ export default function PromptBuilder() {
                       <div className="flex items-center space-x-2">
                         <Checkbox 
                           id="include-player-news" 
+                          data-testid="checkbox-player-news"
                           checked={includePlayerNews}
                           onCheckedChange={(checked) => setIncludePlayerNews(checked as boolean)}
                         />
@@ -571,6 +572,7 @@ export default function PromptBuilder() {
                       <div className="flex items-center space-x-2">
                         <Checkbox 
                           id="include-player-projections" 
+                          data-testid="checkbox-player-projections"
                           checked={includePlayerProjections}
                           onCheckedChange={(checked) => setIncludePlayerProjections(checked as boolean)}
                         />
@@ -582,6 +584,7 @@ export default function PromptBuilder() {
                       <div className="flex items-center space-x-2">
                         <Checkbox 
                           id="include-player-rankings" 
+                          data-testid="checkbox-player-rankings"
                           checked={includePlayerRankings}
                           onCheckedChange={(checked) => setIncludePlayerRankings(checked as boolean)}
                         />
