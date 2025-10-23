@@ -75,13 +75,44 @@ export class FantasyGeminiService {
       scoringFormat = 'Half PPR';
     }
 
+    // Create news map for quick lookup (player name -> news items)
+    const newsMap = new Map<string, any[]>();
+    if (fantasyProsData?.news) {
+      fantasyProsData.news.forEach((newsItem: any) => {
+        if (newsItem.playerName) {
+          const existing = newsMap.get(newsItem.playerName) || [];
+          existing.push(newsItem);
+          newsMap.set(newsItem.playerName, existing);
+        }
+      });
+    }
+
+    // Format roster with inline news
+    const starters = userTeam.roster?.filter((p: any) => p.isStarter) || [];
+    const bench = userTeam.roster?.filter((p: any) => p.isBench) || [];
+
+    const formatRosterWithNews = (players: any[]) => {
+      return players.map((p: any) => {
+        const news = newsMap.get(p.name);
+        if (news && news.length > 0) {
+          const latestNews = news[0];
+          let newsText = `📰 ${latestNews.headline}`;
+          if (latestNews.description) {
+            newsText += ` - ${latestNews.description}`;
+          }
+          return `${p.name} (${newsText})`;
+        }
+        return p.name;
+      }).join(', ');
+    };
+
     return `
 You are a fantasy football expert assistant. Answer the user's question using this comprehensive league context:
 
 ==== YOUR TEAM ROSTER ====
 Team: ${userTeam.name}
-Starters: ${userTeam.roster?.filter((p: any) => p.isStarter).map((p: any) => p.name).join(', ') || 'Unknown'}
-Bench: ${userTeam.roster?.filter((p: any) => p.isBench).map((p: any) => p.name).join(', ') || 'Unknown'}
+Starters: ${formatRosterWithNews(starters) || 'Unknown'}
+Bench: ${formatRosterWithNews(bench) || 'Unknown'}
 
 ==== LEAGUE SETTINGS ====
 Scoring: ${scoringFormat} (${scoringSettings.receptionPoints || 0} points per reception)
@@ -345,6 +376,35 @@ Provide a detailed, specific response that considers:
     const bench = userTeam.roster?.filter((p: any) => p.isBench) || [];
     const ir = userTeam.roster?.filter((p: any) => p.isIR) || [];
 
+    // Create news map for quick lookup (player name -> news items)
+    const newsMap = new Map<string, any[]>();
+    if (fantasyProsData?.news) {
+      fantasyProsData.news.forEach((newsItem: any) => {
+        if (newsItem.playerName) {
+          const existing = newsMap.get(newsItem.playerName) || [];
+          existing.push(newsItem);
+          newsMap.set(newsItem.playerName, existing);
+        }
+      });
+    }
+
+    // Helper to format player with inline news
+    const formatPlayerWithNews = (p: any, prefix: string) => {
+      let playerLine = `- ${prefix} ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`;
+      
+      // Add inline news if available
+      const news = newsMap.get(p.name);
+      if (news && news.length > 0) {
+        const latestNews = news[0]; // Show most recent news
+        playerLine += `\n  📰 NEWS: ${latestNews.headline}`;
+        if (latestNews.description) {
+          playerLine += `\n      ${latestNews.description}`;
+        }
+      }
+      
+      return playerLine;
+    };
+
     // Build plain text prompt that requests HTML response
     return `You are a fantasy football expert. Analyze the following ESPN Fantasy Football data and provide comprehensive recommendations.
 
@@ -359,23 +419,35 @@ Teams in League: ${league.teamCount || 'Unknown'}
 
 STARTERS:
 ${starters.length > 0 ? starters.map((p: any) => 
-  `- [${p.lineupSlot || 'FLEX'}] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  formatPlayerWithNews(p, `[${p.lineupSlot || 'FLEX'}]`)
 ).join('\n') : '- No starters found'}
 
 BENCH:
 ${bench.length > 0 ? bench.map((p: any) => 
-  `- [Bench] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Active'}`
+  formatPlayerWithNews(p, '[Bench]')
 ).join('\n') : '- No bench players'}
 
 ${ir.length > 0 ? `INJURED RESERVE:
 ${ir.map((p: any) => 
-  `- [I.R.] ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Status: ${p.injuryStatus || 'Injured'}`
+  formatPlayerWithNews(p, '[I.R.]')
 ).join('\n')}` : ''}
 
 ==== TOP AVAILABLE WAIVER WIRE PLAYERS ====
-${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => 
-  `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`
-).join('\n') : '- No waiver wire data available'}
+${waiverWire.topAvailable && waiverWire.topAvailable.length > 0 ? waiverWire.topAvailable.map((p: any) => {
+  let playerLine = `- ${p.name || 'Unknown'} (${p.position || 'FLEX'}, ${p.nflTeam || 'FA'}) - Proj: ${p.projectedPoints || '0.0'} pts - Owned: ${p.ownershipPercent || '0.0'}% - Status: ${p.injuryStatus || 'Active'}`;
+  
+  // Add inline news for waiver wire players
+  const news = newsMap.get(p.name);
+  if (news && news.length > 0) {
+    const latestNews = news[0];
+    playerLine += `\n  📰 NEWS: ${latestNews.headline}`;
+    if (latestNews.description) {
+      playerLine += `\n      ${latestNews.description}`;
+    }
+  }
+  
+  return playerLine;
+}).join('\n') : '- No waiver wire data available'}
 ${this.buildFantasyProsDataSection(fantasyProsData)}
 ==== REQUESTED ANALYSIS ====
 Please provide a comprehensive fantasy football analysis with the following sections:
