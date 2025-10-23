@@ -3652,6 +3652,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Active';
       };
 
+      // Fetch Fantasy Pros news if requested
+      const newsMap = new Map<string, any[]>();
+      if (options.includeNewsUpdates) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          const newsResult = await db
+            .select()
+            .from(schema.fantasyProsNews)
+            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+            .limit(50);
+          
+          // Create news map for quick lookup (player name -> news items)
+          newsResult.forEach((newsItem: any) => {
+            if (newsItem.playerName) {
+              const existing = newsMap.get(newsItem.playerName) || [];
+              existing.push(newsItem);
+              newsMap.set(newsItem.playerName, existing);
+            }
+          });
+          
+          console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
+        } catch (error: any) {
+          console.error('Error fetching Fantasy Pros news for custom prompt:', error);
+        }
+      }
+
       let promptSections = [];
 
       // Add custom prompt first
