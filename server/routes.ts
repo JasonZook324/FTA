@@ -3657,8 +3657,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectionsMap = new Map<string, any>();
       const rankingsMap = new Map<string, any>();
       
-      // Fetch news if requested
-      if (options.includePlayerNews) {
+      // Fetch news if requested (either from player-level data or external research checkbox)
+      if (options.includePlayerNews || options.includeNewsUpdates) {
         try {
           const { db } = await import('./db');
           const { sql } = await import('drizzle-orm');
