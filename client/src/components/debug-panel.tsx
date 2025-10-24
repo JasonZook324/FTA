@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 interface DebugRequest {
   id: string;
@@ -32,6 +33,7 @@ export function addDebugRequest(request: DebugRequest) {
 }
 
 export default function DebugPanel() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [requests, setRequests] = useState<DebugRequest[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<DebugRequest | null>(null);
@@ -44,6 +46,11 @@ export default function DebugPanel() {
     window.addEventListener('debug-request-added', handleUpdate);
     return () => window.removeEventListener('debug-request-added', handleUpdate);
   }, []);
+
+  // Only show debug panel for jasonazook user
+  if (user?.username !== 'jasonazook') {
+    return null;
+  }
 
   if (!isOpen) {
     return (

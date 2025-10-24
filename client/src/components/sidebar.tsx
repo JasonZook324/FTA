@@ -116,29 +116,38 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.href;
-            
-            return (
-              <li key={item.name}>
-                <Link 
-                  href={item.href}
-                  className={cn(
-                    "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
-                    isActive 
-                      ? "bg-primary text-primary-foreground" 
-                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                  )}
-                  data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-sm">{item.name}</span>
-                </Link>
-              </li>
-            );
-          })}
+          {navigation
+            .filter((item) => {
+              // Hide admin-only pages for non-admin users
+              const adminOnlyPages = ['API Playground', 'Jobs'];
+              if (adminOnlyPages.includes(item.name)) {
+                return user?.username === 'jasonazook';
+              }
+              return true;
+            })
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = location === item.href;
+              
+              return (
+                <li key={item.name}>
+                  <Link 
+                    href={item.href}
+                    className={cn(
+                      "flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target", 
+                      isActive 
+                        ? "bg-primary text-primary-foreground" 
+                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                    data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-sm">{item.name}</span>
+                  </Link>
+                </li>
+              );
+            })}
         </ul>
       </nav>
 

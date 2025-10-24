@@ -22,6 +22,7 @@ import DebugPanel from "@/components/debug-panel";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
+import { AdminRoute } from "@/lib/admin-route";
 
 function App() {
   return (
@@ -107,7 +108,7 @@ function App() {
                 </div>
               )} />
 
-                <ProtectedRoute path="/jobs" component={() => (
+                <AdminRoute path="/jobs" component={() => (
                   <div className="flex min-h-screen">
                     <Sidebar />
                     <div className="flex-1 flex flex-col lg:ml-0">
@@ -167,7 +168,7 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/api-playground" component={() => (
+              <AdminRoute path="/api-playground" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">
