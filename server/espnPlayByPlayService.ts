@@ -199,18 +199,40 @@ function calculateRedZoneStatsForGame(plays: any[], teamMap: Map<string, { abbre
   let currentDrive: { 
     offenseTeamId: string | null; 
     defenseTeamId: string | null;
-    hasAttempt: boolean; 
-    hasTd: boolean; 
-    hasFg: boolean;
+    hasAttempt: boolean;
   } = {
     offenseTeamId: null,
     defenseTeamId: null,
-    hasAttempt: false,
-    hasTd: false,
-    hasFg: false
+    hasAttempt: false
   };
 
-  for (const play of plays) {
+  const finalizeDrive = (hasTd: boolean, hasFg: boolean) => {
+    if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
+      const offenseStats = gameStats.get(currentDrive.offenseTeamId);
+      const defenseStats = gameStats.get(currentDrive.defenseTeamId);
+      
+      if (offenseStats) {
+        offenseStats.offense.attempts++;
+        if (hasTd) offenseStats.offense.tds++;
+        if (hasFg) offenseStats.offense.fgs++;
+      }
+      
+      if (defenseStats) {
+        defenseStats.defense.attempts++;
+        if (hasTd) defenseStats.defense.tds++;
+        if (hasFg) defenseStats.defense.fgs++;
+      }
+    }
+    
+    currentDrive = { 
+      offenseTeamId: null, 
+      defenseTeamId: null,
+      hasAttempt: false
+    };
+  };
+
+  for (let i = 0; i < plays.length; i++) {
+    const play = plays[i];
     const offenseTeamId = getOffenseTeamId(play);
     const defenseTeamId = getDefenseTeamId(play);
     
@@ -220,89 +242,52 @@ function calculateRedZoneStatsForGame(plays: any[], teamMap: Map<string, { abbre
     if (isRedZonePlay(play)) {
       // If this is a new drive (different team or first red zone play)
       if (currentDrive.offenseTeamId !== offenseTeamId) {
-        // Finalize previous drive
-        if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
-          const offenseStats = gameStats.get(currentDrive.offenseTeamId);
-          const defenseStats = gameStats.get(currentDrive.defenseTeamId);
-          
-          if (offenseStats) {
-            offenseStats.offense.attempts++;
-            if (currentDrive.hasTd) offenseStats.offense.tds++;
-            if (currentDrive.hasFg) offenseStats.offense.fgs++;
-          }
-          
-          if (defenseStats) {
-            defenseStats.defense.attempts++;
-            if (currentDrive.hasTd) defenseStats.defense.tds++;
-            if (currentDrive.hasFg) defenseStats.defense.fgs++;
-          }
-        }
+        // Finalize previous drive with no score
+        finalizeDrive(false, false);
         
         // Start new drive
         currentDrive = {
           offenseTeamId,
           defenseTeamId,
-          hasAttempt: true,
-          hasTd: false,
-          hasFg: false
+          hasAttempt: true
         };
       } else {
         // Same drive, mark as having an attempt
         currentDrive.hasAttempt = true;
       }
 
-      // Check outcome of this play
-      if (isTouchdown(play)) {
-        currentDrive.hasTd = true;
-      } else if (isFieldGoal(play)) {
-        currentDrive.hasFg = true;
+      // Check if this play or the next play ends the drive
+      const isTd = isTouchdown(play);
+      const isFg = isFieldGoal(play);
+      
+      if (isTd || isFg) {
+        // Scoring play ends the drive
+        finalizeDrive(isTd, isFg);
       }
-    } else {
-      // Not a red zone play - if we were tracking a drive, finalize it
-      if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
-        const offenseStats = gameStats.get(currentDrive.offenseTeamId);
-        const defenseStats = gameStats.get(currentDrive.defenseTeamId);
-        
-        if (offenseStats) {
-          offenseStats.offense.attempts++;
-          if (currentDrive.hasTd) offenseStats.offense.tds++;
-          if (currentDrive.hasFg) offenseStats.offense.fgs++;
+    } else if (currentDrive.hasAttempt && currentDrive.offenseTeamId) {
+      // Not in red zone, but we're tracking a red zone drive
+      const isTd = isTouchdown(play);
+      const isFg = isFieldGoal(play);
+      
+      // Check for scoring plays that end the drive
+      if (isTd || isFg) {
+        // Verify it's the same team (or special teams for FG)
+        if (offenseTeamId === currentDrive.offenseTeamId || isFg) {
+          finalizeDrive(isTd, isFg);
+          continue;
         }
-        
-        if (defenseStats) {
-          defenseStats.defense.attempts++;
-          if (currentDrive.hasTd) defenseStats.defense.tds++;
-          if (currentDrive.hasFg) defenseStats.defense.fgs++;
-        }
-        
-        currentDrive = { 
-          offenseTeamId: null, 
-          defenseTeamId: null,
-          hasAttempt: false, 
-          hasTd: false, 
-          hasFg: false 
-        };
+      }
+      
+      // Check if possession changed to a different team
+      if (offenseTeamId !== currentDrive.offenseTeamId) {
+        // Drive ended without a score (turnover, punt, etc.)
+        finalizeDrive(false, false);
       }
     }
   }
 
-  // Finalize last drive if needed
-  if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
-    const offenseStats = gameStats.get(currentDrive.offenseTeamId);
-    const defenseStats = gameStats.get(currentDrive.defenseTeamId);
-    
-    if (offenseStats) {
-      offenseStats.offense.attempts++;
-      if (currentDrive.hasTd) offenseStats.offense.tds++;
-      if (currentDrive.hasFg) offenseStats.offense.fgs++;
-    }
-    
-    if (defenseStats) {
-      defenseStats.defense.attempts++;
-      if (currentDrive.hasTd) defenseStats.defense.tds++;
-      if (currentDrive.hasFg) defenseStats.defense.fgs++;
-    }
-  }
+  // Finalize last drive if needed (drive ended without score)
+  finalizeDrive(false, false);
 
   return gameStats;
 }
