@@ -39,7 +39,14 @@ export default function Streaming() {
   const currentSeason = 2025;
 
   const { data: kickerData, isLoading } = useQuery<{ recommendations: KickerRecommendation[] }>({
-    queryKey: ["/api/kicker-streaming", { season: currentSeason, week: selectedWeek }],
+    queryKey: ["/api/kicker-streaming", currentSeason, selectedWeek],
+    queryFn: async () => {
+      const response = await fetch(`/api/kicker-streaming?season=${currentSeason}&week=${selectedWeek}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch kicker recommendations');
+      }
+      return response.json();
+    },
     enabled: !!user,
   });
 
