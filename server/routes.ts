@@ -4380,6 +4380,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Kicker streaming recommendations
+  app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.query;
+      const { getKickerRecommendations } = await import("./kickerStreamingService");
+      
+      const recommendations = await getKickerRecommendations(
+        parseInt(season as string), 
+        parseInt(week as string)
+      );
+      
+      res.json({ recommendations });
+    } catch (error: any) {
+      console.error('Kicker streaming error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to get kicker recommendations',
+        recommendations: []
+      });
+    }
+  });
+
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {
