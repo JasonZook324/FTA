@@ -31,6 +31,7 @@ A dual-layer authentication system is in place. User authentication uses `passpo
 The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with:
 - **Fantasy Pros API**: Player rankings, projections, injury data, and news across all major sports
 - **The Odds API**: NFL Vegas betting lines (spreads, moneylines, over/under) for kicker streaming analysis (free tier: 500 requests/month)
+- **ESPN NFL Stats API** (unofficial): Team-level statistics including general, offensive, defensive, and kicking stats (free, no authentication required)
 - **Neon Database**: PostgreSQL hosting with connection pooling
 - **Vite**: Development tooling and build system
 
