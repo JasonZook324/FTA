@@ -4290,6 +4290,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NFL Stats & Odds refresh jobs
+  app.post("/api/jobs/nfl-refresh-stadiums", requireAuth, async (req, res) => {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Read static stadium data
+      const stadiumDataPath = path.join(process.cwd(), 'server', 'data', 'nfl-stadiums.json');
+      const stadiumData = JSON.parse(await fs.readFile(stadiumDataPath, 'utf-8'));
+      
+      // Clear existing stadium data
+      await db.delete(schema.nflStadiums);
+      
+      // Insert stadium data
+      let insertedCount = 0;
+      for (const stadium of stadiumData) {
+        await db.insert(schema.nflStadiums).values(stadium);
+        insertedCount++;
+      }
+      
+      res.json({ 
+        message: `Successfully loaded ${insertedCount} NFL stadiums`,
+        recordCount: insertedCount
+      });
+    } catch (error: any) {
+      console.error('NFL stadium refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh stadiums' });
+    }
+  });
+
+  app.post("/api/jobs/nfl-refresh-odds", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.body;
+      const { refreshNflOdds } = await import("./oddsApiService");
+      const result = await refreshNflOdds(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} NFL odds records for week ${week}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh NFL odds' });
+      }
+    } catch (error: any) {
+      console.error('NFL odds refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh NFL odds' });
+    }
+  });
+
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {

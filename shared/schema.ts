@@ -268,3 +268,94 @@ export type Matchup = typeof matchups.$inferSelect;
 export type InsertMatchup = z.infer<typeof insertMatchupSchema>;
 export type Player = typeof players.$inferSelect;
 export type InsertPlayer = z.infer<typeof insertPlayerSchema>;
+
+// NFL Kicker Streaming Data Tables
+export const nflStadiums = pgTable("nfl_stadiums", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamAbbreviation: text("team_abbreviation").notNull().unique(), // e.g., "ARI", "ATL"
+  teamName: text("team_name").notNull(),
+  stadiumName: text("stadium_name").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  roofType: text("roof_type").notNull(), // "dome", "retractable", "open"
+  surfaceType: text("surface_type"), // "grass", "turf", etc.
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  teamAbbreviationIndex: uniqueIndex("nfl_stadiums_team_abbr").on(table.teamAbbreviation),
+}));
+
+export const nflVegasOdds = pgTable("nfl_vegas_odds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  season: integer("season").notNull(),
+  week: integer("week").notNull(),
+  gameId: text("game_id").notNull(), // External API game ID
+  homeTeam: text("home_team").notNull(),
+  awayTeam: text("away_team").notNull(),
+  commenceTime: timestamp("commence_time"),
+  homeMoneyline: integer("home_moneyline"), // e.g., -150
+  awayMoneyline: integer("away_moneyline"), // e.g., +130
+  homeSpread: text("home_spread"), // e.g., "-7.5"
+  awaySpread: text("away_spread"), // e.g., "+7.5"
+  overUnder: text("over_under"), // e.g., "47.5"
+  bookmaker: text("bookmaker"), // e.g., "draftkings", "fanduel"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueGameBookmaker: uniqueIndex("nfl_vegas_odds_game_bookmaker").on(table.season, table.week, table.gameId, table.bookmaker),
+}));
+
+export const nflTeamStats = pgTable("nfl_team_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  season: integer("season").notNull(),
+  week: integer("week"), // null for season totals
+  teamAbbreviation: text("team_abbreviation").notNull(),
+  teamName: text("team_name").notNull(),
+  gamesPlayed: integer("games_played"),
+  // Red Zone Offense
+  redZoneAttempts: integer("red_zone_attempts"),
+  redZoneTouchdowns: integer("red_zone_touchdowns"),
+  redZoneFieldGoals: integer("red_zone_field_goals"),
+  redZoneTdRate: text("red_zone_td_rate"), // decimal as text
+  // Red Zone Defense
+  oppRedZoneAttempts: integer("opp_red_zone_attempts"),
+  oppRedZoneTouchdowns: integer("opp_red_zone_touchdowns"),
+  oppRedZoneFieldGoals: integer("opp_red_zone_field_goals"),
+  oppRedZoneTdRate: text("opp_red_zone_td_rate"), // decimal as text
+  // Kicking Stats
+  fieldGoalAttempts: integer("field_goal_attempts"),
+  fieldGoalsMade: integer("field_goals_made"),
+  fieldGoalPercentage: text("field_goal_percentage"),
+  // General offense/defense
+  pointsScored: integer("points_scored"),
+  pointsAllowed: integer("points_allowed"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueTeamSeasonWeek: uniqueIndex("nfl_team_stats_unique").on(table.season, table.week, table.teamAbbreviation),
+}));
+
+export const insertNflStadiumSchema = createInsertSchema(nflStadiums).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNflVegasOddsSchema = createInsertSchema(nflVegasOdds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNflTeamStatsSchema = createInsertSchema(nflTeamStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NflStadium = typeof nflStadiums.$inferSelect;
+export type InsertNflStadium = z.infer<typeof insertNflStadiumSchema>;
+export type NflVegasOdds = typeof nflVegasOdds.$inferSelect;
+export type InsertNflVegasOdds = z.infer<typeof insertNflVegasOddsSchema>;
+export type NflTeamStats = typeof nflTeamStats.$inferSelect;
+export type InsertNflTeamStats = z.infer<typeof insertNflTeamStatsSchema>;

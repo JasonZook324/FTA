@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, TrendingUp } from "lucide-react";
+import { Loader2, Database, TrendingUp, Activity } from "lucide-react";
 
 export default function Jobs() {
   const [status, setStatus] = useState<string>("");
@@ -23,12 +23,19 @@ export default function Jobs() {
   const [fpSeason, setFpSeason] = useState("2025");
   const [fpWeek, setFpWeek] = useState("");
 
+  // NFL Stats & Odds parameters
+  const [nflSeason, setNflSeason] = useState("2025");
+  const [nflWeek, setNflWeek] = useState("");
+
   // Set default week to current week when league data loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
       setFpWeek(currentLeague.currentWeek.toString());
     }
-  }, [currentLeague?.currentWeek, fpWeek]);
+    if (currentLeague?.currentWeek && !nflWeek) {
+      setNflWeek(currentLeague.currentWeek.toString());
+    }
+  }, [currentLeague?.currentWeek, fpWeek, nflWeek]);
 
   async function runJob(endpoint: string, label: string, body?: any) {
     setLoading(true);
@@ -258,6 +265,82 @@ export default function Jobs() {
           >
             Refresh Players
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* NFL Stats & Odds Data Refresh */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            <CardTitle>NFL Stats & Odds</CardTitle>
+          </div>
+          <CardDescription>
+            Refresh NFL stadium data and Vegas odds for kicker streaming analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="nfl-season">Season</Label>
+              <Input
+                id="nfl-season"
+                data-testid="input-nfl-season"
+                type="number"
+                value={nflSeason}
+                onChange={(e) => setNflSeason(e.target.value)}
+                placeholder="2025"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="nfl-week">Week</Label>
+              <Input
+                id="nfl-week"
+                data-testid="input-nfl-week"
+                type="number"
+                value={nflWeek}
+                onChange={(e) => setNflWeek(e.target.value)}
+                placeholder="1"
+              />
+            </div>
+          </div>
+
+          {/* Refresh Buttons */}
+          <div className="space-y-3">
+            <Button
+              data-testid="button-nfl-refresh-stadiums"
+              disabled={loading}
+              onClick={() => runJob(
+                "/api/jobs/nfl-refresh-stadiums",
+                "Refresh NFL Stadiums"
+              )}
+              variant="outline"
+              className="w-full"
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Load Stadium Data (Domes & Retractable Roofs)
+            </Button>
+
+            <Button
+              data-testid="button-nfl-refresh-odds"
+              disabled={loading}
+              onClick={() => runJob(
+                "/api/jobs/nfl-refresh-odds",
+                "Refresh NFL Odds",
+                {
+                  season: parseInt(nflSeason),
+                  week: parseInt(nflWeek)
+                }
+              )}
+              variant="outline"
+              className="w-full"
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh Vegas Odds (The Odds API)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
