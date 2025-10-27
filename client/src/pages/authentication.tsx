@@ -541,7 +541,7 @@ export default function Authentication() {
                 <TabsContent value="connect" className="space-y-4">
                   <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Connect a new league to make it available to all users. You'll need your ESPN cookies and league information.
+                      Connect a new league to make it available to all users. The league name and details will be automatically fetched from ESPN.
                     </p>
                   </div>
                   <Form {...connectLeagueForm}>

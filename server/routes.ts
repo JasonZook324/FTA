@@ -820,11 +820,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues/connect", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { espnLeagueId, season, espnS2, swid, leagueName, sport } = req.body;
+      const { espnLeagueId, season, espnS2, swid, sport } = req.body;
       
-      if (!espnLeagueId || !season || !espnS2 || !swid || !leagueName || !sport) {
+      if (!espnLeagueId || !season || !espnS2 || !swid || !sport) {
         return res.status(400).json({ 
-          message: "Missing required fields: espnLeagueId, season, espnS2, swid, leagueName, sport" 
+          message: "Missing required fields: espnLeagueId, season, espnS2, swid, sport" 
         });
       }
 
@@ -849,6 +849,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Fetch league data from ESPN to get the league name and other details
+      const leagueData = await espnApiService.getLeagueData(
+        testCredentials,
+        sport,
+        season,
+        espnLeagueId,
+        ['mTeam', 'mSettings']
+      );
+
+      if (!leagueData || !leagueData.settings?.name) {
+        return res.status(400).json({ 
+          message: "Could not fetch league data from ESPN. Please verify your league ID and season." 
+        });
+      }
+
+      const leagueName = leagueData.settings.name;
+
       // Check if league profile already exists
       const existingProfile = await storage.getLeagueProfileByEspnId(espnLeagueId, season);
       
@@ -870,12 +887,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create new league profile
+      // Create new league profile with league name from ESPN
       const leagueProfile = await storage.createLeagueProfile({
         espnLeagueId,
         season,
         name: leagueName,
-        sport
+        sport,
+        teamCount: leagueData.teams?.length || null,
+        currentWeek: leagueData.scoringPeriodId || null,
+        playoffTeams: leagueData.settings?.playoffTeamCount || null,
+        scoringType: leagueData.settings?.scoringType || null,
+        tradeDeadline: leagueData.settings?.tradeDeadline || null,
+        settings: leagueData.settings || {}
       });
 
       // Create league credentials
