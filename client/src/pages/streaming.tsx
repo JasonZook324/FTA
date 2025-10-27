@@ -181,9 +181,13 @@ export default function Streaming() {
                         {rec.nflTeam} Kicker
                       </h3>
                       {rec.isHome ? (
-                        <Home className="w-4 h-4 text-green-600" title="Home Game" />
+                        <span title="Home Game">
+                          <Home className="w-4 h-4 text-green-600" />
+                        </span>
                       ) : (
-                        <Plane className="w-4 h-4 text-orange-600" title="Away Game" />
+                        <span title="Away Game">
+                          <Plane className="w-4 h-4 text-orange-600" />
+                        </span>
                       )}
                     </div>
                     
