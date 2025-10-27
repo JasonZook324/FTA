@@ -17,13 +17,22 @@ The frontend is a React 18 application with TypeScript, utilizing a component-ba
 The backend is an Express.js application with TypeScript, following a RESTful API design. It incorporates a service layer for ESPN API communication and separate route handlers for different resources. Middleware is used for logging and error handling.
 
 ### Data Storage Solutions
-The application exclusively uses **Neon PostgreSQL** for all data storage, configured via the `.env` file. Drizzle ORM is used for type-safe database operations. The schema includes tables for users, ESPN credentials, leagues, teams, matchups, players, and Fantasy Pros data (players, rankings, projections, news). An in-memory storage option exists for development but is not used in production.
+The application exclusively uses **Neon PostgreSQL** for all data storage, configured via the `.env` file. Drizzle ORM is used for type-safe database operations. The schema includes tables for:
+- User management: users, ESPN credentials
+- ESPN data: leagues, teams, matchups, players
+- Fantasy Pros data: players, rankings, projections, news, refresh logs
+- NFL Stats & Odds (for kicker streaming): stadiums, Vegas odds, team stats
+An in-memory storage option exists for development but is not used in production.
 
 ### Authentication and Authorization
 A dual-layer authentication system is in place. User authentication uses `passport-local` with `bcrypt` for secure account management, and sessions are stored in PostgreSQL. All API routes are protected, ensuring data isolation per user. ESPN API authentication uses user-managed S2 session tokens and SWID stored in the database, allowing personalized access to ESPN's Fantasy API.
 
 ### External Service Integrations
-The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with Neon Database for PostgreSQL hosting and utilizes Vite for development tooling.
+The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with:
+- **Fantasy Pros API**: Player rankings, projections, injury data, and news across all major sports
+- **The Odds API**: NFL Vegas betting lines (spreads, moneylines, over/under) for kicker streaming analysis (free tier: 500 requests/month)
+- **Neon Database**: PostgreSQL hosting with connection pooling
+- **Vite**: Development tooling and build system
 
 ## External Dependencies
 
@@ -39,4 +48,7 @@ The primary integration is with ESPN's Fantasy Sports API v3, providing league d
 -   **Routing**: Wouter
 -   **Form Handling**: React Hook Form with Zod
 -   **Build Tools**: Vite
--   **External API**: ESPN Fantasy Sports API v3
+-   **External APIs**: 
+    -   ESPN Fantasy Sports API v3
+    -   Fantasy Pros API (player data, rankings, projections)
+    -   The Odds API (NFL betting lines)

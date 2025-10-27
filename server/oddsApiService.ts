@@ -92,18 +92,18 @@ export async function refreshNflOdds(season: number, week: number): Promise<Refr
             // Moneyline
             const homeOutcome = market.outcomes.find((o: any) => o.name === homeTeam);
             const awayOutcome = market.outcomes.find((o: any) => o.name === awayTeam);
-            homeMoneyline = homeOutcome?.price || null;
-            awayMoneyline = awayOutcome?.price || null;
+            homeMoneyline = homeOutcome?.price ?? null;
+            awayMoneyline = awayOutcome?.price ?? null;
           } else if (market.key === 'spreads' && market.outcomes) {
-            // Spread
+            // Spread - check for undefined, not truthiness, to preserve 0 values
             const homeOutcome = market.outcomes.find((o: any) => o.name === homeTeam);
             const awayOutcome = market.outcomes.find((o: any) => o.name === awayTeam);
-            homeSpread = homeOutcome?.point ? String(homeOutcome.point) : null;
-            awaySpread = awayOutcome?.point ? String(awayOutcome.point) : null;
+            homeSpread = homeOutcome?.point !== undefined ? String(homeOutcome.point) : null;
+            awaySpread = awayOutcome?.point !== undefined ? String(awayOutcome.point) : null;
           } else if (market.key === 'totals' && market.outcomes) {
             // Over/Under - take the first point value
             const totalOutcome = market.outcomes[0];
-            overUnder = totalOutcome?.point ? String(totalOutcome.point) : null;
+            overUnder = totalOutcome?.point !== undefined ? String(totalOutcome.point) : null;
           }
         }
 

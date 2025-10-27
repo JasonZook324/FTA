@@ -4407,7 +4407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get total count with filters
       const countQuery = `SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`;
       const countResult = await db.execute(sql.raw(countQuery));
-      const total = parseInt(countResult.rows[0]?.total || '0');
+      const total = parseInt(String(countResult.rows[0]?.total || 0));
       
       // Get data with pagination - try to order by id, fallback to first column
       let dataQuery: string;
