@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,8 +35,22 @@ interface KickerRecommendation {
 
 export default function Streaming() {
   const { user } = useAuth();
-  const [selectedWeek, setSelectedWeek] = useState("1");
+  const [selectedWeek, setSelectedWeek] = useState("");
   const currentSeason = 2025;
+
+  // Fetch leagues to get current week
+  const { data: leagues } = useQuery<any[]>({
+    queryKey: ['/api/leagues'],
+    enabled: !!user,
+  });
+  const currentLeague = leagues?.[0];
+
+  // Set default week to current week when league data loads
+  useEffect(() => {
+    if (currentLeague?.currentWeek && !selectedWeek) {
+      setSelectedWeek(currentLeague.currentWeek.toString());
+    }
+  }, [currentLeague?.currentWeek, selectedWeek]);
 
   const { data: kickerData, isLoading } = useQuery<{ recommendations: KickerRecommendation[] }>({
     queryKey: ["/api/kicker-streaming", currentSeason, selectedWeek],
@@ -47,7 +61,7 @@ export default function Streaming() {
       }
       return response.json();
     },
-    enabled: !!user,
+    enabled: !!user && !!selectedWeek,
   });
 
   const recommendations = kickerData?.recommendations || [];
