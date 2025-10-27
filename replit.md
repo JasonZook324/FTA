@@ -57,6 +57,15 @@ A comprehensive waiver wire analysis tool that ranks NFL kickers by matchup qual
 - **Location**: `/streaming` page with week selector (1-18) and comprehensive "How It Works" instructional section
 - **Limitation**: Read-only ESPN API means users must manually add recommended kickers via ESPN Fantasy interface
 
+### Jobs Page (Improved - October 2025)
+The Jobs page provides automated data refresh workflows with visual progress tracking:
+- **Sequential Execution**: Single "Refresh All" button per data category runs jobs in the correct order automatically
+- **Visual Progress**: Real-time progress bar and step-by-step status indicators show which job is currently running
+- **Status Icons**: Pending (circle) → Running (spinner) → Completed (checkmark) or Error (alert) states for each step
+- **NFL Kicker Streaming Pipeline**: Automatically runs 4 jobs in sequence: Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
+- **Fantasy Pros Pipeline**: Automatically refreshes player data, rankings, projections, and news in correct order
+- **User Experience**: Eliminates need for manual job sequencing, prevents errors from running jobs out of order, provides clear feedback on progress
+
 ## External Dependencies
 
 -   **Database**: PostgreSQL via Neon Database (`@neondatabase/serverless`)
