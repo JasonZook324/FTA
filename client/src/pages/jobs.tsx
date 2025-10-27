@@ -76,10 +76,10 @@ export default function Jobs() {
     setFpSteps(jobs);
 
     const jobConfigs = [
-      { endpoint: "/api/jobs/fantasypros-refresh-players", name: "Refresh Players" },
-      { endpoint: "/api/jobs/fantasypros-refresh-rankings", name: "Refresh Rankings" },
-      { endpoint: "/api/jobs/fantasypros-refresh-projections", name: "Refresh Projections" },
-      { endpoint: "/api/jobs/fantasypros-refresh-news", name: "Refresh News" },
+      { endpoint: "/api/jobs/fp-refresh-players", name: "Refresh Players" },
+      { endpoint: "/api/jobs/fp-refresh-rankings", name: "Refresh Rankings" },
+      { endpoint: "/api/jobs/fp-refresh-projections", name: "Refresh Projections" },
+      { endpoint: "/api/jobs/fp-refresh-news", name: "Refresh News" },
     ];
 
     for (let i = 0; i < jobConfigs.length; i++) {
