@@ -8,8 +8,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  selectedLeagueId: varchar("selected_league_id"), // References old leagues table (deprecated - use selectedLeagueProfileId)
-  selectedLeagueProfileId: varchar("selected_league_profile_id"), // New: references league_profiles
+  selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
   selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -129,7 +128,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   selectedLeagueId: true,
-  selectedLeagueProfileId: true,
   selectedTeamId: true,
 });
 
