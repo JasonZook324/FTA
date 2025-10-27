@@ -29,7 +29,6 @@ const connectLeagueSchema = z.object({
   season: z.coerce.number().min(2020).max(2030),
   espnS2: z.string().min(1, "ESPN_S2 cookie is required"),
   swid: z.string().min(1, "SWID cookie is required"),
-  leagueName: z.string().min(1, "League name is required"),
   sport: z.string().default("ffl")
 });
 
@@ -100,7 +99,6 @@ export default function Authentication() {
       season: 2024,
       espnS2: "",
       swid: "",
-      leagueName: "",
       sport: "ffl"
     },
   });
@@ -551,20 +549,6 @@ export default function Authentication() {
                       onSubmit={connectLeagueForm.handleSubmit((data) => connectLeagueMutation.mutate(data))}
                       className="space-y-4"
                     >
-                      <FormField
-                        control={connectLeagueForm.control}
-                        name="leagueName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>League Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="e.g., Fantasy Football 2024" data-testid="input-league-name" />
-                            </FormControl>
-                            <FormDescription>A friendly name for this league</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={connectLeagueForm.control}
                         name="espnLeagueId"
