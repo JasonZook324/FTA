@@ -45,6 +45,18 @@ The application calculates comprehensive red zone statistics (plays inside the o
 - **Drive tracking**: Continues tracking red zone drives even when the offense exits the red zone, capturing field goals kicked from outside (e.g., team reaches 10-yard line, then kicks 27-yard FG from 17-yard line)
 - **Database integration**: Merges calculated stats with existing team statistics in the nflTeamStats table
 
+### Kicker Streaming Feature (New - October 2025)
+A comprehensive waiver wire analysis tool that ranks NFL kickers by matchup quality for fantasy football streaming. The feature combines multiple data sources to generate actionable recommendations:
+- **Scoring Algorithm** (0-100 point scale):
+  - Dome Advantage (0-30 pts): Prioritizes kickers in dome or retractable roof stadiums for weather-protected conditions
+  - Vegas Matchup (0-30 pts): Favors underdogs (+15 pts) and high over/under totals (47+: 15 pts) for increased FG opportunities
+  - Red Zone Efficiency (0-25 pts): Targets teams with low TD conversion rates that stall in the red zone
+  - Opponent Defense (0-15 pts): Considers defensive red zone TD rates that force more field goal attempts
+- **User Interface**: Weekly rankings with visual indicators (dome, underdog, high totals), score breakdowns, projections, and "Find in ESPN" links
+- **Data Pipeline**: Integrates stadium data, Vegas odds (The Odds API), and red zone statistics from play-by-play analysis
+- **Location**: `/streaming` page with week selector (1-18) and comprehensive "How It Works" instructional section
+- **Limitation**: Read-only ESPN API means users must manually add recommended kickers via ESPN Fantasy interface
+
 ## External Dependencies
 
 -   **Database**: PostgreSQL via Neon Database (`@neondatabase/serverless`)
