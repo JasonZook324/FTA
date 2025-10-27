@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { nflTeamStats } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 /**
  * ESPN NFL Stats API Service
@@ -122,6 +122,8 @@ function calculateRedZoneTdRate(attempts: number | null, touchdowns: number | nu
  */
 export async function parseTeamStats(
   teamId: number,
+  teamAbbreviation: string,
+  teamName: string,
   season: number,
   week: number | null = null,
   seasonType: number = 2
@@ -134,7 +136,6 @@ export async function parseTeamStats(
       return null;
     }
 
-    const team = espnStats.team;
     const categories = espnStats.splits.categories;
 
     // Find relevant stat categories
@@ -143,29 +144,29 @@ export async function parseTeamStats(
     const kickingStats = categories.find(c => c.name === 'kicking')?.stats || [];
     const generalStats = categories.find(c => c.name === 'general')?.stats || [];
 
-    // Extract available stats
-    const gamesPlayed = getStatValue(generalStats, 'gamesPlayed') || getStatValue(generalStats, 'GP');
+    // Extract available stats (use ?? to preserve zero values)
+    const gamesPlayed = getStatValue(generalStats, 'gamesPlayed') ?? getStatValue(generalStats, 'GP');
     
     // Red Zone stats (may not be available in ESPN API)
-    const redZoneAttempts = getStatValue(offenseStats, 'redZoneAttempts') || getStatValue(offenseStats, 'RZA');
-    const redZoneTouchdowns = getStatValue(offenseStats, 'redZoneTDs') || getStatValue(offenseStats, 'RZTD');
+    const redZoneAttempts = getStatValue(offenseStats, 'redZoneAttempts') ?? getStatValue(offenseStats, 'RZA');
+    const redZoneTouchdowns = getStatValue(offenseStats, 'redZoneTDs') ?? getStatValue(offenseStats, 'RZTD');
     const redZoneFieldGoals = getStatValue(offenseStats, 'redZoneFGs');
     
     // Opponent red zone stats
-    const oppRedZoneAttempts = getStatValue(defenseStats, 'redZoneAttempts') || getStatValue(defenseStats, 'oppRZA');
-    const oppRedZoneTouchdowns = getStatValue(defenseStats, 'redZoneTDs') || getStatValue(defenseStats, 'oppRZTD');
+    const oppRedZoneAttempts = getStatValue(defenseStats, 'redZoneAttempts') ?? getStatValue(defenseStats, 'oppRZA');
+    const oppRedZoneTouchdowns = getStatValue(defenseStats, 'redZoneTDs') ?? getStatValue(defenseStats, 'oppRZTD');
     const oppRedZoneFieldGoals = getStatValue(defenseStats, 'redZoneFGs');
     
     // Kicking stats
-    const fieldGoalAttempts = getStatValue(kickingStats, 'fieldGoalAttempts') || getStatValue(kickingStats, 'FGA');
-    const fieldGoalsMade = getStatValue(kickingStats, 'fieldGoalsMade') || getStatValue(kickingStats, 'FGM');
-    const fieldGoalPercentage = fieldGoalAttempts && fieldGoalsMade 
+    const fieldGoalAttempts = getStatValue(kickingStats, 'fieldGoalAttempts') ?? getStatValue(kickingStats, 'FGA');
+    const fieldGoalsMade = getStatValue(kickingStats, 'fieldGoalsMade') ?? getStatValue(kickingStats, 'FGM');
+    const fieldGoalPercentage = fieldGoalAttempts !== null && fieldGoalAttempts > 0 && fieldGoalsMade !== null && fieldGoalsMade >= 0
       ? ((fieldGoalsMade / fieldGoalAttempts) * 100).toFixed(2)
       : null;
     
     // General stats
-    const pointsScored = getStatValue(offenseStats, 'points') || getStatValue(generalStats, 'points') || getStatValue(generalStats, 'PF');
-    const pointsAllowed = getStatValue(defenseStats, 'points') || getStatValue(generalStats, 'PA');
+    const pointsScored = getStatValue(offenseStats, 'points') ?? getStatValue(generalStats, 'points') ?? getStatValue(generalStats, 'PF');
+    const pointsAllowed = getStatValue(defenseStats, 'points') ?? getStatValue(generalStats, 'PA');
 
     // Calculate TD rates
     const redZoneTdRate = calculateRedZoneTdRate(redZoneAttempts, redZoneTouchdowns);
@@ -174,8 +175,8 @@ export async function parseTeamStats(
     return {
       season,
       week,
-      teamAbbreviation: team.abbreviation,
-      teamName: team.displayName,
+      teamAbbreviation,
+      teamName,
       gamesPlayed,
       redZoneAttempts,
       redZoneTouchdowns,
@@ -213,7 +214,7 @@ export async function fetchAllTeamStats(
     
     // Fetch stats for each team
     const statsPromises = teams.map(team => 
-      parseTeamStats(team.id, season, week, seasonType)
+      parseTeamStats(team.id, team.abbreviation, team.name, season, week, seasonType)
     );
     
     const allStats = await Promise.all(statsPromises);
@@ -257,10 +258,11 @@ export async function refreshNflTeamStats(
           eq(nflTeamStats.week, week)
         ));
     } else {
+      // For season totals, delete records where week IS NULL
       await db.delete(nflTeamStats)
         .where(and(
           eq(nflTeamStats.season, season),
-          eq(nflTeamStats.week, null as any)
+          isNull(nflTeamStats.week)
         ));
     }
     
