@@ -4360,6 +4360,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/jobs/nfl-refresh-red-zone-stats", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.body;
+      const { refreshRedZoneStats } = await import("./espnPlayByPlayService");
+      const result = await refreshRedZoneStats(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully calculated ${result.recordCount} NFL red zone stats for week ${week}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to calculate red zone stats' });
+      }
+    } catch (error: any) {
+      console.error('NFL red zone stats calculation error:', error);
+      res.status(500).json({ message: error.message || 'Failed to calculate red zone stats' });
+    }
+  });
+
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {

@@ -358,6 +358,24 @@ export default function Jobs() {
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Refresh Team Stats (ESPN API)
             </Button>
+
+            <Button
+              data-testid="button-nfl-refresh-red-zone-stats"
+              disabled={loading}
+              onClick={() => runJob(
+                "/api/jobs/nfl-refresh-red-zone-stats",
+                "Calculate Red Zone Stats",
+                {
+                  season: parseInt(nflSeason),
+                  week: parseInt(nflWeek)
+                }
+              )}
+              variant="outline"
+              className="w-full"
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Calculate Red Zone Stats (Play-by-Play)
+            </Button>
           </div>
         </CardContent>
       </Card>
