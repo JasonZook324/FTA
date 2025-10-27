@@ -8,7 +8,8 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
+  selectedLeagueId: varchar("selected_league_id"), // References old leagues table (deprecated - use selectedLeagueProfileId)
+  selectedLeagueProfileId: varchar("selected_league_profile_id"), // New: references league_profiles
   selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -84,10 +85,51 @@ export const players = pgTable("players", {
   stats: jsonb("stats"),
 });
 
+// New shareable league system
+export const leagueProfiles = pgTable("league_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  espnLeagueId: text("espn_league_id").notNull(),
+  season: integer("season").notNull(),
+  name: text("name").notNull(),
+  sport: text("sport").notNull(), // ffl, fba, fhk, flb
+  teamCount: integer("team_count"),
+  currentWeek: integer("current_week"),
+  playoffTeams: integer("playoff_teams"),
+  scoringType: text("scoring_type"),
+  tradeDeadline: text("trade_deadline"),
+  settings: jsonb("settings"),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => ({
+  uniqueLeague: uniqueIndex("league_profiles_espn_season").on(table.espnLeagueId, table.season),
+}));
+
+export const leagueCredentials = pgTable("league_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueProfileId: varchar("league_profile_id").notNull().references(() => leagueProfiles.id, { onDelete: "cascade" }).unique(), // One credential per league profile
+  espnS2: text("espn_s2").notNull(),
+  swid: text("swid").notNull(),
+  addedByUserId: varchar("added_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  isValid: boolean("is_valid").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastValidated: timestamp("last_validated"),
+});
+
+export const userLeagues = pgTable("user_leagues", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  leagueProfileId: varchar("league_profile_id").notNull().references(() => leagueProfiles.id, { onDelete: "cascade" }),
+  role: text("role").default("member"), // member, admin, owner
+  joinedAt: timestamp("joined_at").defaultNow(),
+}, (table) => ({
+  uniqueUserLeague: uniqueIndex("user_leagues_user_league").on(table.userId, table.leagueProfileId),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   selectedLeagueId: true,
+  selectedLeagueProfileId: true,
   selectedTeamId: true,
 });
 
@@ -113,6 +155,25 @@ export const insertMatchupSchema = createInsertSchema(matchups).omit({
 
 export const insertPlayerSchema = createInsertSchema(players).omit({
   id: true,
+});
+
+// New shareable league schemas
+export const insertLeagueProfileSchema = createInsertSchema(leagueProfiles).omit({
+  id: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+
+export const insertLeagueCredentialsSchema = createInsertSchema(leagueCredentials).omit({
+  id: true,
+  isValid: true,
+  createdAt: true,
+  lastValidated: true,
+});
+
+export const insertUserLeagueSchema = createInsertSchema(userLeagues).omit({
+  id: true,
+  joinedAt: true,
 });
 
 // Fantasy Pros data tables for contextual information
@@ -268,6 +329,12 @@ export type Matchup = typeof matchups.$inferSelect;
 export type InsertMatchup = z.infer<typeof insertMatchupSchema>;
 export type Player = typeof players.$inferSelect;
 export type InsertPlayer = z.infer<typeof insertPlayerSchema>;
+export type LeagueProfile = typeof leagueProfiles.$inferSelect;
+export type InsertLeagueProfile = z.infer<typeof insertLeagueProfileSchema>;
+export type LeagueCredentials = typeof leagueCredentials.$inferSelect;
+export type InsertLeagueCredentials = z.infer<typeof insertLeagueCredentialsSchema>;
+export type UserLeague = typeof userLeagues.$inferSelect;
+export type InsertUserLeague = z.infer<typeof insertUserLeagueSchema>;
 
 // NFL Kicker Streaming Data Tables
 export const nflStadiums = pgTable("nfl_stadiums", {
