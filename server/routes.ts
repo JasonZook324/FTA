@@ -759,6 +759,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Shareable League Profile routes
+  // Get all available league profiles with membership status
+  app.get("/api/leagues/available", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Get all league profiles
+      const allProfiles = await storage.getAllLeagueProfiles();
+      
+      // Get user's league memberships
+      const userMemberships = await storage.getUserLeagues(userId);
+      const membershipSet = new Set(userMemberships.map(ul => ul.leagueProfileId));
+      
+      // Add membership status to each profile
+      const profilesWithStatus = allProfiles.map(profile => ({
+        ...profile,
+        isMember: membershipSet.has(profile.id)
+      }));
+      
+      res.json(profilesWithStatus);
+    } catch (error: any) {
+      console.error('Error getting available leagues:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Connect to a new league and create shareable profile
+  app.post("/api/leagues/connect", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { espnLeagueId, season, espnS2, swid, leagueName, sport } = req.body;
+      
+      if (!espnLeagueId || !season || !espnS2 || !swid || !leagueName || !sport) {
+        return res.status(400).json({ 
+          message: "Missing required fields: espnLeagueId, season, espnS2, swid, leagueName, sport" 
+        });
+      }
+
+      // Validate credentials with ESPN API
+      const testCredentials: EspnCredentials = {
+        id: '',
+        userId,
+        espnS2,
+        swid,
+        testLeagueId: espnLeagueId,
+        testSeason: season,
+        isValid: true,
+        createdAt: new Date(),
+        lastValidated: null
+      };
+      
+      const isValid = await espnApiService.validateCredentials(testCredentials);
+      
+      if (!isValid) {
+        return res.status(400).json({ 
+          message: "Invalid ESPN credentials. Please check your espn_s2 and SWID cookies." 
+        });
+      }
+
+      // Check if league profile already exists
+      const existingProfile = await storage.getLeagueProfileByEspnId(espnLeagueId, season);
+      
+      if (existingProfile) {
+        // League profile exists, just add user membership if not already a member
+        const existingMembership = await storage.getUserLeague(userId, existingProfile.id);
+        
+        if (!existingMembership) {
+          await storage.createUserLeague({
+            userId,
+            leagueProfileId: existingProfile.id
+          });
+        }
+        
+        return res.json({ 
+          message: "League already exists. You've been added as a member.",
+          leagueProfile: existingProfile,
+          isNewProfile: false
+        });
+      }
+
+      // Create new league profile
+      const leagueProfile = await storage.createLeagueProfile({
+        espnLeagueId,
+        season,
+        name: leagueName,
+        sport
+      });
+
+      // Create league credentials
+      await storage.createLeagueCredentials({
+        leagueProfileId: leagueProfile.id,
+        espnS2,
+        swid,
+        addedByUserId: userId
+      });
+
+      // Add creator as a member
+      await storage.createUserLeague({
+        userId,
+        leagueProfileId: leagueProfile.id
+      });
+
+      res.json({ 
+        message: "League profile created successfully",
+        leagueProfile,
+        isNewProfile: true
+      });
+    } catch (error: any) {
+      console.error('Error connecting to league:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Join an existing league profile
+  app.post("/api/leagues/:id/join", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const leagueProfileId = req.params.id;
+      
+      // Check if league profile exists
+      const leagueProfile = await storage.getLeagueProfile(leagueProfileId);
+      
+      if (!leagueProfile) {
+        return res.status(404).json({ message: "League profile not found" });
+      }
+
+      // Check if user is already a member
+      const existingMembership = await storage.getUserLeague(userId, leagueProfileId);
+      
+      if (existingMembership) {
+        return res.status(400).json({ message: "You are already a member of this league" });
+      }
+
+      // Add user as a member
+      await storage.createUserLeague({
+        userId,
+        leagueProfileId
+      });
+
+      res.json({ 
+        message: "Successfully joined league",
+        leagueProfile
+      });
+    } catch (error: any) {
+      console.error('Error joining league:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // League routes
   app.get("/api/leagues", requireAuth, async (req: any, res) => {
     try {
