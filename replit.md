@@ -32,8 +32,18 @@ The primary integration is with ESPN's Fantasy Sports API v3, providing league d
 - **Fantasy Pros API**: Player rankings, projections, injury data, and news across all major sports
 - **The Odds API**: NFL Vegas betting lines (spreads, moneylines, over/under) for kicker streaming analysis (free tier: 500 requests/month)
 - **ESPN NFL Stats API** (unofficial): Team-level statistics including general, offensive, defensive, and kicking stats (free, no authentication required)
+- **ESPN Play-by-Play API**: Game-level play-by-play data used to calculate red zone statistics (attempts, TDs, FGs, TD rates) for both offensive and defensive units
 - **Neon Database**: PostgreSQL hosting with connection pooling
 - **Vite**: Development tooling and build system
+
+### Red Zone Statistics Feature
+The application calculates comprehensive red zone statistics (plays inside the opponent's 20-yard line) from ESPN's play-by-play data for kicker streaming analysis. Key features:
+- **Offensive metrics**: Red zone attempts, touchdowns, field goals, and TD rate
+- **Defensive metrics**: Opponent red zone attempts, touchdowns allowed, field goals allowed, and opponent TD rate
+- **Per-game processing**: Prevents drive state bleed between games and ensures accurate statistics
+- **Parallel fetching**: Efficiently processes 100+ plays per game across multiple games per week
+- **Drive tracking**: Continues tracking red zone drives even when the offense exits the red zone, capturing field goals kicked from outside (e.g., team reaches 10-yard line, then kicks 27-yard FG from 17-yard line)
+- **Database integration**: Merges calculated stats with existing team statistics in the nflTeamStats table
 
 ## External Dependencies
 
