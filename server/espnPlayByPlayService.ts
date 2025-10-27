@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { nflTeamStats } from "@shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /**
  * ESPN Play-by-Play Service
@@ -15,10 +15,16 @@ interface RedZoneStats {
   teamId: string;
   teamAbbreviation: string;
   teamName: string;
+  // Offensive stats
   attempts: number;
   touchdowns: number;
   fieldGoals: number;
   tdRate: string | null;
+  // Defensive stats (opponent red zone)
+  oppAttempts: number;
+  oppTouchdowns: number;
+  oppFieldGoals: number;
+  oppTdRate: string | null;
 }
 
 interface RefreshResult {
@@ -57,40 +63,65 @@ async function getGamesForWeek(season: number, week: number): Promise<any[]> {
 
 /**
  * Get play-by-play data for a specific game
+ * Uses pagination to fetch all plays efficiently
  */
 async function getPlayByPlay(eventId: string): Promise<any[]> {
   try {
-    const url = `${ESPN_CORE_API}/events/${eventId}/competitions/${eventId}/plays?limit=500`;
-    console.log(`Fetching plays for game ${eventId}`);
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`Failed to fetch plays for game ${eventId}: ${response.statusText}`);
-      return [];
-    }
-
-    const data: any = await response.json();
-    
-    if (!data.items || data.items.length === 0) {
-      console.log(`No plays found for game ${eventId}`);
-      return [];
-    }
-
-    // Fetch detailed play data for each play reference
     const plays = [];
-    for (const item of data.items) {
-      try {
-        const playResponse = await fetch(item.$ref);
-        if (playResponse.ok) {
-          const play = await playResponse.json();
-          plays.push(play);
-        }
-      } catch (err) {
-        console.error(`Error fetching play ${item.id}:`, err);
+    let pageIndex = 1;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const url = `${ESPN_CORE_API}/events/${eventId}/competitions/${eventId}/plays?limit=100&page=${pageIndex}`;
+      console.log(`Fetching plays page ${pageIndex} for game ${eventId}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to fetch plays page ${pageIndex} for game ${eventId}: ${response.statusText}`);
+        break;
+      }
+
+      const data: any = await response.json();
+      
+      if (!data.items || data.items.length === 0) {
+        break;
+      }
+
+      // The items are already full play objects with all data (not just refs)
+      // If they ARE refs, we need to fetch them in parallel
+      if (data.items[0].$ref) {
+        // Fetch all plays on this page in parallel
+        const playPromises = data.items.map(async (item: any) => {
+          try {
+            const playResponse = await fetch(item.$ref);
+            if (playResponse.ok) {
+              return await playResponse.json();
+            }
+          } catch (err) {
+            console.error(`Error fetching play ${item.id}:`, err);
+          }
+          return null;
+        });
+        
+        const pagePlays = await Promise.all(playPromises);
+        plays.push(...pagePlays.filter(p => p !== null));
+      } else {
+        // Items already contain full play data
+        plays.push(...data.items);
+      }
+
+      // Check if there are more pages
+      hasMore = data.pageIndex < data.pageCount;
+      pageIndex++;
+      
+      // Safety limit to prevent infinite loops
+      if (pageIndex > 20) {
+        console.warn(`Exceeded maximum page limit for game ${eventId}`);
+        break;
       }
     }
 
-    console.log(`Fetched ${plays.length} plays for game ${eventId}`);
+    console.log(`Fetched ${plays.length} total plays for game ${eventId}`);
     return plays;
   } catch (error) {
     console.error(`Error fetching play-by-play for game ${eventId}:`, error);
@@ -150,27 +181,30 @@ function getDefenseTeamId(play: any): string | null {
 }
 
 /**
- * Calculate red zone statistics from play-by-play data
+ * Calculate red zone statistics from play-by-play data for a single game
+ * This processes one game at a time to prevent drive state bleed between games
  */
-function calculateRedZoneStats(plays: any[], teamMap: Map<string, { abbreviation: string; name: string }>): Map<string, RedZoneStats> {
-  const statsMap = new Map<string, RedZoneStats>();
+function calculateRedZoneStatsForGame(plays: any[], teamMap: Map<string, { abbreviation: string; name: string }>): Map<string, { offense: { attempts: number; tds: number; fgs: number }; defense: { attempts: number; tds: number; fgs: number } }> {
+  const gameStats = new Map<string, { offense: { attempts: number; tds: number; fgs: number }; defense: { attempts: number; tds: number; fgs: number } }>();
 
-  // Initialize stats for all teams
+  // Initialize stats for all teams in this game
   teamMap.forEach((teamInfo, teamId) => {
-    statsMap.set(teamId, {
-      teamId,
-      teamAbbreviation: teamInfo.abbreviation,
-      teamName: teamInfo.name,
-      attempts: 0,
-      touchdowns: 0,
-      fieldGoals: 0,
-      tdRate: null
+    gameStats.set(teamId, {
+      offense: { attempts: 0, tds: 0, fgs: 0 },
+      defense: { attempts: 0, tds: 0, fgs: 0 }
     });
   });
 
-  // Track red zone drives (group consecutive red zone plays)
-  let currentDrive: { teamId: string | null; hasAttempt: boolean; hasTd: boolean; hasFg: boolean } = {
-    teamId: null,
+  // Track red zone drives
+  let currentDrive: { 
+    offenseTeamId: string | null; 
+    defenseTeamId: string | null;
+    hasAttempt: boolean; 
+    hasTd: boolean; 
+    hasFg: boolean;
+  } = {
+    offenseTeamId: null,
+    defenseTeamId: null,
     hasAttempt: false,
     hasTd: false,
     hasFg: false
@@ -178,25 +212,36 @@ function calculateRedZoneStats(plays: any[], teamMap: Map<string, { abbreviation
 
   for (const play of plays) {
     const offenseTeamId = getOffenseTeamId(play);
-    if (!offenseTeamId) continue;
+    const defenseTeamId = getDefenseTeamId(play);
+    
+    if (!offenseTeamId || !defenseTeamId) continue;
 
     // Check if this is a red zone play
     if (isRedZonePlay(play)) {
       // If this is a new drive (different team or first red zone play)
-      if (currentDrive.teamId !== offenseTeamId) {
+      if (currentDrive.offenseTeamId !== offenseTeamId) {
         // Finalize previous drive
-        if (currentDrive.teamId && currentDrive.hasAttempt) {
-          const stats = statsMap.get(currentDrive.teamId);
-          if (stats) {
-            stats.attempts++;
-            if (currentDrive.hasTd) stats.touchdowns++;
-            if (currentDrive.hasFg) stats.fieldGoals++;
+        if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
+          const offenseStats = gameStats.get(currentDrive.offenseTeamId);
+          const defenseStats = gameStats.get(currentDrive.defenseTeamId);
+          
+          if (offenseStats) {
+            offenseStats.offense.attempts++;
+            if (currentDrive.hasTd) offenseStats.offense.tds++;
+            if (currentDrive.hasFg) offenseStats.offense.fgs++;
+          }
+          
+          if (defenseStats) {
+            defenseStats.defense.attempts++;
+            if (currentDrive.hasTd) defenseStats.defense.tds++;
+            if (currentDrive.hasFg) defenseStats.defense.fgs++;
           }
         }
         
         // Start new drive
         currentDrive = {
-          teamId: offenseTeamId,
+          offenseTeamId,
+          defenseTeamId,
           hasAttempt: true,
           hasTd: false,
           hasFg: false
@@ -214,36 +259,52 @@ function calculateRedZoneStats(plays: any[], teamMap: Map<string, { abbreviation
       }
     } else {
       // Not a red zone play - if we were tracking a drive, finalize it
-      if (currentDrive.teamId && currentDrive.hasAttempt) {
-        const stats = statsMap.get(currentDrive.teamId);
-        if (stats) {
-          stats.attempts++;
-          if (currentDrive.hasTd) stats.touchdowns++;
-          if (currentDrive.hasFg) stats.fieldGoals++;
+      if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
+        const offenseStats = gameStats.get(currentDrive.offenseTeamId);
+        const defenseStats = gameStats.get(currentDrive.defenseTeamId);
+        
+        if (offenseStats) {
+          offenseStats.offense.attempts++;
+          if (currentDrive.hasTd) offenseStats.offense.tds++;
+          if (currentDrive.hasFg) offenseStats.offense.fgs++;
         }
-        currentDrive = { teamId: null, hasAttempt: false, hasTd: false, hasFg: false };
+        
+        if (defenseStats) {
+          defenseStats.defense.attempts++;
+          if (currentDrive.hasTd) defenseStats.defense.tds++;
+          if (currentDrive.hasFg) defenseStats.defense.fgs++;
+        }
+        
+        currentDrive = { 
+          offenseTeamId: null, 
+          defenseTeamId: null,
+          hasAttempt: false, 
+          hasTd: false, 
+          hasFg: false 
+        };
       }
     }
   }
 
   // Finalize last drive if needed
-  if (currentDrive.teamId && currentDrive.hasAttempt) {
-    const stats = statsMap.get(currentDrive.teamId);
-    if (stats) {
-      stats.attempts++;
-      if (currentDrive.hasTd) stats.touchdowns++;
-      if (currentDrive.hasFg) stats.fieldGoals++;
+  if (currentDrive.offenseTeamId && currentDrive.defenseTeamId && currentDrive.hasAttempt) {
+    const offenseStats = gameStats.get(currentDrive.offenseTeamId);
+    const defenseStats = gameStats.get(currentDrive.defenseTeamId);
+    
+    if (offenseStats) {
+      offenseStats.offense.attempts++;
+      if (currentDrive.hasTd) offenseStats.offense.tds++;
+      if (currentDrive.hasFg) offenseStats.offense.fgs++;
+    }
+    
+    if (defenseStats) {
+      defenseStats.defense.attempts++;
+      if (currentDrive.hasTd) defenseStats.defense.tds++;
+      if (currentDrive.hasFg) defenseStats.defense.fgs++;
     }
   }
 
-  // Calculate TD rates
-  statsMap.forEach(stats => {
-    if (stats.attempts > 0) {
-      stats.tdRate = ((stats.touchdowns / stats.attempts) * 100).toFixed(2);
-    }
-  });
-
-  return statsMap;
+  return gameStats;
 }
 
 /**
@@ -281,40 +342,87 @@ export async function refreshRedZoneStats(season: number, week: number): Promise
       return { success: false, recordCount: 0, error: 'No games found for this week' };
     }
 
-    // Map to store all plays and team info
-    const allPlays: any[] = [];
-    const teamMap = new Map<string, { abbreviation: string; name: string }>();
+    // Aggregated stats across all games
+    const weekStats = new Map<string, RedZoneStats>();
 
-    // Fetch play-by-play for each game
+    // Process each game separately to prevent drive state bleed
     for (const game of games) {
       const eventId = game.id;
-      const plays = await getPlayByPlay(eventId);
-      allPlays.push(...plays);
-
-      // Extract team info from the game
+      console.log(`Processing game ${eventId}...`);
+      
+      // Get team info for this game
+      const gameTeamMap = new Map<string, { abbreviation: string; name: string }>();
       if (game.competitions?.[0]?.competitors) {
         for (const competitor of game.competitions[0].competitors) {
           const teamId = competitor.team?.id || competitor.id;
-          if (teamId && !teamMap.has(teamId)) {
+          if (teamId) {
             const teamInfo = await getTeamInfo(teamId);
             if (teamInfo) {
-              teamMap.set(teamId, teamInfo);
+              gameTeamMap.set(teamId, teamInfo);
+              
+              // Initialize week stats if not present
+              if (!weekStats.has(teamId)) {
+                weekStats.set(teamId, {
+                  teamId,
+                  teamAbbreviation: teamInfo.abbreviation,
+                  teamName: teamInfo.name,
+                  attempts: 0,
+                  touchdowns: 0,
+                  fieldGoals: 0,
+                  tdRate: null,
+                  oppAttempts: 0,
+                  oppTouchdowns: 0,
+                  oppFieldGoals: 0,
+                  oppTdRate: null
+                });
+              }
             }
           }
         }
       }
+      
+      // Fetch play-by-play for this game
+      const plays = await getPlayByPlay(eventId);
+      
+      if (plays.length === 0) {
+        console.log(`No plays found for game ${eventId}, skipping`);
+        continue;
+      }
+      
+      // Calculate stats for this game
+      const gameStats = calculateRedZoneStatsForGame(plays, gameTeamMap);
+      
+      // Aggregate into week stats
+      gameStats.forEach((stats, teamId) => {
+        const teamWeekStats = weekStats.get(teamId);
+        if (teamWeekStats) {
+          teamWeekStats.attempts += stats.offense.attempts;
+          teamWeekStats.touchdowns += stats.offense.tds;
+          teamWeekStats.fieldGoals += stats.offense.fgs;
+          teamWeekStats.oppAttempts += stats.defense.attempts;
+          teamWeekStats.oppTouchdowns += stats.defense.tds;
+          teamWeekStats.oppFieldGoals += stats.defense.fgs;
+        }
+      });
     }
 
-    console.log(`Collected ${allPlays.length} total plays from ${games.length} games`);
-    console.log(`Found ${teamMap.size} teams`);
+    console.log(`Collected stats from ${games.length} games`);
+    console.log(`Found ${weekStats.size} teams`);
 
-    // Calculate red zone stats
-    const redZoneStats = calculateRedZoneStats(allPlays, teamMap);
+    // Calculate TD rates
+    weekStats.forEach(stats => {
+      if (stats.attempts > 0) {
+        stats.tdRate = ((stats.touchdowns / stats.attempts) * 100).toFixed(2);
+      }
+      if (stats.oppAttempts > 0) {
+        stats.oppTdRate = ((stats.oppTouchdowns / stats.oppAttempts) * 100).toFixed(2);
+      }
+    });
 
     // Update database with red zone stats
     let updatedCount = 0;
     
-    for (const [teamId, stats] of redZoneStats) {
+    for (const [teamId, stats] of weekStats) {
       try {
         // Check if record exists
         const existing = await db.query.nflTeamStats.findFirst({
@@ -333,6 +441,10 @@ export async function refreshRedZoneStats(season: number, week: number): Promise
               redZoneTouchdowns: stats.touchdowns,
               redZoneFieldGoals: stats.fieldGoals,
               redZoneTdRate: stats.tdRate,
+              oppRedZoneAttempts: stats.oppAttempts,
+              oppRedZoneTouchdowns: stats.oppTouchdowns,
+              oppRedZoneFieldGoals: stats.oppFieldGoals,
+              oppRedZoneTdRate: stats.oppTdRate,
               updatedAt: new Date()
             })
             .where(eq(nflTeamStats.id, existing.id));
@@ -347,12 +459,16 @@ export async function refreshRedZoneStats(season: number, week: number): Promise
             redZoneAttempts: stats.attempts,
             redZoneTouchdowns: stats.touchdowns,
             redZoneFieldGoals: stats.fieldGoals,
-            redZoneTdRate: stats.tdRate
+            redZoneTdRate: stats.tdRate,
+            oppRedZoneAttempts: stats.oppAttempts,
+            oppRedZoneTouchdowns: stats.oppTouchdowns,
+            oppRedZoneFieldGoals: stats.oppFieldGoals,
+            oppRedZoneTdRate: stats.oppTdRate
           });
           updatedCount++;
         }
 
-        console.log(`✓ ${stats.teamAbbreviation}: ${stats.attempts} RZ attempts, ${stats.touchdowns} TDs, ${stats.fieldGoals} FGs (${stats.tdRate}% TD rate)`);
+        console.log(`✓ ${stats.teamAbbreviation}: OFF ${stats.attempts} RZ attempts, ${stats.touchdowns} TDs, ${stats.fieldGoals} FGs (${stats.tdRate}% TD) | DEF ${stats.oppAttempts} RZ attempts, ${stats.oppTouchdowns} TDs, ${stats.oppFieldGoals} FGs (${stats.oppTdRate}% TD)`);
       } catch (err) {
         console.error(`Failed to update red zone stats for ${stats.teamAbbreviation}:`, err);
       }
