@@ -242,7 +242,7 @@ export default function Streaming() {
                   </div>
 
                   {/* Score & Projection */}
-                  <div className="flex md:flex-col gap-4 md:gap-2 items-center md:items-end">
+                  <div className="flex md:flex-col gap-4 md:gap-2 items-center md:items-end flex-shrink-0">
                     <div className="text-center">
                       <div className="text-xs font-medium text-muted-foreground mb-1">Total Score</div>
                       <div 
@@ -261,6 +261,18 @@ export default function Streaming() {
                         {rec.projection} pts
                       </div>
                     </div>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      className="mt-2"
+                      data-testid={`button-add-kicker-${index}`}
+                      onClick={() => {
+                        // Open ESPN Fantasy in new tab
+                        window.open('https://fantasy.espn.com', '_blank');
+                      }}
+                    >
+                      Find in ESPN
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -282,6 +294,36 @@ export default function Streaming() {
           </CardContent>
         </Card>
       )}
+
+      {/* How to Use Section */}
+      <Card className="mt-8 border-2 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            How to Use These Recommendations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="bg-primary/5 p-4 rounded-lg">
+            <h4 className="font-semibold mb-2">Step 1: Review Rankings</h4>
+            <p className="text-sm text-muted-foreground">
+              Kickers are ranked by total score. Higher scores indicate better matchup conditions for field goal opportunities.
+            </p>
+          </div>
+          <div className="bg-primary/5 p-4 rounded-lg">
+            <h4 className="font-semibold mb-2">Step 2: Check Availability</h4>
+            <p className="text-sm text-muted-foreground">
+              Click "Find in ESPN" to open ESPN Fantasy. Search for the team's kicker (e.g., search "{recommendations.length > 0 ? recommendations[0].nflTeam : 'team name'} K") to see if they're available on the waiver wire.
+            </p>
+          </div>
+          <div className="bg-primary/5 p-4 rounded-lg">
+            <h4 className="font-semibold mb-2">Step 3: Add to Your Team</h4>
+            <p className="text-sm text-muted-foreground">
+              In ESPN Fantasy, navigate to "Players" → filter by "K" position → search for the kicker → click "Add" to claim them or add to your waiver claims.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* How It Works Section */}
       <Card className="mt-8">
