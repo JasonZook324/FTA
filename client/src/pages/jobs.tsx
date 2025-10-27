@@ -340,6 +340,24 @@ export default function Jobs() {
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Refresh Vegas Odds (The Odds API)
             </Button>
+
+            <Button
+              data-testid="button-nfl-refresh-team-stats"
+              disabled={loading}
+              onClick={() => runJob(
+                "/api/jobs/nfl-refresh-team-stats",
+                "Refresh NFL Team Stats",
+                {
+                  season: parseInt(nflSeason),
+                  week: nflWeek ? parseInt(nflWeek) : null
+                }
+              )}
+              variant="outline"
+              className="w-full"
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh Team Stats (ESPN API)
+            </Button>
           </div>
         </CardContent>
       </Card>
