@@ -1,3 +1,7 @@
+import { db } from "./db";
+import { nflTeamStats } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+
 /**
  * ESPN NFL Stats API Service
  * Fetches team statistics from ESPN's unofficial NFL API
@@ -6,6 +10,12 @@
 
 const ESPN_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 const ESPN_SITE_API = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+
+interface RefreshResult {
+  success: boolean;
+  recordCount: number;
+  error?: string;
+}
 
 interface ESPNTeamStatistic {
   name: string;
@@ -217,5 +227,59 @@ export async function fetchAllTeamStats(
   } catch (error) {
     console.error('Error fetching all team stats:', error);
     throw error;
+  }
+}
+
+/**
+ * Refresh NFL team stats and save to database
+ */
+export async function refreshNflTeamStats(
+  season: number,
+  week: number | null = null,
+  seasonType: number = 2
+): Promise<RefreshResult> {
+  try {
+    console.log(`Refreshing NFL team stats for ${season} season, week ${week || 'season totals'}...`);
+    
+    // Fetch all team stats from ESPN API
+    const teamStats = await fetchAllTeamStats(season, week, seasonType);
+    
+    if (teamStats.length === 0) {
+      console.warn('No team stats found from ESPN API');
+      return { success: false, recordCount: 0, error: 'No stats available' };
+    }
+    
+    // Delete existing stats for this season/week combination
+    if (week !== null) {
+      await db.delete(nflTeamStats)
+        .where(and(
+          eq(nflTeamStats.season, season),
+          eq(nflTeamStats.week, week)
+        ));
+    } else {
+      await db.delete(nflTeamStats)
+        .where(and(
+          eq(nflTeamStats.season, season),
+          eq(nflTeamStats.week, null as any)
+        ));
+    }
+    
+    let insertedCount = 0;
+    
+    // Insert each team's stats
+    for (const stats of teamStats) {
+      try {
+        await db.insert(nflTeamStats).values(stats);
+        insertedCount++;
+      } catch (err) {
+        console.error(`Failed to insert stats for ${stats.teamAbbreviation}:`, err);
+      }
+    }
+    
+    console.log(`✓ Successfully refreshed ${insertedCount} NFL team stats records`);
+    return { success: true, recordCount: insertedCount };
+  } catch (error: any) {
+    console.error('Error refreshing NFL team stats:', error);
+    return { success: false, recordCount: 0, error: error.message };
   }
 }
