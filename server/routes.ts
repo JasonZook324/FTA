@@ -4290,6 +4290,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NFL Stats & Odds refresh jobs
+  app.post("/api/jobs/nfl-refresh-stadiums", requireAuth, async (req, res) => {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Read static stadium data
+      const stadiumDataPath = path.join(process.cwd(), 'server', 'data', 'nfl-stadiums.json');
+      const stadiumData = JSON.parse(await fs.readFile(stadiumDataPath, 'utf-8'));
+      
+      // Clear existing stadium data
+      await db.delete(schema.nflStadiums);
+      
+      // Insert stadium data
+      let insertedCount = 0;
+      for (const stadium of stadiumData) {
+        await db.insert(schema.nflStadiums).values(stadium);
+        insertedCount++;
+      }
+      
+      res.json({ 
+        message: `Successfully loaded ${insertedCount} NFL stadiums`,
+        recordCount: insertedCount
+      });
+    } catch (error: any) {
+      console.error('NFL stadium refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh stadiums' });
+    }
+  });
+
+  app.post("/api/jobs/nfl-refresh-odds", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.body;
+      const { refreshNflOdds } = await import("./oddsApiService");
+      const result = await refreshNflOdds(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} NFL odds records for week ${week}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh NFL odds' });
+      }
+    } catch (error: any) {
+      console.error('NFL odds refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh NFL odds' });
+    }
+  });
+
+  app.post("/api/jobs/nfl-refresh-team-stats", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = null } = req.body;
+      const { refreshNflTeamStats } = await import("./espnNflStatsService");
+      const result = await refreshNflTeamStats(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} NFL team stats records${week ? ` for week ${week}` : ' (season totals)'}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh NFL team stats' });
+      }
+    } catch (error: any) {
+      console.error('NFL team stats refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh NFL team stats' });
+    }
+  });
+
+  app.post("/api/jobs/nfl-refresh-red-zone-stats", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.body;
+      const { refreshRedZoneStats } = await import("./espnPlayByPlayService");
+      const result = await refreshRedZoneStats(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully calculated ${result.recordCount} NFL red zone stats for week ${week}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to calculate red zone stats' });
+      }
+    } catch (error: any) {
+      console.error('NFL red zone stats calculation error:', error);
+      res.status(500).json({ message: error.message || 'Failed to calculate red zone stats' });
+    }
+  });
+
+  // Kicker streaming recommendations
+  app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.query;
+      const { getKickerRecommendations } = await import("./kickerStreamingService");
+      
+      const recommendations = await getKickerRecommendations(
+        parseInt(season as string), 
+        parseInt(week as string)
+      );
+      
+      res.json({ recommendations });
+    } catch (error: any) {
+      console.error('Kicker streaming error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to get kicker recommendations',
+        recommendations: []
+      });
+    }
+  });
+
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {
@@ -4357,7 +4468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get total count with filters
       const countQuery = `SELECT COUNT(*) as total FROM ${tableName} ${whereClause}`;
       const countResult = await db.execute(sql.raw(countQuery));
-      const total = parseInt(countResult.rows[0]?.total || '0');
+      const total = parseInt(String(countResult.rows[0]?.total || 0));
       
       // Get data with pagination - try to order by id, fallback to first column
       let dataQuery: string;

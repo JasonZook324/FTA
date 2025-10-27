@@ -1,0 +1,101 @@
+[
+  {
+    "teamAbbreviation": "ARI",
+    "teamName": "Arizona Cardinals",
+    "stadiumName": "State Farm Stadium",
+    "city": "Glendale",
+    "state": "AZ",
+    "roofType": "retractable",
+    "surfaceType": "grass"
+  },
+  {
+    "teamAbbreviation": "ATL",
+    "teamName": "Atlanta Falcons",
+    "stadiumName": "Mercedes-Benz Stadium",
+    "city": "Atlanta",
+    "state": "GA",
+    "roofType": "retractable",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "DAL",
+    "teamName": "Dallas Cowboys",
+    "stadiumName": "AT&T Stadium",
+    "city": "Arlington",
+    "state": "TX",
+    "roofType": "retractable",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "HOU",
+    "teamName": "Houston Texans",
+    "stadiumName": "NRG Stadium",
+    "city": "Houston",
+    "state": "TX",
+    "roofType": "retractable",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "IND",
+    "teamName": "Indianapolis Colts",
+    "stadiumName": "Lucas Oil Stadium",
+    "city": "Indianapolis",
+    "state": "IN",
+    "roofType": "retractable",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "LV",
+    "teamName": "Las Vegas Raiders",
+    "stadiumName": "Allegiant Stadium",
+    "city": "Las Vegas",
+    "state": "NV",
+    "roofType": "dome",
+    "surfaceType": "grass"
+  },
+  {
+    "teamAbbreviation": "DET",
+    "teamName": "Detroit Lions",
+    "stadiumName": "Ford Field",
+    "city": "Detroit",
+    "state": "MI",
+    "roofType": "dome",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "MIN",
+    "teamName": "Minnesota Vikings",
+    "stadiumName": "U.S. Bank Stadium",
+    "city": "Minneapolis",
+    "state": "MN",
+    "roofType": "dome",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "NO",
+    "teamName": "New Orleans Saints",
+    "stadiumName": "Caesars Superdome",
+    "city": "New Orleans",
+    "state": "LA",
+    "roofType": "dome",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "LAR",
+    "teamName": "Los Angeles Rams",
+    "stadiumName": "SoFi Stadium",
+    "city": "Inglewood",
+    "state": "CA",
+    "roofType": "dome",
+    "surfaceType": "turf"
+  },
+  {
+    "teamAbbreviation": "LAC",
+    "teamName": "Los Angeles Chargers",
+    "stadiumName": "SoFi Stadium",
+    "city": "Inglewood",
+    "state": "CA",
+    "roofType": "dome",
+    "surfaceType": "turf"
+  }
+]

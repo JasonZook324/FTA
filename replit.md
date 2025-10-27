@@ -17,13 +17,54 @@ The frontend is a React 18 application with TypeScript, utilizing a component-ba
 The backend is an Express.js application with TypeScript, following a RESTful API design. It incorporates a service layer for ESPN API communication and separate route handlers for different resources. Middleware is used for logging and error handling.
 
 ### Data Storage Solutions
-The application exclusively uses **Neon PostgreSQL** for all data storage, configured via the `.env` file. Drizzle ORM is used for type-safe database operations. The schema includes tables for users, ESPN credentials, leagues, teams, matchups, players, and Fantasy Pros data (players, rankings, projections, news). An in-memory storage option exists for development but is not used in production.
+The application exclusively uses **Neon PostgreSQL** for all data storage, configured via the `.env` file. Drizzle ORM is used for type-safe database operations. The schema includes tables for:
+- User management: users, ESPN credentials
+- ESPN data: leagues, teams, matchups, players
+- Fantasy Pros data: players, rankings, projections, news, refresh logs
+- NFL Stats & Odds (for kicker streaming): stadiums, Vegas odds, team stats
+An in-memory storage option exists for development but is not used in production.
 
 ### Authentication and Authorization
 A dual-layer authentication system is in place. User authentication uses `passport-local` with `bcrypt` for secure account management, and sessions are stored in PostgreSQL. All API routes are protected, ensuring data isolation per user. ESPN API authentication uses user-managed S2 session tokens and SWID stored in the database, allowing personalized access to ESPN's Fantasy API.
 
 ### External Service Integrations
-The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with Neon Database for PostgreSQL hosting and utilizes Vite for development tooling.
+The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with:
+- **Fantasy Pros API**: Player rankings, projections, injury data, and news across all major sports
+- **The Odds API**: NFL Vegas betting lines (spreads, moneylines, over/under) for kicker streaming analysis (free tier: 500 requests/month)
+- **ESPN NFL Stats API** (unofficial): Team-level statistics including general, offensive, defensive, and kicking stats (free, no authentication required)
+- **ESPN Play-by-Play API**: Game-level play-by-play data used to calculate red zone statistics (attempts, TDs, FGs, TD rates) for both offensive and defensive units
+- **Neon Database**: PostgreSQL hosting with connection pooling
+- **Vite**: Development tooling and build system
+
+### Red Zone Statistics Feature
+The application calculates comprehensive red zone statistics (plays inside the opponent's 20-yard line) from ESPN's play-by-play data for kicker streaming analysis. Key features:
+- **Offensive metrics**: Red zone attempts, touchdowns, field goals, and TD rate
+- **Defensive metrics**: Opponent red zone attempts, touchdowns allowed, field goals allowed, and opponent TD rate
+- **Per-game processing**: Prevents drive state bleed between games and ensures accurate statistics
+- **Parallel fetching**: Efficiently processes 100+ plays per game across multiple games per week
+- **Drive tracking**: Continues tracking red zone drives even when the offense exits the red zone, capturing field goals kicked from outside (e.g., team reaches 10-yard line, then kicks 27-yard FG from 17-yard line)
+- **Database integration**: Merges calculated stats with existing team statistics in the nflTeamStats table
+
+### Kicker Streaming Feature (New - October 2025)
+A comprehensive waiver wire analysis tool that ranks NFL kickers by matchup quality for fantasy football streaming. The feature combines multiple data sources to generate actionable recommendations:
+- **Scoring Algorithm** (0-100 point scale):
+  - Dome Advantage (0-30 pts): Prioritizes kickers in dome or retractable roof stadiums for weather-protected conditions
+  - Vegas Matchup (0-30 pts): Favors underdogs (+15 pts) and high over/under totals (47+: 15 pts) for increased FG opportunities
+  - Red Zone Efficiency (0-25 pts): Targets teams with low TD conversion rates that stall in the red zone
+  - Opponent Defense (0-15 pts): Considers defensive red zone TD rates that force more field goal attempts
+- **User Interface**: Weekly rankings with visual indicators (dome, underdog, high totals), score breakdowns, projections, and "Find in ESPN" links
+- **Data Pipeline**: Integrates stadium data, Vegas odds (The Odds API), and red zone statistics from play-by-play analysis
+- **Location**: `/streaming` page with week selector (1-18) and comprehensive "How It Works" instructional section
+- **Limitation**: Read-only ESPN API means users must manually add recommended kickers via ESPN Fantasy interface
+
+### Jobs Page (Improved - October 2025)
+The Jobs page provides automated data refresh workflows with visual progress tracking:
+- **Sequential Execution**: Single "Refresh All" button per data category runs jobs in the correct order automatically
+- **Visual Progress**: Real-time progress bar and step-by-step status indicators show which job is currently running
+- **Status Icons**: Pending (circle) → Running (spinner) → Completed (checkmark) or Error (alert) states for each step
+- **NFL Kicker Streaming Pipeline**: Automatically runs 4 jobs in sequence: Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
+- **Fantasy Pros Pipeline**: Automatically refreshes player data, rankings, projections, and news in correct order
+- **User Experience**: Eliminates need for manual job sequencing, prevents errors from running jobs out of order, provides clear feedback on progress
 
 ## External Dependencies
 
@@ -39,4 +80,7 @@ The primary integration is with ESPN's Fantasy Sports API v3, providing league d
 -   **Routing**: Wouter
 -   **Form Handling**: React Hook Form with Zod
 -   **Build Tools**: Vite
--   **External API**: ESPN Fantasy Sports API v3
+-   **External APIs**: 
+    -   ESPN Fantasy Sports API v3
+    -   Fantasy Pros API (player data, rankings, projections)
+    -   The Odds API (NFL betting lines)
