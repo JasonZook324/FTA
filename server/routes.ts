@@ -414,24 +414,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       console.log(`Reload league request for user: ${userId}`);
       
-      const credentials = await storage.getEspnCredentials(userId);
-      if (!credentials || !credentials.isValid) {
+      const personalCreds = await storage.getEspnCredentials(userId);
+      if (!personalCreds || !personalCreds.isValid) {
         console.log(`Invalid or missing credentials for user: ${userId}`);
         return res.status(401).json({ message: "Valid ESPN credentials required" });
       }
 
-      if (!credentials.testLeagueId || !credentials.testSeason) {
-        console.log(`Missing league ID or season: ${credentials.testLeagueId}, ${credentials.testSeason}`);
+      if (!personalCreds.testLeagueId || !personalCreds.testSeason) {
+        console.log(`Missing league ID or season: ${personalCreds.testLeagueId}, ${personalCreds.testSeason}`);
         return res.status(400).json({ message: "League ID and season required" });
       }
 
+      // Check if this league has a league profile with shared credentials
+      let credentials = personalCreds;
+      const leagueProfile = await storage.getLeagueProfileByEspnId(personalCreds.testLeagueId, personalCreds.testSeason);
+      
+      if (leagueProfile) {
+        const userMembership = await storage.getUserLeague(userId, leagueProfile.id);
+        
+        if (userMembership) {
+          const sharedCreds = await storage.getLeagueCredentials(leagueProfile.id);
+          
+          if (sharedCreds && sharedCreds.isValid) {
+            console.log(`Using shared credentials from league profile for reload: ${leagueProfile.name}`);
+            credentials = {
+              id: sharedCreds.id,
+              userId: userId,
+              espnS2: sharedCreds.espnS2,
+              swid: sharedCreds.swid,
+              testLeagueId: personalCreds.testLeagueId,
+              testSeason: personalCreds.testSeason,
+              isValid: sharedCreds.isValid,
+              createdAt: sharedCreds.createdAt,
+              lastValidated: sharedCreds.lastValidated
+            };
+          }
+        }
+      }
+
       console.log(`Fetching fresh league data from ESPN API...`);
+      // Use the validated values from personalCreds for league operations
+      const leagueId = personalCreds.testLeagueId;
+      const season = personalCreds.testSeason;
+
       // Reload league data using the FIXED logic - get both league and roster data for complete team info
       const leagueData = await espnApiService.getLeagueData(
         credentials,
         'ffl',
-        credentials.testSeason,
-        credentials.testLeagueId,
+        season,
+        leagueId,
         ['mTeam', 'mSettings']
       );
 
@@ -440,8 +471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rosterData = await espnApiService.getRosters(
         credentials,
         'ffl', 
-        credentials.testSeason,
-        credentials.testLeagueId
+        season,
+        leagueId
       );
       
       console.log(`ESPN API returned league: ${leagueData.settings?.name}, teams: ${leagueData.teams?.length}, members: ${leagueData.members?.length}`);
@@ -449,10 +480,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse and store league information
       const leagueInfo = {
         userId,
-        espnLeagueId: credentials.testLeagueId,
-        name: leagueData.settings?.name || `League ${credentials.testLeagueId}`,
+        espnLeagueId: leagueId,
+        name: leagueData.settings?.name || `League ${leagueId}`,
         sport: 'ffl',
-        season: credentials.testSeason,
+        season: season,
         teamCount: leagueData.teams?.length || 0,
         currentWeek: leagueData.scoringPeriodId || 1,
         playoffTeams: leagueData.settings?.playoffTeamCount || 6,
@@ -462,17 +493,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Upsert logic: check if league exists, update or create
-      const existingLeague = await storage.getLeagueByEspnId(userId, credentials.testLeagueId, credentials.testSeason);
+      const existingLeague = await storage.getLeagueByEspnId(userId, leagueId, season);
       
       let league;
       if (existingLeague) {
-        console.log(`Updating existing league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
+        console.log(`Updating existing league: ESPN ID=${leagueId}, Name="${leagueInfo.name}"`);
         league = await storage.updateLeague(existingLeague.id, leagueInfo);
         if (!league) {
           throw new Error("Failed to update existing league");
         }
       } else {
-        console.log(`Creating new league: ESPN ID=${credentials.testLeagueId}, Name="${leagueInfo.name}"`);
+        console.log(`Creating new league: ESPN ID=${leagueId}, Name="${leagueInfo.name}"`);
         league = await storage.createLeague(leagueInfo);
       }
 
@@ -972,11 +1003,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const credentials = await storage.getEspnCredentials(userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ 
-          message: "Valid ESPN credentials required. Please configure authentication first." 
-        });
+      // Check if this league exists as a league profile
+      let credentials;
+      let isUsingSharedCredentials = false;
+      
+      const leagueProfile = await storage.getLeagueProfileByEspnId(espnLeagueId, season);
+      
+      if (leagueProfile) {
+        // Check if user is a member of this league profile
+        const userMembership = await storage.getUserLeague(userId, leagueProfile.id);
+        
+        if (userMembership) {
+          // User is a member, use shared credentials from league profile
+          const sharedCreds = await storage.getLeagueCredentials(leagueProfile.id);
+          
+          if (sharedCreds && sharedCreds.isValid) {
+            console.log(`Using shared credentials from league profile: ${leagueProfile.name}`);
+            credentials = {
+              id: sharedCreds.id,
+              userId: userId,
+              espnS2: sharedCreds.espnS2,
+              swid: sharedCreds.swid,
+              testLeagueId: espnLeagueId,
+              testSeason: season,
+              isValid: sharedCreds.isValid,
+              createdAt: sharedCreds.createdAt,
+              lastValidated: sharedCreds.lastValidated
+            };
+            isUsingSharedCredentials = true;
+          }
+        }
+      }
+      
+      // Fall back to user's personal credentials if no shared credentials available
+      if (!credentials) {
+        console.log('Using personal ESPN credentials');
+        const personalCreds = await storage.getEspnCredentials(userId);
+        if (!personalCreds || !personalCreds.isValid) {
+          return res.status(401).json({ 
+            message: "Valid ESPN credentials required. Please configure authentication first." 
+          });
+        }
+        credentials = personalCreds;
       }
 
       // Fetch league data from ESPN
