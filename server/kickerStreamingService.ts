@@ -123,16 +123,53 @@ async function getWeekMatchups(season: number, week: number): Promise<TeamMatchu
 
 /**
  * Normalize team abbreviations to match across different data sources
+ * Maps full team names from Vegas odds API to ESPN abbreviations
  */
 function normalizeTeamAbbr(teamName: string): string {
-  // Map common variations to standard ESPN abbreviations
   const mapping: Record<string, string> = {
-    'LA Rams': 'LAR',
-    'Los Angeles Rams': 'LAR',
-    'LA Chargers': 'LAC',
+    // AFC East
+    'Buffalo Bills': 'BUF',
+    'Miami Dolphins': 'MIA',
+    'New England Patriots': 'NE',
+    'New York Jets': 'NYJ',
+    // AFC North
+    'Baltimore Ravens': 'BAL',
+    'Cincinnati Bengals': 'CIN',
+    'Cleveland Browns': 'CLE',
+    'Pittsburgh Steelers': 'PIT',
+    // AFC South
+    'Houston Texans': 'HOU',
+    'Indianapolis Colts': 'IND',
+    'Jacksonville Jaguars': 'JAX',
+    'Tennessee Titans': 'TEN',
+    // AFC West
+    'Denver Broncos': 'DEN',
+    'Kansas City Chiefs': 'KC',
+    'Las Vegas Raiders': 'LV',
     'Los Angeles Chargers': 'LAC',
+    'LA Chargers': 'LAC',
+    // NFC East
+    'Dallas Cowboys': 'DAL',
+    'New York Giants': 'NYG',
+    'Philadelphia Eagles': 'PHI',
+    'Washington Commanders': 'WSH',
     'Washington': 'WSH',
-    'Washington Commanders': 'WSH'
+    // NFC North
+    'Chicago Bears': 'CHI',
+    'Detroit Lions': 'DET',
+    'Green Bay Packers': 'GB',
+    'Minnesota Vikings': 'MIN',
+    // NFC South
+    'Atlanta Falcons': 'ATL',
+    'Carolina Panthers': 'CAR',
+    'New Orleans Saints': 'NO',
+    'Tampa Bay Buccaneers': 'TB',
+    // NFC West
+    'Arizona Cardinals': 'ARI',
+    'Los Angeles Rams': 'LAR',
+    'LA Rams': 'LAR',
+    'San Francisco 49ers': 'SF',
+    'Seattle Seahawks': 'SEA'
   };
   
   return mapping[teamName] || teamName;
