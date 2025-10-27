@@ -345,7 +345,7 @@ export default function Jobs() {
                 type="number"
                 value={nflWeek}
                 onChange={(e) => setNflWeek(e.target.value)}
-                placeholder="1"
+                placeholder={currentLeague?.currentWeek ? `Current: ${currentLeague.currentWeek}` : "Enter week"}
                 required
               />
             </div>
