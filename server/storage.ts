@@ -5,7 +5,11 @@ import {
   type Team, type InsertTeam,
   type Matchup, type InsertMatchup,
   type Player, type InsertPlayer,
-  users, espnCredentials, leagues, teams, matchups, players
+  type LeagueProfile, type InsertLeagueProfile,
+  type LeagueCredentials, type InsertLeagueCredentials,
+  type UserLeague, type InsertUserLeague,
+  users, espnCredentials, leagues, teams, matchups, players,
+  leagueProfiles, leagueCredentials, userLeagues
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -60,6 +64,24 @@ export interface IStorage {
   createPlayer(player: InsertPlayer): Promise<Player>;
   updatePlayer(id: string, player: Partial<Player>): Promise<Player | undefined>;
   deletePlayer(id: string): Promise<boolean>;
+
+  // League Profile methods (shareable leagues)
+  getAllLeagueProfiles(): Promise<LeagueProfile[]>;
+  getLeagueProfile(id: string): Promise<LeagueProfile | undefined>;
+  getLeagueProfileByEspnId(espnLeagueId: string, season: number): Promise<LeagueProfile | undefined>;
+  createLeagueProfile(profile: InsertLeagueProfile): Promise<LeagueProfile>;
+  updateLeagueProfile(id: string, profile: Partial<LeagueProfile>): Promise<LeagueProfile | undefined>;
+
+  // League Credentials methods (shareable credentials)
+  getLeagueCredentials(leagueProfileId: string): Promise<LeagueCredentials | undefined>;
+  createLeagueCredentials(credentials: InsertLeagueCredentials): Promise<LeagueCredentials>;
+  updateLeagueCredentials(leagueProfileId: string, credentials: Partial<LeagueCredentials>): Promise<LeagueCredentials | undefined>;
+
+  // User League methods (user memberships)
+  getUserLeagues(userId: string): Promise<UserLeague[]>;
+  getUserLeague(userId: string, leagueProfileId: string): Promise<UserLeague | undefined>;
+  createUserLeague(userLeague: InsertUserLeague): Promise<UserLeague>;
+  deleteUserLeague(userId: string, leagueProfileId: string): Promise<boolean>;
 }
 
 const MemoryStore = createMemoryStore(session);
@@ -332,6 +354,55 @@ export class MemStorage implements IStorage {
   async deletePlayer(id: string): Promise<boolean> {
     return this.players.delete(id);
   }
+
+  // League Profile methods (not implemented in memory storage)
+  async getAllLeagueProfiles(): Promise<LeagueProfile[]> {
+    throw new Error("League profiles not supported in memory storage");
+  }
+
+  async getLeagueProfile(id: string): Promise<LeagueProfile | undefined> {
+    throw new Error("League profiles not supported in memory storage");
+  }
+
+  async getLeagueProfileByEspnId(espnLeagueId: string, season: number): Promise<LeagueProfile | undefined> {
+    throw new Error("League profiles not supported in memory storage");
+  }
+
+  async createLeagueProfile(profile: InsertLeagueProfile): Promise<LeagueProfile> {
+    throw new Error("League profiles not supported in memory storage");
+  }
+
+  async updateLeagueProfile(id: string, updates: Partial<LeagueProfile>): Promise<LeagueProfile | undefined> {
+    throw new Error("League profiles not supported in memory storage");
+  }
+
+  async getLeagueCredentials(leagueProfileId: string): Promise<LeagueCredentials | undefined> {
+    throw new Error("League credentials not supported in memory storage");
+  }
+
+  async createLeagueCredentials(credentials: InsertLeagueCredentials): Promise<LeagueCredentials> {
+    throw new Error("League credentials not supported in memory storage");
+  }
+
+  async updateLeagueCredentials(leagueProfileId: string, updates: Partial<LeagueCredentials>): Promise<LeagueCredentials | undefined> {
+    throw new Error("League credentials not supported in memory storage");
+  }
+
+  async getUserLeagues(userId: string): Promise<UserLeague[]> {
+    throw new Error("User leagues not supported in memory storage");
+  }
+
+  async getUserLeague(userId: string, leagueProfileId: string): Promise<UserLeague | undefined> {
+    throw new Error("User leagues not supported in memory storage");
+  }
+
+  async createUserLeague(userLeague: InsertUserLeague): Promise<UserLeague> {
+    throw new Error("User leagues not supported in memory storage");
+  }
+
+  async deleteUserLeague(userId: string, leagueProfileId: string): Promise<boolean> {
+    throw new Error("User leagues not supported in memory storage");
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -587,6 +658,110 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(players)
       .where(eq(players.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // League Profile methods (shareable leagues)
+  async getAllLeagueProfiles(): Promise<LeagueProfile[]> {
+    return await db.select().from(leagueProfiles);
+  }
+
+  async getLeagueProfile(id: string): Promise<LeagueProfile | undefined> {
+    const [profile] = await db
+      .select()
+      .from(leagueProfiles)
+      .where(eq(leagueProfiles.id, id));
+    return profile || undefined;
+  }
+
+  async getLeagueProfileByEspnId(espnLeagueId: string, season: number): Promise<LeagueProfile | undefined> {
+    const [profile] = await db
+      .select()
+      .from(leagueProfiles)
+      .where(and(
+        eq(leagueProfiles.espnLeagueId, espnLeagueId),
+        eq(leagueProfiles.season, season)
+      ));
+    return profile || undefined;
+  }
+
+  async createLeagueProfile(profile: InsertLeagueProfile): Promise<LeagueProfile> {
+    const [newProfile] = await db
+      .insert(leagueProfiles)
+      .values(profile)
+      .returning();
+    return newProfile;
+  }
+
+  async updateLeagueProfile(id: string, updates: Partial<LeagueProfile>): Promise<LeagueProfile | undefined> {
+    const [updated] = await db
+      .update(leagueProfiles)
+      .set(updates)
+      .where(eq(leagueProfiles.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // League Credentials methods (shareable credentials)
+  async getLeagueCredentials(leagueProfileId: string): Promise<LeagueCredentials | undefined> {
+    const [credentials] = await db
+      .select()
+      .from(leagueCredentials)
+      .where(eq(leagueCredentials.leagueProfileId, leagueProfileId));
+    return credentials || undefined;
+  }
+
+  async createLeagueCredentials(credentials: InsertLeagueCredentials): Promise<LeagueCredentials> {
+    const [newCredentials] = await db
+      .insert(leagueCredentials)
+      .values(credentials)
+      .returning();
+    return newCredentials;
+  }
+
+  async updateLeagueCredentials(leagueProfileId: string, updates: Partial<LeagueCredentials>): Promise<LeagueCredentials | undefined> {
+    const [updated] = await db
+      .update(leagueCredentials)
+      .set(updates)
+      .where(eq(leagueCredentials.leagueProfileId, leagueProfileId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // User League methods (user memberships)
+  async getUserLeagues(userId: string): Promise<UserLeague[]> {
+    return await db
+      .select()
+      .from(userLeagues)
+      .where(eq(userLeagues.userId, userId));
+  }
+
+  async getUserLeague(userId: string, leagueProfileId: string): Promise<UserLeague | undefined> {
+    const [userLeague] = await db
+      .select()
+      .from(userLeagues)
+      .where(and(
+        eq(userLeagues.userId, userId),
+        eq(userLeagues.leagueProfileId, leagueProfileId)
+      ));
+    return userLeague || undefined;
+  }
+
+  async createUserLeague(userLeague: InsertUserLeague): Promise<UserLeague> {
+    const [newUserLeague] = await db
+      .insert(userLeagues)
+      .values(userLeague)
+      .returning();
+    return newUserLeague;
+  }
+
+  async deleteUserLeague(userId: string, leagueProfileId: string): Promise<boolean> {
+    const result = await db
+      .delete(userLeagues)
+      .where(and(
+        eq(userLeagues.userId, userId),
+        eq(userLeagues.leagueProfileId, leagueProfileId)
+      ));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 }
