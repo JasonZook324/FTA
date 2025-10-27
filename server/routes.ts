@@ -4340,6 +4340,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/jobs/nfl-refresh-team-stats", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = null } = req.body;
+      const { refreshNflTeamStats } = await import("./espnNflStatsService");
+      const result = await refreshNflTeamStats(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} NFL team stats records${week ? ` for week ${week}` : ' (season totals)'}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh NFL team stats' });
+      }
+    } catch (error: any) {
+      console.error('NFL team stats refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh NFL team stats' });
+    }
+  });
+
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {
