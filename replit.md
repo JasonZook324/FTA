@@ -27,6 +27,17 @@ An in-memory storage option exists for development but is not used in production
 ### Authentication and Authorization
 A dual-layer authentication system is in place. User authentication uses `passport-local` with `bcrypt` for secure account management, and sessions are stored in PostgreSQL. All API routes are protected, ensuring data isolation per user. ESPN API authentication uses user-managed S2 session tokens and SWID stored in the database, allowing personalized access to ESPN's Fantasy API.
 
+### Shareable League Credentials (New - October 2025)
+A collaborative feature allowing multiple users to access the same ESPN league without individually providing credentials:
+- **League Profiles**: Central storage for unique leagues (identified by ESPN league ID + season) with metadata automatically fetched from ESPN API
+- **Shared Credentials**: ESPN S2 and SWID tokens stored per league profile, enabling all members to access league data
+- **User Workflows**: 
+  - Join Existing League: Browse and join leagues already connected by other users
+  - Connect New League: Create new shareable league profiles (league name automatically populated from ESPN API)
+- **Database Schema**: Three new tables (`league_profiles`, `league_credentials`, `user_leagues`) enable many-to-many user-league relationships
+- **Smart Credential Selection**: League loading endpoints prioritize shared credentials from league profiles over personal credentials
+- **API Endpoints**: GET `/api/leagues/available`, POST `/api/leagues/connect`, POST `/api/leagues/:id/join`
+
 ### External Service Integrations
 The primary integration is with ESPN's Fantasy Sports API v3, providing league data, player information, and statistics across multiple sports. The system handles ESPN's authentication and data transformation. It also integrates with:
 - **Fantasy Pros API**: Player rankings, projections, injury data, and news across all major sports
