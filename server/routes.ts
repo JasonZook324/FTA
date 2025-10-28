@@ -314,6 +314,50 @@ class EspnApiService {
 
 const espnApiService = new EspnApiService();
 
+// Custom error class for API errors with HTTP status codes
+class ApiError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Helper function to get league profile credentials
+async function getLeagueProfileCredentials(userId: string, espnLeagueId: string, season: number) {
+  // Find league profile for this league
+  const leagueProfile = await storage.getLeagueProfileByEspnId(espnLeagueId, season);
+  
+  if (!leagueProfile) {
+    throw new ApiError(404, "League profile not found. This league may not be connected yet.");
+  }
+
+  // Verify user is a member of this league
+  const membership = await storage.getUserLeague(userId, leagueProfile.id);
+  if (!membership) {
+    throw new ApiError(403, "Access denied. You are not a member of this league.");
+  }
+
+  // Get credentials for this league profile
+  const leagueCredentials = await storage.getLeagueCredentials(leagueProfile.id);
+  
+  if (!leagueCredentials || !leagueCredentials.isValid) {
+    throw new ApiError(401, "No valid ESPN credentials found for this league. Please reconnect the league.");
+  }
+
+  // Format credentials for ESPN API
+  return {
+    id: leagueCredentials.id,
+    userId: userId,
+    espnS2: leagueCredentials.espnS2,
+    swid: leagueCredentials.swid,
+    testLeagueId: espnLeagueId,
+    testSeason: season,
+    isValid: leagueCredentials.isValid,
+    createdAt: leagueCredentials.createdAt,
+    lastValidated: leagueCredentials.lastValidated
+  };
+}
+
 // Middleware to check if user is authenticated
 function requireAuth(req: any, res: any, next: any) {
   if (!req.isAuthenticated()) {
@@ -1243,10 +1287,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get live roster data which has both team names AND current stats
       console.log("Fetching live roster data with team stats...");
@@ -1346,6 +1392,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Standings API error:', error);
       
+      // Handle ApiError with specific status codes
+      if (error instanceof ApiError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      
       // Handle ESPN API timeouts and connection errors
       if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message?.includes('terminated')) {
         return res.status(503).json({ 
@@ -1400,10 +1451,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get comprehensive data for the 4 required AI analysis points
       const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
@@ -1679,10 +1732,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get comprehensive data for enhanced context (same as recommendations)
       const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
@@ -1932,10 +1987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       console.log(`Generating analysis prompt for team ${teamId} in league ${league.espnLeagueId}`);
 
@@ -2130,10 +2187,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Helper functions for data formatting (same as analysis prompt)
       const getNFLTeamName = (teamId: number): string => {
@@ -2423,10 +2482,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get comprehensive roster data for all teams
       const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
@@ -2532,10 +2593,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       console.log(`Generating trade analysis prompt for team ${teamId} in league ${league.espnLeagueId}`);
 
@@ -2635,10 +2698,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       const rostersData = await espnApiService.getRosters(
         credentials,
@@ -2659,18 +2724,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sport, season } = req.params;
       const { leagueId } = req.query;
 
-      const credentials = await storage.getEspnCredentials(req.user.id);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
-
-      // If leagueId is provided, get the ESPN league ID for better data (including opponents)
+      // If leagueId is provided, use league profile credentials
+      let credentials;
       let espnLeagueId = undefined;
+      
       if (leagueId) {
         const league = await storage.getLeague(leagueId as string);
         if (league) {
           espnLeagueId = league.espnLeagueId.toString();
+          // Use league profile credentials
+          credentials = await getLeagueProfileCredentials(
+            req.user.id,
+            espnLeagueId,
+            league.season
+          );
         }
+      }
+      
+      if (!credentials) {
+        return res.status(401).json({ message: "Valid ESPN credentials required. Please select a league." });
       }
 
       const playersData = await espnApiService.getPlayers(
@@ -2704,10 +2776,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get league info to find current scoring period
       const leagueData = await espnApiService.getLeagueData(
@@ -2830,10 +2904,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get waiver wire players (reuse logic from above)
       const playersData = await espnApiService.getPlayers(
@@ -3047,10 +3123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      const credentials = await storage.getEspnCredentials(req.user.id);
-      if (!credentials) {
-        return res.status(404).json({ message: 'ESPN credentials not found' });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get roster data using the same method as waiver wire
       const rostersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/segments/0/leagues/${league.espnLeagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1`;
@@ -3276,10 +3354,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      const credentials = await storage.getEspnCredentials(req.user.id);
-      if (!credentials) {
-        return res.status(404).json({ message: 'ESPN credentials not found' });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get roster data using the same method as full roster export
       const rostersUrl = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${league.season}/segments/0/leagues/${league.espnLeagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=1&nocache=${Date.now()}`;
@@ -3472,10 +3552,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get live roster data from ESPN
       const rosterData = await espnApiService.getRosters(
@@ -3551,10 +3633,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get live roster data and league settings from ESPN
       const [rosterData, leagueDetailsData] = await Promise.all([
@@ -3760,11 +3844,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      // Get ESPN data with comprehensive views (same as waiver wire endpoint)
-      const credentials = await storage.getEspnCredentials(req.user.id);
-      if (!credentials) {
-        return res.status(404).json({ message: 'ESPN credentials not found' });
-      }
+      // Use league profile credentials
+      const credentials = await getLeagueProfileCredentials(
+        req.user.id,
+        league.espnLeagueId.toString(),
+        league.season
+      );
 
       // Get league data for current scoring period
       const leagueData = await espnApiService.getLeagueData(
