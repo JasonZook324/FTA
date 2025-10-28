@@ -34,7 +34,13 @@ export default function LeagueHeader() {
   // Reload league data mutation
   const reloadLeagueMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`);
+      if (!currentLeague) {
+        throw new Error("No league selected");
+      }
+      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`, {
+        espnLeagueId: currentLeague.espnLeagueId,
+        season: currentLeague.season
+      });
       return response.json();
     },
     onSuccess: (data) => {
@@ -55,22 +61,26 @@ export default function LeagueHeader() {
     },
   });
 
-  // Disconnect mutation
+  // Disconnect mutation (leave league)
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", `/api/espn-credentials`);
+      if (!currentLeague) {
+        throw new Error("No league selected");
+      }
+      const response = await apiRequest("DELETE", `/api/leagues/${currentLeague.id}/leave`);
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Disconnected",
-        description: "Successfully disconnected from ESPN account and cleared all data",
+        title: "Left League",
+        description: "Successfully left the league",
       });
-      queryClient.clear();
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues/available"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Disconnect Error",
+        title: "Leave Error",
         description: error.message,
         variant: "destructive",
       });
