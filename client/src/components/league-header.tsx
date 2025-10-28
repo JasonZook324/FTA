@@ -19,6 +19,12 @@ export default function LeagueHeader() {
     enabled: !!user,
   });
 
+  // Query league profiles (shareable leagues)
+  const { data: leagueProfiles, isLoading: profilesLoading } = useQuery({
+    queryKey: ["/api/leagues/available"],
+    enabled: !!user,
+  });
+
   // Query authentication status
   const { data: credentials } = useQuery({
     queryKey: ["/api/espn-credentials"],
@@ -38,6 +44,7 @@ export default function LeagueHeader() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues/available"] });
     },
     onError: (error: Error) => {
       toast({
@@ -70,9 +77,12 @@ export default function LeagueHeader() {
     },
   });
 
-  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 ? leagues[0] : null;
+  // Prefer personal leagues, fall back to league profiles
+  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 
+    ? leagues[0] 
+    : (leagueProfiles && Array.isArray(leagueProfiles) && leagueProfiles.length > 0 ? leagueProfiles[0] : null);
 
-  if (leaguesLoading) {
+  if (leaguesLoading || profilesLoading) {
     return (
       <div className="bg-card border-b border-border px-6 py-3">
         <div className="flex items-center justify-between">
