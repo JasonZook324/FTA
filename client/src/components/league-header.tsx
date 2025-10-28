@@ -77,10 +77,15 @@ export default function LeagueHeader() {
     },
   });
 
-  // Prefer personal leagues, fall back to league profiles
+  // Filter league profiles to only show ones user has joined
+  const memberLeagues = leagueProfiles && Array.isArray(leagueProfiles) 
+    ? leagueProfiles.filter((profile: any) => profile.isMember) 
+    : [];
+
+  // Prefer personal leagues, fall back to member league profiles
   const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 
     ? leagues[0] 
-    : (leagueProfiles && Array.isArray(leagueProfiles) && leagueProfiles.length > 0 ? leagueProfiles[0] : null);
+    : (memberLeagues.length > 0 ? memberLeagues[0] : null);
 
   if (leaguesLoading || profilesLoading) {
     return (
