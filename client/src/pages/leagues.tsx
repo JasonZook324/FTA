@@ -20,12 +20,6 @@ export default function Leagues() {
     enabled: !!user,
   });
 
-  // Query ESPN credentials status  
-  const { data: credentials } = useQuery<{ isValid?: boolean }>({
-    queryKey: ["/api/espn-credentials"],
-    enabled: !!user,
-  });
-
   return (
     <>
       {/* Header Bar */}
@@ -50,23 +44,9 @@ export default function Leagues() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-6">
-        {/* Authentication Status */}
-        {!credentials?.isValid && (
-          <Card className="mb-6 border-destructive/50 bg-destructive/5">
-            <CardContent className="pt-4">
-              <div className="flex items-center space-x-2">
-                <Badge variant="destructive">Authentication Required</Badge>
-                <p className="text-sm text-muted-foreground">
-                  Please configure your ESPN credentials in the Authentication section before loading leagues.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* League Selector */}
-          <LeagueSelector disabled={!credentials?.isValid} />
+          <LeagueSelector />
 
           {/* League Information */}
           <div className="xl:col-span-2">
@@ -90,7 +70,7 @@ export default function Leagues() {
                       </div>
                     ))}
                   </div>
-                ) : leagues && leagues.length > 0 ? (
+                ) : leagues && Array.isArray(leagues) && leagues.length > 0 ? (
                   <div className="space-y-4">
                     {leagues.map((league: any) => (
                       <Card key={league.id} className="p-4">

@@ -25,12 +25,6 @@ export default function LeagueHeader() {
     enabled: !!user,
   });
 
-  // Query authentication status
-  const { data: credentials } = useQuery({
-    queryKey: ["/api/espn-credentials"],
-    enabled: !!user,
-  });
-
   // Reload league data mutation
   const reloadLeagueMutation = useMutation({
     mutationFn: async () => {
@@ -48,7 +42,6 @@ export default function LeagueHeader() {
         title: "Success",
         description: `League data refreshed! "${data.league.name}" now has ${data.league.teamCount} teams with updated information.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leagues/available"] });
     },

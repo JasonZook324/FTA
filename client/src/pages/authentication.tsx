@@ -67,11 +67,9 @@ export default function Authentication() {
     },
   });
 
-  // Query existing credentials
-  const { data: credentials, isLoading } = useQuery<EspnCredentials>({
-    queryKey: ["/api/espn-credentials"],
-    enabled: !!userId,
-  });
+  // Placeholder for credentials (old system - being phased out)
+  const credentials = null as any;
+  const isLoading = false;
 
   // Query user leagues
   const { data: leagues } = useQuery<League[]>({
