@@ -19,16 +19,22 @@ export default function LeagueHeader() {
     enabled: !!user,
   });
 
-  // Query authentication status
-  const { data: credentials } = useQuery({
-    queryKey: ["/api/espn-credentials"],
+  // Query league profiles (shareable leagues)
+  const { data: leagueProfiles, isLoading: profilesLoading } = useQuery({
+    queryKey: ["/api/leagues/available"],
     enabled: !!user,
   });
 
   // Reload league data mutation
   const reloadLeagueMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`);
+      if (!currentLeague) {
+        throw new Error("No league selected");
+      }
+      const response = await apiRequest("POST", `/api/espn-credentials/reload-league`, {
+        espnLeagueId: currentLeague.espnLeagueId,
+        season: currentLeague.season
+      });
       return response.json();
     },
     onSuccess: (data) => {
@@ -36,8 +42,8 @@ export default function LeagueHeader() {
         title: "Success",
         description: `League data refreshed! "${data.league.name}" now has ${data.league.teamCount} teams with updated information.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/espn-credentials"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues/available"] });
     },
     onError: (error: Error) => {
       toast({
@@ -48,31 +54,43 @@ export default function LeagueHeader() {
     },
   });
 
-  // Disconnect mutation
+  // Disconnect mutation (leave league)
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", `/api/espn-credentials`);
+      if (!currentLeague) {
+        throw new Error("No league selected");
+      }
+      const response = await apiRequest("DELETE", `/api/leagues/${currentLeague.id}/leave`);
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Disconnected",
-        description: "Successfully disconnected from ESPN account and cleared all data",
+        title: "Left League",
+        description: "Successfully left the league",
       });
-      queryClient.clear();
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues/available"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Disconnect Error",
+        title: "Leave Error",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 ? leagues[0] : null;
+  // Filter league profiles to only show ones user has joined
+  const memberLeagues = leagueProfiles && Array.isArray(leagueProfiles) 
+    ? leagueProfiles.filter((profile: any) => profile.isMember) 
+    : [];
 
-  if (leaguesLoading) {
+  // Prefer personal leagues, fall back to member league profiles
+  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 
+    ? leagues[0] 
+    : (memberLeagues.length > 0 ? memberLeagues[0] : null);
+
+  if (leaguesLoading || profilesLoading) {
     return (
       <div className="bg-card border-b border-border px-6 py-3">
         <div className="flex items-center justify-between">
