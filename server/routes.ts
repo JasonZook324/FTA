@@ -3855,9 +3855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeMatchupAnalysis: options.includeMatchupAnalysis
       });
 
-      // Get league data from storage
-      const leagues = await storage.getLeagues(req.user.id);
-      const league = leagues.find(l => l.id === leagueId);
+      // Get league data from storage (works for both personal leagues and league profiles)
+      const league = await storage.getLeague(leagueId);
       
       if (!league) {
         return res.status(404).json({ message: "League not found" });
