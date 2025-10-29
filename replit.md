@@ -86,6 +86,17 @@ The Jobs page provides automated data refresh workflows with visual progress tra
 - **User Experience**: Eliminates need for manual job sequencing, prevents errors from running jobs out of order, provides clear feedback on progress
 - **Vegas Odds Week Filtering (Fixed October 2025)**: The Odds API service now correctly filters games by calculating NFL week from game dates, preventing duplicate team entries when multiple weeks are refreshed
 
+### AI Prompt Builder (Enhanced - October 2025)
+A comprehensive tool for generating detailed prompts to paste into AI assistants like ChatGPT or Claude for fantasy football analysis. Key features:
+- **Team Selection**: Uses the global team selector in the league header for consistent UX
+- **Customizable Data Sections**: Include league settings, your team roster, opponent teams (all or specific), waiver wire players, matchups, and standings
+- **Automatic Player Enrichment**: All player listings automatically include:
+  - **Injury Status**: Shows [IR], [O], [D], [Q] designations for injured players
+  - **News Headlines**: Displays latest FantasyPros news items for all players when available (independent of checkbox settings)
+  - **Rankings & Projections**: Optional FantasyPros data when requested via checkboxes
+- **Team Name Fallback Logic**: Comprehensive fallback (location+nickname → location → nickname → name → owner's team → Team ID) ensures readable team names throughout
+- **Copy to Clipboard**: One-click copy functionality for generated prompts
+
 ## External Dependencies
 
 -   **Database**: PostgreSQL via Neon Database (`@neondatabase/serverless`)

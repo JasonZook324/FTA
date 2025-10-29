@@ -52,7 +52,7 @@ export default function PromptBuilder() {
   const [includePlayerRankings, setIncludePlayerRankings] = useState(false);
 
   // Query teams for the selected team's league (needed for selecting other teams)
-  const { data: teamsData } = useQuery<{ teams?: any[] }>({
+  const { data: teamsData } = useQuery<{ teams?: any[]; members?: any[] }>({
     queryKey: ["/api/leagues", selectedTeam?.leagueId, "standings"],
     enabled: !!selectedTeam?.leagueId,
   });
@@ -232,9 +232,30 @@ export default function PromptBuilder() {
                         <label className="text-xs text-muted-foreground">Select teams to include:</label>
                         <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                           {teamsData?.teams?.filter((team: any) => team.id !== selectedTeam?.teamId).map((team: any) => {
-                            const teamName = team.location && team.nickname 
-                              ? `${team.location} ${team.nickname}` 
-                              : `Team ${team.id}`;
+                            // Comprehensive team name fallback logic
+                            const getTeamName = (team: any) => {
+                              if (team.location && team.nickname) {
+                                return `${team.location} ${team.nickname}`;
+                              }
+                              if (team.location) return team.location;
+                              if (team.nickname) return team.nickname;
+                              if (team.name) return team.name;
+                              // Try to get owner's team name from members
+                              if (team.owners && teamsData.members) {
+                                const ownerId = team.owners[0]?.id || team.owners[0];
+                                const member = teamsData.members.find((m: any) => m.id === ownerId);
+                                if (member) {
+                                  if (member.firstName && member.lastName) {
+                                    return `${member.firstName} ${member.lastName}'s Team`;
+                                  }
+                                  if (member.displayName) {
+                                    return `${member.displayName}'s Team`;
+                                  }
+                                }
+                              }
+                              return `Team ${team.id}`;
+                            };
+                            const teamName = getTeamName(team);
                             return (
                               <div key={team.id} className="flex items-center space-x-2">
                                 <Checkbox 
