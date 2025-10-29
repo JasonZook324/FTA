@@ -4020,36 +4020,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Active';
       };
 
-      // Fetch Fantasy Pros data if requested
+      // Fetch Fantasy Pros data
       const newsMap = new Map<string, any[]>();
       const projectionsMap = new Map<string, any>();
       const rankingsMap = new Map<string, any>();
       
-      // Fetch news if requested (either from player-level data or external research checkbox)
-      if (options.includePlayerNews || options.includeNewsUpdates) {
-        try {
-          const { db } = await import('./db');
-          const { sql } = await import('drizzle-orm');
-          const newsResult = await db
-            .select()
-            .from(schema.fantasyProsNews)
-            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
-            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
-            .limit(100);
-          
-          // Create news map for quick lookup (player name -> news items)
-          newsResult.forEach((newsItem: any) => {
-            if (newsItem.playerName) {
-              const existing = newsMap.get(newsItem.playerName) || [];
-              existing.push(newsItem);
-              newsMap.set(newsItem.playerName, existing);
-            }
-          });
-          
-          console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
-        } catch (error: any) {
-          console.error('Error fetching Fantasy Pros news for custom prompt:', error);
-        }
+      // Always fetch news for all players listed in the prompt
+      try {
+        const { db } = await import('./db');
+        const { sql } = await import('drizzle-orm');
+        const newsResult = await db
+          .select()
+          .from(schema.fantasyProsNews)
+          .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+          .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+          .limit(200);
+        
+        // Create news map for quick lookup (player name -> news items)
+        newsResult.forEach((newsItem: any) => {
+          if (newsItem.playerName) {
+            const existing = newsMap.get(newsItem.playerName) || [];
+            existing.push(newsItem);
+            newsMap.set(newsItem.playerName, existing);
+          }
+        });
+        
+        console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
+      } catch (error: any) {
+        console.error('Error fetching Fantasy Pros news for custom prompt:', error);
       }
       
       // Fetch projections if requested
