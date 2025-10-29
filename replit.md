@@ -81,9 +81,10 @@ The Jobs page provides automated data refresh workflows with visual progress tra
 - **Sequential Execution**: Single "Refresh All" button per data category runs jobs in the correct order automatically
 - **Visual Progress**: Real-time progress bar and step-by-step status indicators show which job is currently running
 - **Status Icons**: Pending (circle) → Running (spinner) → Completed (checkmark) or Error (alert) states for each step
-- **NFL Kicker Streaming Pipeline**: Automatically runs 4 jobs in sequence: Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
+- **NFL Kicker Streaming Pipeline**: Automatically runs 5 jobs in sequence: Cleanup Old Vegas Odds → Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
 - **Fantasy Pros Pipeline**: Automatically refreshes player data, rankings, projections, and news in correct order
 - **User Experience**: Eliminates need for manual job sequencing, prevents errors from running jobs out of order, provides clear feedback on progress
+- **Vegas Odds Week Filtering (Fixed October 2025)**: The Odds API service now correctly filters games by calculating NFL week from game dates, preventing duplicate team entries when multiple weeks are refreshed
 
 ## External Dependencies
 
