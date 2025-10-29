@@ -119,7 +119,7 @@ export default function Sidebar() {
           {navigation
             .filter((item) => {
               // Hide admin-only pages for non-admin/developer users
-              const adminOnlyPages = ['API Playground', 'Jobs'];
+              const adminOnlyPages = ['API Playground', 'Jobs', 'Matchups'];
               if (adminOnlyPages.includes(item.name)) {
                 // Allow access for Admin (role 9) or Developer (role 2)
                 return user?.role === 9 || user?.role === 2;
