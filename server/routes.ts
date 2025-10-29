@@ -4519,6 +4519,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Submit prompt to OpenAI API
+  app.post("/api/leagues/:leagueId/submit-ai-prompt", requireAuth, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const { teamId, promptText, model } = req.body;
+
+      console.log(`Submitting prompt to OpenAI for user ${req.user.id}, league ${leagueId}`);
+
+      // Validate request
+      if (!promptText || promptText.trim().length === 0) {
+        return res.status(400).json({ message: "Prompt text is required" });
+      }
+
+      // Verify user has access to this league
+      const leagues = await storage.getLeagues(req.user.id);
+      const league = leagues.find(l => l.id === leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      // Submit to OpenAI
+      const { openaiService } = await import('./openaiService');
+      const aiResponse = await openaiService.submitPrompt({
+        prompt: promptText,
+        model: model || "gpt-4",
+      });
+
+      // Store in database
+      const { db } = await import('./db');
+      const { aiPromptResponses } = await import('@shared/schema');
+      
+      const [savedResponse] = await db.insert(aiPromptResponses).values({
+        userId: req.user.id,
+        leagueId: league.id,
+        teamId: teamId ? parseInt(teamId) : null,
+        promptText,
+        responseText: aiResponse.responseText,
+        aiModel: aiResponse.model,
+        aiProvider: 'openai',
+        tokensUsed: aiResponse.tokensUsed,
+        responseTime: aiResponse.responseTime,
+        status: 'success',
+      }).returning();
+
+      console.log(`AI response saved: ${savedResponse.id}, tokens: ${aiResponse.tokensUsed}`);
+
+      // Return response to frontend
+      res.json({
+        responseId: savedResponse.id,
+        responseText: aiResponse.responseText,
+        tokensUsed: aiResponse.tokensUsed,
+        model: aiResponse.model,
+        responseTime: aiResponse.responseTime,
+      });
+
+    } catch (error: any) {
+      console.error('Error submitting prompt to AI:', error);
+
+      // Store error in database for debugging
+      try {
+        const { db } = await import('./db');
+        const { aiPromptResponses } = await import('@shared/schema');
+        
+        await db.insert(aiPromptResponses).values({
+          userId: req.user.id,
+          leagueId: req.params.leagueId,
+          teamId: req.body.teamId ? parseInt(req.body.teamId) : null,
+          promptText: req.body.promptText,
+          responseText: '',
+          aiModel: req.body.model || 'gpt-4',
+          aiProvider: 'openai',
+          status: 'error',
+          errorMessage: error.message,
+        });
+      } catch (dbError) {
+        console.error('Failed to save error to database:', dbError);
+      }
+
+      res.status(500).json({ 
+        message: "Failed to get AI response", 
+        error: error.message 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
     // Jobs endpoints for refreshing data
     app.post("/api/jobs/refresh-leagues", async (req, res) => {
