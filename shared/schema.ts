@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: integer("role").notNull().default(0), // 0=Standard User, 1=Paid User, 2=Developer, 9=Administrator
   selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
   selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
   createdAt: timestamp("created_at").defaultNow(),
