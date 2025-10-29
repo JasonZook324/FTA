@@ -156,9 +156,24 @@ export default function Sidebar() {
       <div className="p-4 border-t border-border">
         {/* User Info */}
         {user && (
-          <div className="mb-4 p-2 bg-accent rounded-md">
-            <p className="text-xs text-muted-foreground">Logged in as</p>
-            <p className="text-sm font-medium text-foreground truncate">{user.username}</p>
+          <div className="mb-4 p-3 bg-accent rounded-md">
+            <p className="text-xs text-muted-foreground mb-1">Logged in as</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground truncate">{user.username}</p>
+              {/* Role Badge */}
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ml-2",
+                user.role === 9 ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" :
+                user.role === 2 ? "bg-blue-500/20 text-blue-700 dark:text-blue-300" :
+                user.role === 1 ? "bg-green-500/20 text-green-700 dark:text-green-300" :
+                "bg-gray-500/20 text-gray-700 dark:text-gray-300"
+              )}>
+                {user.role === 9 ? "Admin" :
+                 user.role === 2 ? "Dev" :
+                 user.role === 1 ? "Paid" :
+                 "User"}
+              </span>
+            </div>
           </div>
         )}
         
