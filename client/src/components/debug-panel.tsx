@@ -47,8 +47,9 @@ export default function DebugPanel() {
     return () => window.removeEventListener('debug-request-added', handleUpdate);
   }, []);
 
-  // Only show debug panel for jasonazook user
-  if (user?.username !== 'jasonazook') {
+  // Only show debug panel for admin (role 9) or developer (role 2) users
+  const isAdminOrDeveloper = user?.role === 9 || user?.role === 2;
+  if (!isAdminOrDeveloper) {
     return null;
   }
 

@@ -118,10 +118,11 @@ export default function Sidebar() {
         <ul className="space-y-2">
           {navigation
             .filter((item) => {
-              // Hide admin-only pages for non-admin users
+              // Hide admin-only pages for non-admin/developer users
               const adminOnlyPages = ['API Playground', 'Jobs'];
               if (adminOnlyPages.includes(item.name)) {
-                return user?.username === 'jasonazook';
+                // Allow access for Admin (role 9) or Developer (role 2)
+                return user?.role === 9 || user?.role === 2;
               }
               return true;
             })

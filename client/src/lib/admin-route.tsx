@@ -29,8 +29,10 @@ export function AdminRoute({
     );
   }
 
-  // Check if user is admin (jasonazook)
-  if (user.username !== 'jasonazook') {
+  // Check if user is admin (role 9) or developer (role 2)
+  const isAdminOrDeveloper = user.role === 9 || user.role === 2;
+  
+  if (!isAdminOrDeveloper) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen">
