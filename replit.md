@@ -96,6 +96,25 @@ A comprehensive tool for generating detailed prompts to paste into AI assistants
   - **Rankings & Projections**: Optional FantasyPros data when requested via checkboxes
 - **Team Name Fallback Logic**: Comprehensive fallback (location+nickname → location → nickname → name → owner's team → Team ID) ensures readable team names throughout
 - **Copy to Clipboard**: One-click copy functionality for generated prompts
+- **Direct OpenAI Integration** (New - October 2025): Submit prompts directly to OpenAI for instant AI analysis without leaving the app
+
+### OpenAI Integration (New - October 2025)
+Direct integration with OpenAI's API allowing users to submit fantasy football prompts and receive AI analysis in real-time:
+- **In-App AI Analysis**: After generating a custom prompt, users can submit it directly to OpenAI without copying/pasting to external tools
+- **Model Selection**: Choose from three AI models:
+  - GPT-4.1 (gpt-4o): Most capable, best for complex analysis
+  - GPT-5 (gpt-4o-mini): Faster, more cost-effective
+  - O3 (o3-mini): Optimized for reasoning tasks
+- **Request Tracking**: All AI interactions logged to `ai_prompt_responses` database table with full audit trail:
+  - User ID, League ID, Team ID context
+  - Complete prompt and response text
+  - Model used, tokens consumed, response time
+  - Status (success/error) and error messages
+- **Error Handling**: Graceful handling of API errors, rate limits, and missing API keys with user-friendly error messages
+- **User Experience**: Loading states, formatted responses, token usage metrics, and response time display
+- **Database Schema**: New `ai_prompt_responses` table tracks all submissions for cost tracking and debugging
+- **Environment Variables**: Requires `OPENAI_API_KEY` to be set by user
+- **API Endpoint**: POST `/api/leagues/:leagueId/submit-ai-prompt` with authentication and league access validation
 
 ## External Dependencies
 
@@ -115,3 +134,4 @@ A comprehensive tool for generating detailed prompts to paste into AI assistants
     -   ESPN Fantasy Sports API v3
     -   Fantasy Pros API (player data, rankings, projections)
     -   The Odds API (NFL betting lines)
+    -   OpenAI API (AI-powered fantasy analysis)
