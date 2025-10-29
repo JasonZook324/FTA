@@ -13,6 +13,14 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 The frontend is a React 18 application with TypeScript, utilizing a component-based architecture. It uses Radix UI primitives and shadcn/ui for a consistent and accessible design, Wouter for routing, and TanStack React Query for server state management. Styling is handled with Tailwind CSS.
 
+**Global Team Selection (Updated - October 2025)**
+The application uses a centralized team selection pattern for improved UX consistency:
+- **Single Source of Truth**: A global team selector in the league header banner (`league-header.tsx`) drives team context across the entire application
+- **Team Context**: React Context (`TeamContext.tsx`) maintains the selected team state (teamId, teamName, leagueId) accessible to all components
+- **Consolidated UI**: Individual page-level team selectors have been removed from AI Recommendations and Prompt Builder pages in favor of the global selector
+- **Empty States**: Pages requiring team selection display instructional empty states directing users to the header selector when no team is chosen
+- **Comprehensive Team Display**: Team names use fallback logic (location+nickname → name → owner's team → Team ID) for consistent display across all views
+
 ### Backend Architecture
 The backend is an Express.js application with TypeScript, following a RESTful API design. It incorporates a service layer for ESPN API communication and separate route handlers for different resources. Middleware is used for logging and error handling.
 
@@ -73,9 +81,10 @@ The Jobs page provides automated data refresh workflows with visual progress tra
 - **Sequential Execution**: Single "Refresh All" button per data category runs jobs in the correct order automatically
 - **Visual Progress**: Real-time progress bar and step-by-step status indicators show which job is currently running
 - **Status Icons**: Pending (circle) → Running (spinner) → Completed (checkmark) or Error (alert) states for each step
-- **NFL Kicker Streaming Pipeline**: Automatically runs 4 jobs in sequence: Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
+- **NFL Kicker Streaming Pipeline**: Automatically runs 5 jobs in sequence: Cleanup Old Vegas Odds → Load Stadium Data → Refresh Vegas Odds → Refresh Team Stats → Calculate Red Zone Stats
 - **Fantasy Pros Pipeline**: Automatically refreshes player data, rankings, projections, and news in correct order
 - **User Experience**: Eliminates need for manual job sequencing, prevents errors from running jobs out of order, provides clear feedback on progress
+- **Vegas Odds Week Filtering (Fixed October 2025)**: The Odds API service now correctly filters games by calculating NFL week from game dates, preventing duplicate team entries when multiple weeks are refreshed
 
 ## External Dependencies
 

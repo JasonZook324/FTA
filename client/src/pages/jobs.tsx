@@ -131,6 +131,7 @@ export default function Jobs() {
     setStatus("");
     
     const jobs: JobStep[] = [
+      { name: "Cleanup Old Vegas Odds", status: 'pending' },
       { name: "Load Stadium Data", status: 'pending' },
       { name: "Refresh Vegas Odds", status: 'pending' },
       { name: "Refresh Team Stats", status: 'pending' },
@@ -139,6 +140,7 @@ export default function Jobs() {
     setNflSteps(jobs);
 
     const jobConfigs = [
+      { endpoint: "/api/jobs/nfl-cleanup-vegas-odds", name: "Cleanup Old Vegas Odds", body: {} },
       { endpoint: "/api/jobs/nfl-refresh-stadiums", name: "Load Stadium Data", body: {} },
       { 
         endpoint: "/api/jobs/nfl-refresh-odds", 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,13 +21,10 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
-import { useAuth } from "@/hooks/use-auth";
 
 export default function PromptBuilder() {
   const { toast } = useToast();
-  const { selectedTeam, setSelectedTeam } = useTeam();
-  const { user } = useAuth();
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
+  const { selectedTeam } = useTeam();
   const [customPrompt, setCustomPrompt] = useState("");
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -54,45 +51,17 @@ export default function PromptBuilder() {
   const [includePlayerProjections, setIncludePlayerProjections] = useState(false);
   const [includePlayerRankings, setIncludePlayerRankings] = useState(false);
 
-  // Query user leagues
-  const { data: leagues } = useQuery({
-    queryKey: ["/api/leagues"],
-    enabled: !!user,
+  // Query teams for the selected team's league (needed for selecting other teams)
+  const { data: teamsData } = useQuery<{ teams?: any[] }>({
+    queryKey: ["/api/leagues", selectedTeam?.leagueId, "standings"],
+    enabled: !!selectedTeam?.leagueId,
   });
-
-  // Query teams for selected league
-  const { data: teamsData, isLoading: isLoadingTeams } = useQuery<{ teams?: any[] }>({
-    queryKey: ["/api/leagues", selectedLeagueId, "standings"],
-    enabled: !!selectedLeagueId,
-  });
-
-  // Auto-select the league if there's only one available
-  useEffect(() => {
-    if (leagues && Array.isArray(leagues) && leagues.length === 1 && !selectedLeagueId) {
-      setSelectedLeagueId(leagues[0].id);
-    }
-  }, [leagues, selectedLeagueId]);
-
-  // Auto-select the team if there's only one available for the selected league
-  useEffect(() => {
-    if (teamsData?.teams && teamsData.teams.length === 1 && selectedLeagueId && !selectedTeam) {
-      const firstTeam = teamsData.teams[0];
-      const teamName = firstTeam.location && firstTeam.nickname 
-        ? `${firstTeam.location} ${firstTeam.nickname}` 
-        : `Team ${firstTeam.id}`;
-      setSelectedTeam({
-        teamId: firstTeam.id,
-        teamName,
-        leagueId: selectedLeagueId
-      });
-    }
-  }, [teamsData, selectedLeagueId, selectedTeam, setSelectedTeam]);
 
   const handleGeneratePrompt = async () => {
-    if (!selectedLeagueId || !selectedTeam) {
+    if (!selectedTeam) {
       toast({
         title: "Selection Required",
-        description: "Please select a league and team first.",
+        description: "Please select a team from the header first.",
         variant: "destructive",
       });
       return;
@@ -100,7 +69,7 @@ export default function PromptBuilder() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch(`/api/leagues/${selectedLeagueId}/custom-prompt`, {
+      const response = await fetch(`/api/leagues/${selectedTeam.leagueId}/custom-prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,74 +160,11 @@ export default function PromptBuilder() {
             </h2>
             <p className="text-muted-foreground">Build custom AI prompts with your fantasy data</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Select value={selectedLeagueId} onValueChange={setSelectedLeagueId}>
-              <SelectTrigger className="w-48" data-testid="select-league">
-                <SelectValue placeholder="Select a league" />
-              </SelectTrigger>
-              <SelectContent>
-                {(leagues && Array.isArray(leagues) ? leagues : []).map((league: any) => (
-                  <SelectItem key={league.id} value={league.id}>
-                    {league.name} ({league.season})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {selectedLeagueId && (
-              <Select 
-                value={selectedTeam?.teamId.toString() || ""} 
-                onValueChange={(value) => {
-                  const teamId = parseInt(value);
-                  const team = teamsData?.teams?.find((t: any) => t.id === teamId);
-                  if (team && selectedLeagueId) {
-                    const teamName = team.location && team.nickname 
-                      ? `${team.location} ${team.nickname}` 
-                      : `Team ${team.id}`;
-                    setSelectedTeam({
-                      teamId,
-                      teamName,
-                      leagueId: selectedLeagueId
-                    });
-                    toast({
-                      title: "Team Selected",
-                      description: `You are now building prompts for "${teamName}"`,
-                    });
-                  }
-                }}
-                disabled={!selectedLeagueId || isLoadingTeams || !teamsData?.teams?.length}
-              >
-                <SelectTrigger className="w-48" data-testid="select-team">
-                  <SelectValue placeholder={
-                    !selectedLeagueId 
-                      ? "Select a league first" 
-                      : isLoadingTeams 
-                        ? "Loading teams..." 
-                        : !teamsData?.teams?.length 
-                          ? "No teams found" 
-                          : "Select your team"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamsData?.teams?.map((team: any) => {
-                    const teamName = team.location && team.nickname 
-                      ? `${team.location} ${team.nickname}` 
-                      : `Team ${team.id}`;
-                    return (
-                      <SelectItem key={team.id} value={team.id.toString()}>
-                        {teamName}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
         </div>
       </header>
 
       <main className="flex-1 p-6 space-y-6 overflow-y-auto">
-        {selectedLeagueId && selectedTeam && (
+        {selectedTeam && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Prompt Configuration */}
             <div className="space-y-6">
@@ -609,13 +515,13 @@ export default function PromptBuilder() {
           </div>
         )}
 
-        {(!selectedLeagueId || !selectedTeam) && (
+        {!selectedTeam && (
           <Card>
             <CardContent className="flex items-center justify-center h-96">
               <div className="text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">
-                  Please select a league and team to start building custom AI prompts
+                  Please select a team from the header to start building custom AI prompts
                 </p>
               </div>
             </CardContent>

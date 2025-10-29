@@ -4,13 +4,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw, Users } from "lucide-react";
 import { useTeam } from "@/contexts/TeamContext";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function LeagueHeader() {
   const { toast } = useToast();
-  const { selectedTeam } = useTeam();
+  const { selectedTeam, setSelectedTeam } = useTeam();
   const { user } = useAuth();
 
   // Query current leagues
@@ -23,6 +24,22 @@ export default function LeagueHeader() {
   const { data: leagueProfiles, isLoading: profilesLoading } = useQuery({
     queryKey: ["/api/leagues/available"],
     enabled: !!user,
+  });
+
+  // Filter league profiles to only show ones user has joined
+  const memberLeagues = leagueProfiles && Array.isArray(leagueProfiles) 
+    ? leagueProfiles.filter((profile: any) => profile.isMember) 
+    : [];
+
+  // Prefer personal leagues, fall back to member league profiles
+  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 
+    ? leagues[0] 
+    : (memberLeagues.length > 0 ? memberLeagues[0] : null);
+
+  // Query teams for the current league (use standings endpoint to get properly formatted team names)
+  const { data: teamsData, isLoading: isLoadingTeams } = useQuery<{ teams?: any[] }>({
+    queryKey: ["/api/leagues", currentLeague?.id, "standings"],
+    enabled: !!currentLeague?.id,
   });
 
   // Reload league data mutation
@@ -80,15 +97,34 @@ export default function LeagueHeader() {
     },
   });
 
-  // Filter league profiles to only show ones user has joined
-  const memberLeagues = leagueProfiles && Array.isArray(leagueProfiles) 
-    ? leagueProfiles.filter((profile: any) => profile.isMember) 
-    : [];
+  // Helper function to get team name
+  const getTeamName = (team: any) => {
+    if (team.location && team.nickname) {
+      return `${team.location} ${team.nickname}`;
+    } else if (team.name) {
+      return team.name;
+    } else if (team.owners && team.owners[0]?.displayName) {
+      return `${team.owners[0].displayName}'s Team`;
+    }
+    return `Team ${team.id}`;
+  };
 
-  // Prefer personal leagues, fall back to member league profiles
-  const currentLeague = leagues && Array.isArray(leagues) && leagues.length > 0 
-    ? leagues[0] 
-    : (memberLeagues.length > 0 ? memberLeagues[0] : null);
+  // Handle team selection
+  const handleTeamSelect = (teamId: string) => {
+    const team = teamsData?.teams?.find((t: any) => t.id.toString() === teamId);
+    if (team && currentLeague) {
+      const teamName = getTeamName(team);
+      setSelectedTeam({
+        teamId: team.id,
+        teamName,
+        leagueId: currentLeague.id
+      });
+      toast({
+        title: "Team Selected",
+        description: `You are now managing "${teamName}"`,
+      });
+    }
+  };
 
   if (leaguesLoading || profilesLoading) {
     return (
@@ -127,13 +163,13 @@ export default function LeagueHeader() {
     );
   }
 
-  // League loaded - show league info with disconnect option
+  // League loaded - show league info with team selector and disconnect option
   return (
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-b border-green-200 dark:border-green-800 px-4 sm:px-6 py-3">
       <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:justify-between">
-        <div className="flex items-center space-x-3 sm:space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
           <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center flex-wrap gap-2">
               <span className="font-semibold text-green-800 dark:text-green-200 text-sm sm:text-base truncate">{currentLeague.name}</span>
               <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 flex-shrink-0">
@@ -146,18 +182,43 @@ export default function LeagueHeader() {
               <span className="whitespace-nowrap">{currentLeague.teamCount} teams</span>
               <span className="hidden sm:inline">•</span>
               <span className="whitespace-nowrap">Week {currentLeague.currentWeek}</span>
-              {selectedTeam && (
-                <>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="whitespace-nowrap flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {selectedTeam.teamName}
-                  </span>
-                </>
-              )}
             </div>
           </div>
+          
+          {/* Team Selector */}
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <Users className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+            <Select
+              value={selectedTeam?.teamId?.toString() || ""}
+              onValueChange={handleTeamSelect}
+              disabled={isLoadingTeams || !teamsData?.teams?.length}
+            >
+              <SelectTrigger 
+                className="h-9 bg-white dark:bg-gray-900 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                data-testid="select-team-header"
+              >
+                <SelectValue placeholder={
+                  isLoadingTeams 
+                    ? "Loading teams..." 
+                    : !teamsData?.teams?.length 
+                      ? "No teams found" 
+                      : "Select your team"
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {teamsData?.teams?.map((team: any) => {
+                  const teamName = getTeamName(team);
+                  return (
+                    <SelectItem key={team.id} value={team.id.toString()}>
+                      {teamName}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <Button
             variant="outline"

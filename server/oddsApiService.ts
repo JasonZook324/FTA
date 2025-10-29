@@ -11,6 +11,38 @@ interface RefreshResult {
   error?: string;
 }
 
+// NFL 2025-2026 season week start dates (Thursdays)
+const NFL_2025_WEEKS = [
+  { week: 1, start: new Date('2025-09-04T00:00:00Z') },
+  { week: 2, start: new Date('2025-09-11T00:00:00Z') },
+  { week: 3, start: new Date('2025-09-18T00:00:00Z') },
+  { week: 4, start: new Date('2025-09-25T00:00:00Z') },
+  { week: 5, start: new Date('2025-10-02T00:00:00Z') },
+  { week: 6, start: new Date('2025-10-09T00:00:00Z') },
+  { week: 7, start: new Date('2025-10-16T00:00:00Z') },
+  { week: 8, start: new Date('2025-10-23T00:00:00Z') },
+  { week: 9, start: new Date('2025-10-30T00:00:00Z') },
+  { week: 10, start: new Date('2025-11-06T00:00:00Z') },
+  { week: 11, start: new Date('2025-11-13T00:00:00Z') },
+  { week: 12, start: new Date('2025-11-20T00:00:00Z') },
+  { week: 13, start: new Date('2025-11-27T00:00:00Z') },
+  { week: 14, start: new Date('2025-12-04T00:00:00Z') },
+  { week: 15, start: new Date('2025-12-11T00:00:00Z') },
+  { week: 16, start: new Date('2025-12-18T00:00:00Z') },
+  { week: 17, start: new Date('2025-12-25T00:00:00Z') },
+  { week: 18, start: new Date('2026-01-01T00:00:00Z') },
+];
+
+function getNFLWeekFromDate(gameDate: Date): number | null {
+  // Find the week this game belongs to
+  for (let i = NFL_2025_WEEKS.length - 1; i >= 0; i--) {
+    if (gameDate >= NFL_2025_WEEKS[i].start) {
+      return NFL_2025_WEEKS[i].week;
+    }
+  }
+  return null;
+}
+
 async function fetchFromOddsApi(endpoint: string): Promise<any> {
   if (!ODDS_API_KEY) {
     throw new Error("Odds API key not configured");
@@ -62,6 +94,7 @@ export async function refreshNflOdds(season: number, week: number): Promise<Refr
       ));
 
     let insertedCount = 0;
+    let skippedCount = 0;
 
     // Process each game
     for (const game of data) {
@@ -73,6 +106,27 @@ export async function refreshNflOdds(season: number, week: number): Promise<Refr
       const homeTeam = game.home_team;
       const awayTeam = game.away_team;
       const commenceTime = game.commence_time ? new Date(game.commence_time) : null;
+      
+      // Calculate which week this game belongs to
+      if (!commenceTime) {
+        console.log(`⚠ Skipping game ${homeTeam} vs ${awayTeam} - no commence time`);
+        skippedCount++;
+        continue;
+      }
+      
+      const gameWeek = getNFLWeekFromDate(commenceTime);
+      if (gameWeek === null) {
+        console.log(`⚠ Skipping game ${homeTeam} vs ${awayTeam} - couldn't determine week for ${commenceTime}`);
+        skippedCount++;
+        continue;
+      }
+      
+      // Only store games for the requested week
+      if (gameWeek !== week) {
+        console.log(`⚠ Skipping game ${homeTeam} vs ${awayTeam} - belongs to week ${gameWeek}, not week ${week}`);
+        skippedCount++;
+        continue;
+      }
 
       // Process each bookmaker's odds for this game
       for (const bookmaker of game.bookmakers) {
@@ -130,7 +184,8 @@ export async function refreshNflOdds(season: number, week: number): Promise<Refr
       }
     }
 
-    console.log(`✓ Successfully refreshed ${insertedCount} NFL odds records`);
+    console.log(`✓ Successfully refreshed ${insertedCount} NFL odds records for week ${week}`);
+    console.log(`ℹ Skipped ${skippedCount} games belonging to other weeks`);
     return { success: true, recordCount: insertedCount };
   } catch (error: any) {
     console.error('Error refreshing NFL odds:', error);
