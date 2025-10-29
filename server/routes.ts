@@ -4179,8 +4179,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const team = getPlayerTeam(getProTeamId(entry.playerPoolEntry));
                 const position = getPositionName(getPlayerPositionId(entry.playerPoolEntry));
                 const slotName = getSlotName(entry.lineupSlotId);
+                const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                 const enrichment = enrichPlayerData(name);
-                return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
               })
               .join('\n') + '\n'
           );
@@ -4203,8 +4205,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
+                  const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                   const enrichment = enrichPlayerData(name);
-                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                  const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                  return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
@@ -4225,8 +4229,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
+                  const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                   const enrichment = enrichPlayerData(name);
-                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                  const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                  return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
