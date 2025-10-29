@@ -4734,6 +4734,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cleanup endpoint to remove all Vegas odds data (use before refreshing)
+  app.post("/api/jobs/nfl-cleanup-vegas-odds", requireAuth, async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { nflVegasOdds } = await import('@shared/schema');
+      
+      console.log('Cleaning up all Vegas odds data...');
+      await db.delete(nflVegasOdds);
+      
+      res.json({ message: 'Successfully cleaned up all Vegas odds data' });
+    } catch (error: any) {
+      console.error('Cleanup error:', error);
+      res.status(500).json({ message: error.message || 'Failed to cleanup Vegas odds data' });
+    }
+  });
+
   // Kicker streaming recommendations
   app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
     try {
