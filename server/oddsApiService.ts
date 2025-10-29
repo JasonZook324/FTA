@@ -11,26 +11,26 @@ interface RefreshResult {
   error?: string;
 }
 
-// NFL 2025 season week start dates (Thursdays)
+// NFL 2025-2026 season week start dates (Thursdays)
 const NFL_2025_WEEKS = [
-  { week: 1, start: new Date('2024-09-05T00:00:00Z') },
-  { week: 2, start: new Date('2024-09-12T00:00:00Z') },
-  { week: 3, start: new Date('2024-09-19T00:00:00Z') },
-  { week: 4, start: new Date('2024-09-26T00:00:00Z') },
-  { week: 5, start: new Date('2024-10-03T00:00:00Z') },
-  { week: 6, start: new Date('2024-10-10T00:00:00Z') },
-  { week: 7, start: new Date('2024-10-17T00:00:00Z') },
-  { week: 8, start: new Date('2024-10-24T00:00:00Z') },
-  { week: 9, start: new Date('2024-10-31T00:00:00Z') },
-  { week: 10, start: new Date('2024-11-07T00:00:00Z') },
-  { week: 11, start: new Date('2024-11-14T00:00:00Z') },
-  { week: 12, start: new Date('2024-11-21T00:00:00Z') },
-  { week: 13, start: new Date('2024-11-28T00:00:00Z') },
-  { week: 14, start: new Date('2024-12-05T00:00:00Z') },
-  { week: 15, start: new Date('2024-12-12T00:00:00Z') },
-  { week: 16, start: new Date('2024-12-19T00:00:00Z') },
-  { week: 17, start: new Date('2024-12-26T00:00:00Z') },
-  { week: 18, start: new Date('2025-01-02T00:00:00Z') },
+  { week: 1, start: new Date('2025-09-04T00:00:00Z') },
+  { week: 2, start: new Date('2025-09-11T00:00:00Z') },
+  { week: 3, start: new Date('2025-09-18T00:00:00Z') },
+  { week: 4, start: new Date('2025-09-25T00:00:00Z') },
+  { week: 5, start: new Date('2025-10-02T00:00:00Z') },
+  { week: 6, start: new Date('2025-10-09T00:00:00Z') },
+  { week: 7, start: new Date('2025-10-16T00:00:00Z') },
+  { week: 8, start: new Date('2025-10-23T00:00:00Z') },
+  { week: 9, start: new Date('2025-10-30T00:00:00Z') },
+  { week: 10, start: new Date('2025-11-06T00:00:00Z') },
+  { week: 11, start: new Date('2025-11-13T00:00:00Z') },
+  { week: 12, start: new Date('2025-11-20T00:00:00Z') },
+  { week: 13, start: new Date('2025-11-27T00:00:00Z') },
+  { week: 14, start: new Date('2025-12-04T00:00:00Z') },
+  { week: 15, start: new Date('2025-12-11T00:00:00Z') },
+  { week: 16, start: new Date('2025-12-18T00:00:00Z') },
+  { week: 17, start: new Date('2025-12-25T00:00:00Z') },
+  { week: 18, start: new Date('2026-01-01T00:00:00Z') },
 ];
 
 function getNFLWeekFromDate(gameDate: Date): number | null {
