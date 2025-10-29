@@ -42,7 +42,7 @@ export default function PromptBuilder() {
     responseTime: number;
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("gpt-4");
+  const [selectedModel, setSelectedModel] = useState("gpt-4o");
 
   // Data inclusion options
   const [includeMyTeam, setIncludeMyTeam] = useState(true);
@@ -250,6 +250,7 @@ export default function PromptBuilder() {
                 </CardHeader>
                 <CardContent>
                   <Textarea
+                    data-testid="input-prompt"
                     placeholder="Enter your custom prompt or question here. The fantasy data you select below will be automatically included..."
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
@@ -271,6 +272,7 @@ export default function PromptBuilder() {
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="include-my-team" 
+                      data-testid="checkbox-my-team"
                       checked={includeMyTeam}
                       onCheckedChange={(checked) => setIncludeMyTeam(checked as boolean)}
                     />
@@ -535,6 +537,7 @@ export default function PromptBuilder() {
                 disabled={isGenerating || !customPrompt.trim()}
                 className="w-full"
                 size="lg"
+                data-testid="button-generate-prompt"
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -586,9 +589,9 @@ export default function PromptBuilder() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gpt-4">GPT-4 (Recommended)</SelectItem>
-                            <SelectItem value="gpt-4-turbo">GPT-4 Turbo (Faster)</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Budget)</SelectItem>
+                            <SelectItem value="gpt-4o" data-testid="option-gpt-4o">GPT-4.1</SelectItem>
+                            <SelectItem value="gpt-4o-mini" data-testid="option-gpt-4o-mini">GPT-5</SelectItem>
+                            <SelectItem value="o3-mini" data-testid="option-o3-mini">O3</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
