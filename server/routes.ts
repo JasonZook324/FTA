@@ -366,6 +366,20 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+// Role guard: allow only specified roles (e.g., 2=Developer, 9=Administrator)
+function requireRole(...allowed: number[]) {
+  return (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const role = Number(req.user?.role);
+    if (!allowed.includes(role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes (register, login, logout, /api/user)
   setupAuth(app);
@@ -1416,7 +1430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Matchups route
-  app.get("/api/leagues/:leagueId/matchups", requireAuth, async (req: any, res) => {
+  app.get("/api/leagues/:leagueId/matchups", requireAuth, requireRole(2, 9), async (req: any, res) => {
     try {
       const { week } = req.query;
       const league = await storage.getLeague(req.params.leagueId);
