@@ -3901,9 +3901,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Helper functions
       const getTeamName = (teamData: any): string => {
+        // Try location + nickname first (e.g., "Minnesota Vikings")
         if (teamData?.location && teamData?.nickname) {
           return `${teamData.location} ${teamData.nickname}`;
         }
+        // Try location alone
+        if (teamData?.location) {
+          return teamData.location;
+        }
+        // Try nickname alone
+        if (teamData?.nickname) {
+          return teamData.nickname;
+        }
+        // Try name field
+        if (teamData?.name) {
+          return teamData.name;
+        }
+        // Try owner's team name (e.g., "John's Team")
+        const owner = rostersData?.members?.find((m: any) => m.id === teamData?.primaryOwner);
+        if (owner) {
+          const ownerName = owner.displayName || owner.firstName || owner.lastName || 'Owner';
+          return `${ownerName}'s Team`;
+        }
+        // Last resort: use team ID
         if (teamData?.id) {
           return `Team ${teamData.id}`;
         }
