@@ -84,7 +84,7 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/matchups" component={() => (
+              <AdminRoute path="/matchups" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">

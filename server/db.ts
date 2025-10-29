@@ -6,6 +6,17 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// In some Windows/dev environments (corporate proxies, custom CAs), TLS
+// verification can fail with UNABLE_TO_GET_ISSUER_CERT_LOCALLY when using Neon's
+// secure WebSocket connection. As a pragmatic dev-only workaround, disable
+// TLS verification in development. Do NOT do this in production.
+if (process.env.NODE_ENV === 'development' && !process.env.CI) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  console.warn(
+    'Development mode: TLS certificate verification disabled for Neon (NODE_TLS_REJECT_UNAUTHORIZED=0)'
+  );
+}
+
 neonConfig.webSocketConstructor = ws;
 
 // Load DATABASE_URL from .env file (Neon database)
