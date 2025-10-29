@@ -3901,9 +3901,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Helper functions
       const getTeamName = (teamData: any): string => {
+        // Try location + nickname first (e.g., "Minnesota Vikings")
         if (teamData?.location && teamData?.nickname) {
           return `${teamData.location} ${teamData.nickname}`;
         }
+        // Try location alone
+        if (teamData?.location) {
+          return teamData.location;
+        }
+        // Try nickname alone
+        if (teamData?.nickname) {
+          return teamData.nickname;
+        }
+        // Try name field
+        if (teamData?.name) {
+          return teamData.name;
+        }
+        // Try owner's team name (e.g., "John's Team")
+        const owner = rostersData?.members?.find((m: any) => m.id === teamData?.primaryOwner);
+        if (owner) {
+          const ownerName = owner.displayName || owner.firstName || owner.lastName || 'Owner';
+          return `${ownerName}'s Team`;
+        }
+        // Last resort: use team ID
         if (teamData?.id) {
           return `Team ${teamData.id}`;
         }
@@ -4020,36 +4040,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'Active';
       };
 
-      // Fetch Fantasy Pros data if requested
+      // Fetch Fantasy Pros data
       const newsMap = new Map<string, any[]>();
       const projectionsMap = new Map<string, any>();
       const rankingsMap = new Map<string, any>();
       
-      // Fetch news if requested (either from player-level data or external research checkbox)
-      if (options.includePlayerNews || options.includeNewsUpdates) {
-        try {
-          const { db } = await import('./db');
-          const { sql } = await import('drizzle-orm');
-          const newsResult = await db
-            .select()
-            .from(schema.fantasyProsNews)
-            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
-            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
-            .limit(100);
-          
-          // Create news map for quick lookup (player name -> news items)
-          newsResult.forEach((newsItem: any) => {
-            if (newsItem.playerName) {
-              const existing = newsMap.get(newsItem.playerName) || [];
-              existing.push(newsItem);
-              newsMap.set(newsItem.playerName, existing);
-            }
-          });
-          
-          console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
-        } catch (error: any) {
-          console.error('Error fetching Fantasy Pros news for custom prompt:', error);
-        }
+      // Always fetch news for all players listed in the prompt
+      try {
+        const { db } = await import('./db');
+        const { sql } = await import('drizzle-orm');
+        const newsResult = await db
+          .select()
+          .from(schema.fantasyProsNews)
+          .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
+          .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
+          .limit(200);
+        
+        // Create news map for quick lookup (player name -> news items)
+        newsResult.forEach((newsItem: any) => {
+          if (newsItem.playerName) {
+            const existing = newsMap.get(newsItem.playerName) || [];
+            existing.push(newsItem);
+            newsMap.set(newsItem.playerName, existing);
+          }
+        });
+        
+        console.log(`Loaded ${newsResult.length} news items into map, covering ${newsMap.size} players`);
+      } catch (error: any) {
+        console.error('Error fetching Fantasy Pros news for custom prompt:', error);
       }
       
       // Fetch projections if requested
@@ -4179,8 +4197,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const team = getPlayerTeam(getProTeamId(entry.playerPoolEntry));
                 const position = getPositionName(getPlayerPositionId(entry.playerPoolEntry));
                 const slotName = getSlotName(entry.lineupSlotId);
+                const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                 const enrichment = enrichPlayerData(name);
-                return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
               })
               .join('\n') + '\n'
           );
@@ -4203,8 +4223,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
+                  const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                   const enrichment = enrichPlayerData(name);
-                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                  const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                  return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
@@ -4225,8 +4247,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const team = getPlayerTeam(player.proTeamId);
                   const position = getPositionName(player.defaultPositionId);
                   const slotName = getSlotName(entry.lineupSlotId);
+                  const injuryStatus = getInjuryStatus(entry.playerPoolEntry);
                   const enrichment = enrichPlayerData(name);
-                  return `${name} (${position}, ${team}) - ${slotName}${enrichment}`;
+                  const statusStr = injuryStatus !== 'Active' ? ` [${injuryStatus}]` : '';
+                  return `${name} (${position}, ${team}) - ${slotName}${statusStr}${enrichment}`;
                 })
                 .join('\n') + '\n'
             );
