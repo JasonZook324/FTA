@@ -1024,27 +1024,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Leave a league profile
+  // Leave a league (handles both personal leagues and league profiles)
   app.delete("/api/leagues/:id/leave", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const leagueProfileId = req.params.id;
+      const leagueId = req.params.id;
       
-      // Check if user is a member
-      const membership = await storage.getUserLeague(userId, leagueProfileId);
+      // First, check if this is a league profile membership
+      const membership = await storage.getUserLeague(userId, leagueId);
       
-      if (!membership) {
-        return res.status(404).json({ message: "You are not a member of this league" });
+      if (membership) {
+        // This is a league profile - remove user from the league profile
+        await storage.deleteUserLeague(userId, leagueId);
+        return res.json({ 
+          message: "Successfully left league"
+        });
       }
-
-      // Remove user from league
-      await storage.deleteUserLeague(userId, leagueProfileId);
-
+      
+      // If not a league profile, check if it's a personal league
+      const personalLeague = await storage.getLeague(leagueId);
+      
+      if (!personalLeague) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      // Verify this is the user's league
+      if (personalLeague.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this league" });
+      }
+      
+      // Delete the personal league
+      await storage.deleteLeague(leagueId);
+      
       res.json({ 
-        message: "Successfully left league"
+        message: "Successfully disconnected from league"
       });
     } catch (error: any) {
-      console.error('Error leaving league:', error);
+      console.error('Error leaving/disconnecting league:', error);
       res.status(500).json({ message: error.message });
     }
   });
