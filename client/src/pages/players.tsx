@@ -10,7 +10,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
-import { useNFLMatchups, getOpponent as getOpponentHelper, getGameTime as getGameTimeHelper } from "@/hooks/use-nfl-matchups";
+import { useNFLMatchups, getOpponent as getOpponentHelper, getGameTime as getGameTimeHelper, useDefensiveRankings, getOpponentRank } from "@/hooks/use-nfl-matchups";
 import { formatGameTime } from "@/lib/timezone-utils";
 
 export default function Players() {
@@ -34,6 +34,10 @@ export default function Players() {
   // Query NFL matchups for current week
   const { data: matchupsData } = useNFLMatchups(parseInt(selectedSeason), currentWeek);
   const nflMatchups = matchupsData?.matchups || [];
+  
+  // Query defensive rankings for current week
+  const { data: rankingsData } = useDefensiveRankings(parseInt(selectedSeason), currentWeek);
+  const defensiveRankings = rankingsData?.rankings || {};
 
   // Auto-select the first league when leagues load
   useEffect(() => {
@@ -165,165 +169,26 @@ export default function Players() {
     return formatGameTime(gameTimeData.gameTimeUtc, teamAbbr, gameTimeData.gameDay);
   };
 
-  // Helper function to get position rank based on opponent defense from live ESPN data
+  // Helper function to get position rank based on opponent defense
   const getPositionRank = (playerData: any) => {
     const player = playerData.player || playerData;
     
-    // First priority: Direct opponent rank from ESPN API
-    if (player.opponentRank !== undefined && player.opponentRank !== null) {
-      return player.opponentRank.toString();
-    }
+    // Get the player's pro team ID
+    const proTeamId = getProTeamId(player);
+    if (!proTeamId) return "--";
     
-    // Second priority: Check ESPN's defense rankings data structure
-    if (player.defenseRankings && typeof player.defenseRankings === 'object') {
-      const position = getPositionName(getPlayerPositionId(player));
-      const defenseRank = player.defenseRankings[`vs${position}`] || player.defenseRankings[position.toLowerCase()];
-      if (defenseRank !== undefined && defenseRank !== null) {
-        return defenseRank.toString();
-      }
-    }
+    // Get team abbreviation
+    const teamAbbr = getTeamAbbr(proTeamId);
+    if (!teamAbbr) return "--";
     
-    // Third priority: Check kona_player_rankings data
-    if (player.playerRankings && typeof player.playerRankings === 'object') {
-      const currentWeek = getCurrentNFLWeek();
-      const weeklyRanking = player.playerRankings[currentWeek] || player.playerRankings.current;
-      if (weeklyRanking && weeklyRanking.opponentRank !== undefined) {
-        return weeklyRanking.opponentRank.toString();
-      }
-    }
+    // Get opponent from matchups
+    const opponent = getOpponentHelper(nflMatchups, teamAbbr);
+    if (!opponent) return "--";
     
-    // Fourth priority: Check stats for opponent ranking data
-    if (player.stats && Array.isArray(player.stats)) {
-      for (const stat of player.stats) {
-        if (stat.opponentRank !== undefined && stat.opponentRank !== null) {
-          return stat.opponentRank.toString();
-        }
-        // ESPN sometimes stores it in stat details
-        if (stat.statDetail && stat.statDetail.opponentRank) {
-          return stat.statDetail.opponentRank.toString();
-        }
-        // Check for defense vs position stats
-        if (stat.opponentDefenseVsPosition !== undefined) {
-          return stat.opponentDefenseVsPosition.toString();
-        }
-      }
-    }
+    // Look up defensive ranking for opponent
+    const rank = getOpponentRank(defensiveRankings, opponent);
     
-    // Fifth priority: Check player outlook for matchup data
-    if (player.outlook) {
-      if (player.outlook.opponentRank !== undefined && player.outlook.opponentRank !== null) {
-        return player.outlook.opponentRank.toString();
-      }
-      // Check outlook stats
-      if (player.outlook.stats && player.outlook.stats.opponentRank) {
-        return player.outlook.stats.opponentRank.toString();
-      }
-      // Check outlook matchup data
-      if (player.outlook.defenseRank !== undefined && player.outlook.defenseRank !== null) {
-        return player.outlook.defenseRank.toString();
-      }
-    }
-    
-    // Sixth priority: Check rankings object for positional rankings
-    if (player.rankings && typeof player.rankings === 'object') {
-      // ESPN sometimes stores opponent rankings by week/position
-      for (const rankKey in player.rankings) {
-        const ranking = player.rankings[rankKey];
-        if (ranking && ranking.opponentRank !== undefined) {
-          return ranking.opponentRank.toString();
-        }
-        if (ranking && ranking.defenseRank !== undefined) {
-          return ranking.defenseRank.toString();
-        }
-      }
-    }
-    
-    // Seventh priority: Check ESPN's game/matchup data structure
-    if (player.game && typeof player.game === 'object') {
-      const opponentDefense = player.game.opponentDefenseRank || player.game.defenseRank;
-      if (opponentDefense !== undefined && opponentDefense !== null) {
-        return opponentDefense.toString();
-      }
-    }
-    
-    // Eighth priority: Check if there's schedule/matchup data with opponent defense stats
-    if (player.schedule && Array.isArray(player.schedule)) {
-      const currentGame = player.schedule.find((game: any) => 
-        game.isCurrentWeek || game.isThisWeek || game.isActive
-      );
-      if (currentGame && currentGame.opponentDefenseRank) {
-        return currentGame.opponentDefenseRank.toString();
-      }
-      if (currentGame && currentGame.defenseRank) {
-        return currentGame.defenseRank.toString();
-      }
-    }
-    
-    // Ninth priority: Check player's team schedule data
-    if (player.teamSchedule && Array.isArray(player.teamSchedule)) {
-      const currentMatchup = player.teamSchedule.find((matchup: any) => 
-        matchup.isCurrentWeek || matchup.week === getCurrentNFLWeek()
-      );
-      if (currentMatchup && currentMatchup.defenseRank) {
-        return currentMatchup.defenseRank.toString();
-      }
-    }
-    
-    // Tenth priority: Check if opponent team data includes defensive rankings
-    const opponentTeamId = getOpponentTeamId(player);
-    if (opponentTeamId && player.opponentTeamStats) {
-      const position = getPositionName(getPlayerPositionId(player));
-      const defenseVsPosition = player.opponentTeamStats[`defense_vs_${position.toLowerCase()}`];
-      if (defenseVsPosition && defenseVsPosition.rank) {
-        return defenseVsPosition.rank.toString();
-      }
-    }
-    
-    // Eleventh priority: Check ESPN's proOpponent and team defense data
-    if (player.proOpponent !== undefined && player.teamDefenseRankings) {
-      const position = getPositionName(getPlayerPositionId(player));
-      const opponentDefense = player.teamDefenseRankings[player.proOpponent];
-      if (opponentDefense && opponentDefense[position.toLowerCase()]) {
-        return opponentDefense[position.toLowerCase()].toString();
-      }
-    }
-    
-    // If no live ESPN data is available, return empty
-    console.warn('No opponent rank data found in ESPN API for player:', getPlayerName(player));
-    return "--";
-  };
-  
-  // Helper function to get current NFL week
-  const getCurrentNFLWeek = () => {
-    const currentDate = new Date();
-    const seasonStart = new Date('2025-09-01'); // Approximate NFL season start
-    const weeksPassed = Math.floor((currentDate.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(1, Math.min(18, weeksPassed + 1));
-  };
-  
-  // Helper function to get opponent team ID from live ESPN data
-  const getOpponentTeamId = (player: any) => {
-    // First check direct opponent field
-    if (player.opponent && player.opponent.teamId) {
-      return player.opponent.teamId;
-    }
-    
-    // Check schedule for current week opponent
-    if (player.schedule && Array.isArray(player.schedule)) {
-      const currentGame = player.schedule.find((game: any) => 
-        game.isCurrentWeek || game.isThisWeek
-      );
-      if (currentGame) {
-        return currentGame.opponentTeamId || currentGame.opponent;
-      }
-    }
-    
-    // Check ESPN's proOpponent field
-    if (player.proOpponent !== undefined && player.proOpponent > 0) {
-      return player.proOpponent;
-    }
-    
-    return null;
+    return rank !== null ? rank.toString() : "--";
   };
 
   // Helper function to get position rank color based on actual ranking
