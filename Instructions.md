@@ -1,568 +1,538 @@
-# Shareable League Profiles Feature - Analysis & Fix Plan
+# Player Details Page - OPP and STATUS Column Fix
 
 ## Executive Summary
 
-**Problem:** The shareable league profiles feature is fully implemented with correct code, but the database tables (league_profiles, league_credentials, user_leagues, players) are invisible to the running application, causing "relation does not exist" errors.
+**Goal:** Populate the OPP (Opponent) and STATUS (Game Day/Time) columns on the Player Details page using data from The Odds API to show accurate NFL matchup information for each player.
 
-**Root Cause:** Database connection string mismatch. The application uses TWO DIFFERENT Neon databases:
-- `drizzle-kit push` creates tables in the **system DATABASE_URL** (ep-young-glade-ad5bqow8)
-- The **running application** queries the **.env DATABASE_URL** (ep-old-fog-adzsx6ik)
+**Example Target Output:**
+```
+Player: Jahmyr Gibbs (DET) | OPP: MIN | STATUS: Sun 12:00 PM (CST)
+```
 
-**Status:** This is a configuration issue, NOT a code issue. All implementation is correct and complete.
+**Feasibility:** ✅ **100% ACHIEVABLE** - All required infrastructure and data sources are in place.
 
 ---
 
-## Detailed Analysis
+## Current State Analysis
 
-### 1. Evidence of the Problem
+### What's Working
+1. ✅ **The Odds API Integration** (`server/oddsApiService.ts`)
+   - Successfully fetches NFL matchup data
+   - Stores in `nflVegasOdds` database table (Neon ep-old-fog)
+   - Data includes: homeTeam, awayTeam, commenceTime, week, season
+   - API Key configured: `ODDS_API_KEY=6280aed458cb09d5d5c86d51fada96ec`
 
-#### Database Connection Mismatch
-```bash
-# System environment variable (used by drizzle.config.ts)
-DATABASE_URL=postgresql://neondb_owner:npg_QyTjH5Lf9FVG@ep-young-glade-ad5bqow8.c-2.us-east-1...
+2. ✅ **Team Abbreviation Mapping** (`server/kickerStreamingService.ts`)
+   - `normalizeTeamAbbr()` function maps full names → abbreviations
+   - Example: "Detroit Lions" → "DET", "Minnesota Vikings" → "MIN"
 
-# .env file (used by running application via server/db.ts)
-DATABASE_URL=postgresql://neondb_owner:npg_17zSemylQtpU@ep-old-fog-adzsx6ik.c-2.us-east-1...
+3. ✅ **Player Team Data** (`client/src/pages/players.tsx`)
+   - Each player has `proTeamId` (ESPN team ID)
+   - `getTeamName()` function maps proTeamId → abbreviation
+   - Example: proTeamId=8 → "DET", proTeamId=16 → "MIN"
+
+4. ✅ **Current Week Calculation**
+   - `getCurrentNFLWeek()` calculates based on season start date
+   - Consistent calculation across frontend and backend
+
+### What's Broken
+
+#### 1. **OPP Column** (Line 387-393: `getOpponent()`)
+```typescript
+const getOpponent = (playerData: any) => {
+  const player = playerData.player || playerData;
+  
+  // ESPN Fantasy API doesn't provide opponent data in player endpoints
+  // This would require NFL schedule data from a different source
+  return "N/A";  // ❌ HARDCODED - NOT IMPLEMENTED
+};
 ```
 
-**Notice:** Different endpoints (ep-young-glade vs ep-old-fog) = different databases!
+**Problem:** Returns hardcoded "N/A" instead of actual opponent abbreviation.
 
-#### How the Mismatch Occurs
-
-**File: drizzle.config.ts**
+#### 2. **STATUS Column** (Line 139-143: `getGameTime()`)
 ```typescript
-export default defineConfig({
-  dbCredentials: {
-    url: process.env.DATABASE_URL,  // ← Uses system secret
-  },
-});
+const getGameTime = (playerData: any) => {
+  const player = playerData.player || playerData;
+  // For now, return a placeholder time
+  return "Sun 1:00 PM";  // ❌ HARDCODED - NOT IMPLEMENTED
+};
 ```
 
-**File: server/db.ts**
+**Problem:** Returns hardcoded "Sun 1:00 PM" instead of actual game day/time with timezone.
+
+---
+
+## Root Cause Analysis
+
+### Why It's Not Working
+
+1. **No Data Bridge**: The `nflVegasOdds` table contains matchup data, but there's no mechanism to:
+   - Fetch this data to the frontend
+   - Map player teams to their opponents
+   - Convert game times to readable format with timezones
+
+2. **Missing API Endpoint**: No route exists to retrieve current week's matchups in a format useful for the Players page
+
+3. **No Lookup Service**: The frontend lacks a service to:
+   - Store/cache matchup data
+   - Look up opponents by team abbreviation
+   - Format game times with proper timezones
+
+4. **Team Name Normalization Gap**: The Odds API returns full names ("Detroit Lions") but we need abbreviations ("DET") for matching
+
+---
+
+## Database Schema (Neon ep-old-fog)
+
+### `nflVegasOdds` Table (Already Exists)
 ```typescript
-// Reads from .env file
-const envConfig = dotenv.parse(fs.readFileSync(envPath));
-if (envConfig.DATABASE_URL) {
-  databaseUrl = envConfig.DATABASE_URL;  // ← Overrides with .env
+{
+  id: varchar (UUID),
+  season: integer,           // 2025
+  week: integer,             // 1-18
+  gameId: text,              // External API game ID
+  homeTeam: text,            // "Detroit Lions"
+  awayTeam: text,            // "Minnesota Vikings"
+  commenceTime: timestamp,   // 2025-11-01T17:00:00Z (UTC)
+  homeMoneyline: integer,
+  awayMoneyline: integer,
+  homeSpread: text,
+  awaySpread: text,
+  overUnder: text,
+  bookmaker: text,
+  createdAt: timestamp,
+  updatedAt: timestamp
 }
 ```
 
-**Result:**
-- `npm run db:push` → Creates tables in **ep-young-glade-ad5bqow8** database
-- Running app → Queries **ep-old-fog-adzsx6ik** database (which lacks the new tables)
-
-### 2. What Tables Are Affected
-
-All shareable league profile tables created after the initial setup:
-
-1. **league_profiles** - Central league metadata storage
-2. **league_credentials** - ESPN S2/SWID tokens per league
-3. **user_leagues** - Many-to-many user-league relationships  
-4. **players** - ESPN player data cache
-
-### 3. Why Old Tables Work
-
-Legacy tables (users, leagues, teams, matchups, etc.) exist in **both** databases because they were created before the .env override was added to server/db.ts. The new tables only exist in the system DATABASE_URL database.
-
-### 4. Files Related to Shareable League Profiles
-
-#### Database Schema
-- **shared/schema.ts** (lines 77-125)
-  - `players` table definition
-  - `leagueProfiles` table definition
-  - `leagueCredentials` table definition
-  - `userLeagues` table definition
-  - Insert schemas for all tables
-
-#### Storage Layer
-- **server/storage.ts**
-  - Imports all four new table objects (line 11-12)
-  - 32 methods implementing CRUD operations:
-    - Player methods (lines 620-662)
-    - League Profile methods (lines 664-713)
-    - League Credentials methods (lines 715-757)
-    - User League methods (lines 759-770)
-
-#### API Routes
-- **server/routes.ts** (lines 783-900)
-  - `GET /api/leagues/available` - Browse shareable leagues
-  - `POST /api/leagues/connect` - Create new league profile with credentials
-  - `POST /api/leagues/:id/join` - Join existing league profile
-  - Smart credential selection (prioritizes league profile credentials over personal)
-
-#### Frontend UI
-- **client/src/pages/authentication.tsx**
-  - "Join Existing League" tab
-  - "Connect New League" tab
-  - League browser with search/filter
-  - Connect form with ESPN ID, season, S2, SWID inputs
-  - Auto-fetch league name from ESPN API
+**Index:** `uniqueGameBookmaker` on (season, week, gameId, bookmaker)
 
 ---
 
-## Why This Is Fixable
+## Solution Architecture
 
-### ✅ Code Quality Assessment
+### Overview
+Create a complete data pipeline from Neon database → Backend API → Frontend lookup service → UI display
 
-1. **Schema Design:** Excellent
-   - Proper foreign key relationships
-   - Unique constraints preventing duplicates
-   - Cascade deletes for data integrity
-   - All tables properly exported
+### Component Breakdown
 
-2. **Storage Layer:** Complete
-   - All CRUD operations implemented
-   - Proper use of Drizzle ORM
-   - Type-safe with TypeScript
-   - Consistent error handling
+#### 1. **Backend: New API Endpoint**
+**File:** `server/routes.ts`
 
-3. **API Layer:** Well-designed
-   - RESTful endpoints
-   - Input validation with Zod
-   - Smart credential fallback logic
-   - Proper error responses
+**Endpoint:** `GET /api/nfl/matchups/:season/:week`
 
-4. **Frontend:** User-friendly
-   - Clear workflows (join vs connect)
-   - Search and filter capabilities
-   - Automatic league name fetching
-   - Helpful error messages
+**Purpose:** 
+- Fetch current week's NFL matchups from `nflVegasOdds` table
+- Normalize team names to abbreviations
+- Group by game (handling multiple bookmakers)
+- Return simplified matchup data
 
-### ❌ Configuration Issue
-
-The ONLY problem is database connection string alignment. This is 100% fixable.
-
----
-
-## Fix Plan
-
-### Option A: Update System Secret (Recommended)
-
-**Goal:** Make drizzle-kit use the same database as the running application.
-
-**Steps:**
-1. Update Replit secret `DATABASE_URL` to match .env file:
-   ```
-   postgresql://neondb_owner:npg_17zSemylQtpU@ep-old-fog-adzsx6ik.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-   ```
-
-2. Recreate tables on the correct database:
-   ```bash
-   npm run db:push --force
-   ```
-
-3. Restart application:
-   ```bash
-   # Workflow will auto-restart after db:push
-   ```
-
-4. Verify tables exist:
-   ```bash
-   npm run db:push
-   # Should output: "No changes detected"
-   ```
-
-**Pros:**
-- Aligns all database operations to one source of truth
-- Preserves existing user data in ep-old-fog database
-- Simple configuration change
-- No code modifications needed
-
-**Cons:**
-- Requires manual secret update in Replit UI
-
-### Option B: Remove .env Override
-
-**Goal:** Make the running application use the system DATABASE_URL.
-
-**Steps:**
-1. Edit `server/db.ts` to remove .env file reading:
-   ```typescript
-   // Simply use process.env.DATABASE_URL directly
-   const databaseUrl = process.env.DATABASE_URL;
-   ```
-
-2. Verify tables already exist:
-   ```bash
-   npm run db:push
-   # Should output: "No changes detected"
-   ```
-
-3. Restart application
-
-**Pros:**
-- No secret management needed
-- Code change is minimal
-- Tables already exist in system database
-
-**Cons:**
-- Loses existing user data in ep-old-fog database
-- Would need data migration if users/leagues exist there
-- Changes application behavior
-
-### Option C: Dual Database Support (Not Recommended)
-
-**Goal:** Maintain both databases with synchronized schemas.
-
-**Why Not:**
-- Violates user requirement: "ONLY HAVE 1 DATABASE"
-- Adds complexity
-- Risk of data inconsistency
-- No clear benefit
-
----
-
-## Recommended Solution: Option A
-
-### Implementation Steps
-
-#### Step 1: Update Replit Secret
-1. Go to Replit project settings
-2. Navigate to Secrets tab
-3. Update `DATABASE_URL` secret to:
-   ```
-   postgresql://neondb_owner:npg_17zSemylQtpU@ep-old-fog-adzsx6ik.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-   ```
-
-#### Step 2: Recreate Tables
-```bash
-# This will now create tables in the ep-old-fog database
-npm run db:push --force
+**Response Format:**
+```typescript
+{
+  week: 9,
+  season: 2025,
+  matchups: [
+    {
+      homeTeam: "DET",
+      awayTeam: "MIN",
+      commenceTime: "2025-11-03T17:00:00Z",
+      isHomeGame: true
+    },
+    // ... all games
+  ]
+}
 ```
 
-Expected output:
-```
-[✓] Changes applied
-```
+#### 2. **Backend: Matchup Service**
+**File:** `server/nflMatchupService.ts` (NEW FILE)
 
-#### Step 3: Verify Synchronization
-```bash
-npm run db:push
-```
+**Functions:**
+```typescript
+// Get current week matchups
+async function getCurrentWeekMatchups(season: number, week: number)
 
-Expected output:
-```
-[i] No changes detected
-```
+// Normalize team name to abbreviation (reuse from kickerStreamingService)
+function normalizeTeamAbbr(teamName: string): string
 
-#### Step 4: Test Application
-1. Restart workflow (will happen automatically)
-2. Navigate to Authentication page
-3. Verify no errors in console
-4. Click "Join Existing League" tab
-5. Should see empty list (not error)
-
-#### Step 5: Test Feature End-to-End
-1. Click "Connect New League" tab
-2. Enter test data:
-   - ESPN League ID: (any valid ID)
-   - Season: 2024
-   - ESPN S2: (your credential)
-   - SWID: (your credential)
-3. Click "Connect League"
-4. Should see success message
-5. Switch to "Join Existing League"
-6. Should see your league listed
-7. Click "Join League"
-8. Should successfully join
-
----
-
-## Verification Checklist
-
-After implementing Option A:
-
-- [ ] System DATABASE_URL matches .env DATABASE_URL
-- [ ] `npm run db:push` reports "No changes detected"
-- [ ] Application starts without errors
-- [ ] GET /api/leagues/available returns 200 (not 500)
-- [ ] Can create new league profile
-- [ ] Can join existing league profile
-- [ ] No "relation does not exist" errors in logs
-
----
-
-## What This Feature Does
-
-Once fixed, users will be able to:
-
-### As a League Connector (First User)
-1. Navigate to Authentication page
-2. Click "Connect New League"
-3. Enter ESPN League ID and season
-4. League name auto-fetches from ESPN API
-5. Enter ESPN S2 and SWID credentials
-6. Submit to create shareable league profile
-7. System stores credentials once for all users
-
-### As a League Joiner (Subsequent Users)
-1. Navigate to Authentication page
-2. Click "Join Existing League"
-3. Browse available leagues
-4. Search by name or filter by sport
-5. Click "Join League" on desired league
-6. Instantly gain access - no credentials needed
-7. Uses shared credentials from league profile
-
-### System Benefits
-- **No Credential Duplication:** Each league's ESPN tokens stored once
-- **Instant Access:** New members join without entering S2/SWID
-- **Automatic League Info:** Name, sport, team count fetched from ESPN
-- **Data Isolation:** Each user still has separate settings
-- **Smart Fallback:** Personal credentials used if league credentials unavailable
-
----
-
-## Technical Architecture
-
-### Database Schema Relationships
-
-```
-users (existing)
-  ├─ user_leagues (NEW - many-to-many)
-  │    └─ league_profiles (NEW - central league storage)
-  │         └─ league_credentials (NEW - one per league)
-  └─ espn_credentials (existing - personal backup)
-
-league_profiles (NEW)
-  ├─ Unique constraint: (espn_league_id, season)
-  ├─ Auto-fetched: name, sport, team_count
-  └─ Referenced by: user_leagues, league_credentials
-
-league_credentials (NEW)
-  ├─ One-to-one with league_profiles
-  ├─ Stores: espn_s2, swid
-  └─ Tracks: added_by_user_id, is_valid
-
-user_leagues (NEW)
-  ├─ Many users can join same league
-  ├─ Unique constraint: (user_id, league_profile_id)
-  └─ Tracks: role, joined_at
+// Build opponent lookup map
+function buildOpponentLookup(matchups): Map<string, MatchupInfo>
 ```
 
-### API Flow for "Connect New League"
+#### 3. **Frontend: Matchup Data Hook**
+**File:** `client/src/hooks/use-nfl-matchups.tsx` (NEW FILE)
 
-```
-Client: POST /api/leagues/connect
-  ↓
-1. Validate input (Zod schema)
-  ↓
-2. Fetch league data from ESPN API
-   - Uses provided S2/SWID to authenticate
-   - Gets league name, sport, team_count
-  ↓
-3. Check for existing league_profile
-   - Query: (espn_league_id, season)
-   - If exists: return error "League already connected"
-  ↓
-4. Create league_profile record
-   - Store ESPN-fetched metadata
-  ↓
-5. Create league_credentials record
-   - Link to league_profile
-   - Store S2/SWID tokens
-  ↓
-6. Create user_leagues record
-   - Link user to league_profile
-   - Set role = "owner"
-  ↓
-7. Return league_profile to client
+**Hook API:**
+```typescript
+const { 
+  getOpponent,        // (teamAbbr: string) => string | null
+  getGameTime,        // (teamAbbr: string) => string | null
+  isHome              // (teamAbbr: string) => boolean
+} = useNFLMatchups(season, week);
 ```
 
-### API Flow for "Join Existing League"
+#### 4. **Frontend: Update Players Page**
+**File:** `client/src/pages/players.tsx`
 
+**Changes:**
+```typescript
+// Use the hook
+const { getOpponent: lookupOpponent, getGameTime: lookupGameTime, isHome: lookupIsHome } = useNFLMatchups(2025, currentWeek);
+
+// Update getOpponent function
+const getOpponent = (playerData: any) => {
+  const teamId = getProTeamId(playerData.player || playerData);
+  const teamAbbr = getTeamName(teamId);
+  const opponent = lookupOpponent(teamAbbr);
+  
+  if (!opponent) return "BYE";
+  return lookupIsHome(teamAbbr) ? opponent : `@${opponent}`;
+};
+
+// Update getGameTime function
+const getGameTime = (playerData: any) => {
+  const teamId = getProTeamId(playerData.player || playerData);
+  const teamAbbr = getTeamName(teamId);
+  return lookupGameTime(teamAbbr) || "--";
+};
 ```
-Client: POST /api/leagues/:id/join
-  ↓
-1. Verify league_profile exists
-  ↓
-2. Check user not already member
-   - Query: user_leagues (user_id, league_profile_id)
-   - If exists: return error "Already joined"
-  ↓
-3. Create user_leagues record
-   - role = "member"
-  ↓
-4. Return success
+
+#### 5. **Timezone Handling**
+**File:** `client/src/lib/timezone-utils.ts` (NEW FILE)
+
+**Function:**
+```typescript
+function formatGameTime(utcTimestamp: string, teamAbbr: string): string {
+  // Maps team → stadium timezone
+  // Formats: "Sun 12:00 PM CST"
+}
 ```
 
 ---
 
-## Why Previous Attempts Failed
+## Implementation Plan
 
-### Attempt: Switch to Direct Connection
-**Action:** Removed `-pooler` from .env DATABASE_URL  
-**Result:** Failed - still querying wrong database  
-**Reason:** System DATABASE_URL still pointed to different endpoint
+### Phase 1: Backend Setup
 
-### Attempt: Kill Node Processes
-**Action:** `pkill -9 -f "node|tsx"`  
-**Result:** Failed - tables still not found  
-**Reason:** Process restart doesn't fix wrong database connection
+#### Task 1.1: Create NFL Matchup Service
+**File:** `server/nflMatchupService.ts`
 
-### Attempt: Drop and Recreate Tables
-**Action:** DROP TABLE, then `npm run db:push`  
-**Result:** Tables created in wrong database again  
-**Reason:** drizzle.config.ts still used system DATABASE_URL
+```typescript
+import { db } from "./db";
+import { nflVegasOdds } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
-### Attempt: Force Push Multiple Times
-**Action:** `npm run db:push --force`  
-**Result:** Success in wrong database  
-**Reason:** Configuration mismatch persists
+interface MatchupInfo {
+  homeTeam: string;
+  awayTeam: string;
+  commenceTime: Date;
+  gameId: string;
+}
+
+function normalizeTeamAbbr(teamName: string): string {
+  const mapping: Record<string, string> = {
+    'Detroit Lions': 'DET',
+    'Minnesota Vikings': 'MIN',
+    'Buffalo Bills': 'BUF',
+    'Miami Dolphins': 'MIA',
+    // ... all 32 teams
+  };
+  return mapping[teamName] || teamName;
+}
+
+export async function getCurrentWeekMatchups(season: number, week: number) {
+  const oddsData = await db
+    .select()
+    .from(nflVegasOdds)
+    .where(and(
+      eq(nflVegasOdds.season, season),
+      eq(nflVegasOdds.week, week)
+    ));
+  
+  // Deduplicate by gameId (multiple bookmakers)
+  const gameMap = new Map<string, MatchupInfo>();
+  
+  for (const game of oddsData) {
+    if (!gameMap.has(game.gameId)) {
+      gameMap.set(game.gameId, {
+        homeTeam: normalizeTeamAbbr(game.homeTeam),
+        awayTeam: normalizeTeamAbbr(game.awayTeam),
+        commenceTime: game.commenceTime!,
+        gameId: game.gameId
+      });
+    }
+  }
+  
+  return Array.from(gameMap.values());
+}
+```
+
+#### Task 1.2: Add API Route
+**File:** `server/routes.ts` (add after line ~2800)
+
+```typescript
+import { getCurrentWeekMatchups } from "./nflMatchupService";
+
+app.get("/api/nfl/matchups/:season/:week", async (req, res) => {
+  try {
+    const { season, week } = req.params;
+    
+    const matchups = await getCurrentWeekMatchups(
+      parseInt(season),
+      parseInt(week)
+    );
+    
+    res.json({
+      season: parseInt(season),
+      week: parseInt(week),
+      matchups: matchups.map(m => ({
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        commenceTime: m.commenceTime.toISOString(),
+        gameId: m.gameId
+      }))
+    });
+  } catch (error: any) {
+    console.error('Error fetching NFL matchups:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+```
+
+### Phase 2: Frontend Setup
+
+#### Task 2.1: Create Timezone Utility
+**File:** `client/src/lib/timezone-utils.ts`
+
+```typescript
+const STADIUM_TIMEZONES: Record<string, string> = {
+  "BUF": "America/New_York",
+  "MIA": "America/New_York",
+  "NE": "America/New_York",
+  "NYJ": "America/New_York",
+  "CHI": "America/Chicago",
+  "DET": "America/Detroit",
+  "MIN": "America/Chicago",
+  "DAL": "America/Chicago",
+  // ... all 32 teams
+};
+
+export function formatGameTime(
+  utcTimestamp: string,
+  teamAbbr: string
+): string {
+  const date = new Date(utcTimestamp);
+  const timezone = STADIUM_TIMEZONES[teamAbbr] || "America/New_York";
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: timezone,
+    timeZoneName: 'short'
+  });
+  
+  return formatter.format(date);
+  // Example: "Sun 12:00 PM CST"
+}
+```
+
+#### Task 2.2: Create Matchup Hook
+**File:** `client/src/hooks/use-nfl-matchups.tsx`
+
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import { formatGameTime } from "@/lib/timezone-utils";
+
+export function useNFLMatchups(season: number, week: number) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/nfl/matchups', season, week],
+    queryFn: async () => {
+      const response = await fetch(`/api/nfl/matchups/${season}/${week}`);
+      if (!response.ok) throw new Error('Failed to fetch matchups');
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour cache
+  });
+
+  // Build lookup maps
+  const opponentMap = new Map<string, string>();
+  const gameTimeMap = new Map<string, string>();
+  const isHomeMap = new Map<string, boolean>();
+
+  if (data?.matchups) {
+    for (const matchup of data.matchups) {
+      opponentMap.set(matchup.homeTeam, matchup.awayTeam);
+      gameTimeMap.set(matchup.homeTeam, formatGameTime(matchup.commenceTime, matchup.homeTeam));
+      isHomeMap.set(matchup.homeTeam, true);
+
+      opponentMap.set(matchup.awayTeam, matchup.homeTeam);
+      gameTimeMap.set(matchup.awayTeam, formatGameTime(matchup.commenceTime, matchup.awayTeam));
+      isHomeMap.set(matchup.awayTeam, false);
+    }
+  }
+
+  return {
+    getOpponent: (teamAbbr: string): string | null => opponentMap.get(teamAbbr) || null,
+    getGameTime: (teamAbbr: string): string | null => gameTimeMap.get(teamAbbr) || null,
+    isHome: (teamAbbr: string): boolean => isHomeMap.get(teamAbbr) || false,
+    isLoading
+  };
+}
+```
+
+#### Task 2.3: Update Players Page
+**File:** `client/src/pages/players.tsx`
+
+**Add import at top (~line 12):**
+```typescript
+import { useNFLMatchups } from "@/hooks/use-nfl-matchups";
+```
+
+**Add hook usage (~line 21):**
+```typescript
+const currentNFLWeek = getCurrentNFLWeek();
+const { getOpponent: lookupOpponent, getGameTime: lookupGameTime, isHome: lookupIsHome } = useNFLMatchups(2025, currentNFLWeek);
+```
+
+**Replace getOpponent (line 387-393):**
+```typescript
+const getOpponent = (playerData: any) => {
+  const player = playerData.player || playerData;
+  const teamId = getProTeamId(player);
+  if (!teamId) return "BYE";
+  
+  const teamAbbr = getTeamName(teamId);
+  const opponent = lookupOpponent(teamAbbr);
+  if (!opponent) return "BYE";
+  
+  return lookupIsHome(teamAbbr) ? opponent : `@${opponent}`;
+};
+```
+
+**Replace getGameTime (line 139-143):**
+```typescript
+const getGameTime = (playerData: any) => {
+  const player = playerData.player || playerData;
+  const teamId = getProTeamId(player);
+  if (!teamId) return "--";
+  
+  const teamAbbr = getTeamName(teamId);
+  return lookupGameTime(teamAbbr) || "--";
+};
+```
+
+### Phase 3: Testing
+
+#### Test Cases
+1. **Basic Display** - Verify OPP shows correct opponents with @ for away games
+2. **Game Times** - Verify STATUS shows formatted times with correct timezones
+3. **Bye Weeks** - Verify BYE/-- displayed when no matchup
+4. **Timezone Accuracy** - Verify EST/CST/PST/MST show correctly
+5. **Data Refresh** - Verify updates when week changes
 
 ---
 
-## Critical Requirements Compliance
+## Data Flow Diagram
 
-### ✅ Use ONLY Neon Database
-- All operations target Neon PostgreSQL
-- No Replit database usage
-- Single source of truth for data
-
-### ✅ No Fallback Data
-- API returns real ESPN data or errors
-- No mock/placeholder data
-- Database schema strictly validated
-
-### ✅ Validate at Source
-- All ESPN data fetched and validated before storage
-- Zod schemas enforce data integrity
-- Database constraints prevent invalid data
-
----
-
-## Post-Fix Testing Plan
-
-### Unit Tests (Manual Verification)
-
-1. **Database Connection**
-   ```bash
-   # Verify single database in use
-   echo $DATABASE_URL
-   grep DATABASE_URL .env
-   # Both should match
-   ```
-
-2. **Schema Synchronization**
-   ```bash
-   npm run db:push
-   # Should output: "No changes detected"
-   ```
-
-3. **Table Existence**
-   ```sql
-   SELECT table_name FROM information_schema.tables 
-   WHERE table_schema = 'public' 
-   AND table_name IN ('league_profiles', 'league_credentials', 'user_leagues', 'players');
-   -- Should return all 4 tables
-   ```
-
-### Integration Tests (API Testing)
-
-1. **GET /api/leagues/available**
-   - Should return 200 status
-   - Should return empty array [] initially
-   - Should not throw "relation does not exist"
-
-2. **POST /api/leagues/connect**
-   - Should accept valid ESPN credentials
-   - Should auto-fetch league name from ESPN
-   - Should create league_profile, league_credentials, user_leagues
-   - Should return created league_profile
-
-3. **POST /api/leagues/:id/join**
-   - Should allow joining existing league
-   - Should prevent duplicate joins
-   - Should create user_leagues entry
-
-### End-to-End Tests (User Workflow)
-
-1. **User A: Connect New League**
-   - Navigate to /authentication
-   - Click "Connect New League"
-   - Enter ESPN League ID: 123456
-   - Enter Season: 2024
-   - Enter ESPN S2 and SWID
-   - Observe league name auto-populates
-   - Click "Connect League"
-   - Verify success message
-   - Verify league appears in personal leagues
-
-2. **User B: Join Existing League**
-   - Login as different user
-   - Navigate to /authentication
-   - Click "Join Existing League"
-   - Verify User A's league appears in list
-   - Click "Join League"
-   - Verify success message
-   - Verify league appears in personal leagues
-   - Verify can access league data without entering credentials
-
-3. **Credential Priority Test**
-   - User with personal ESPN credentials
-   - Joins league with league profile credentials
-   - System should prioritize league profile credentials
-   - Verify league data loads successfully
-   - Remove league profile credentials
-   - Verify system falls back to personal credentials
+```
+The Odds API → oddsApiService.ts → nflVegasOdds (Neon DB)
+                                          ↓
+                          nflMatchupService.ts (normalizes teams)
+                                          ↓
+                          GET /api/nfl/matchups/:season/:week
+                                          ↓
+                          useNFLMatchups hook (builds lookup maps)
+                                          ↓
+                          players.tsx (getOpponent/getGameTime)
+                                          ↓
+                          UI: OPP="MIN" STATUS="Sun 12:00 PM CST"
+```
 
 ---
 
-## Success Metrics
+## File Changes Summary
 
-### Technical Metrics
-- Zero "relation does not exist" errors
-- All API endpoints return proper status codes
-- Database operations complete without errors
-- Single DATABASE_URL in use across all systems
+### New Files (3)
+1. `server/nflMatchupService.ts` - Matchup data service (~100 lines)
+2. `client/src/hooks/use-nfl-matchups.tsx` - React hook (~80 lines)
+3. `client/src/lib/timezone-utils.ts` - Timezone utility (~70 lines)
 
-### Feature Metrics
-- Users can create shareable league profiles
-- Users can join leagues without entering credentials
-- League names auto-fetch from ESPN API
-- Duplicate league prevention works
-- Multiple users can share same league
+### Modified Files (2)
+1. `server/routes.ts` - Add API endpoint (~25 lines)
+2. `client/src/pages/players.tsx` - Update 2 functions (~20 lines)
 
-### User Experience Metrics
-- Clear error messages when operations fail
-- Instant access to joined leagues
-- No credential management burden for joiners
-- Search and filter functionality works
-- Smooth onboarding for new league members
+**Total: ~295 lines of code**
 
 ---
 
-## Maintenance Notes
+## Why This Will Work
 
-### Future Schema Changes
-Always ensure:
-1. Update shared/schema.ts with new tables/columns
-2. Run `npm run db:push` to sync
-3. Verify DATABASE_URL alignment before pushing
-4. Test in development environment first
+✅ **All Infrastructure Exists**
+- Odds API integration working
+- Database table populated
+- Team mapping functions available
+- Player team IDs accessible
 
-### Credential Rotation
-If league credentials expire:
-1. League owner updates league_credentials record
-2. All members automatically use new credentials
-3. No individual user action required
+✅ **Simple Data Flow**
+- Fetch from DB → Build maps → Display
+- O(1) lookup performance
+- React Query caching (1 hour)
 
-### Adding New Sports
-Current supported: ffl (NFL), fba (NBA), fhk (NHL), flb (MLB)
-To add more:
-1. No schema changes needed
-2. Update ESPN API endpoints if different
-3. Test with new sport's league data
+✅ **No External Dependencies**
+- No new npm packages
+- Uses existing patterns
+- Follows project conventions
+
+✅ **Fully Testable**
+- Each component independent
+- Clear error handling
+- Database queries verifiable
+
+---
+
+## Success Criteria
+
+**OPP Column:**
+- Shows opponent abbreviation (e.g., "MIN")
+- Adds "@" for away games (e.g., "@MIN")
+- Shows "BYE" for bye weeks
+
+**STATUS Column:**
+- Shows day and time (e.g., "Sun 12:00 PM")
+- Includes timezone (e.g., "CST")
+- Shows "--" for bye weeks
+
+**Performance:**
+- Page load < 2 seconds
+- 1-hour cache duration
+- No redundant API calls
+
+---
+
+## Timeline & Risk
+
+**Effort Estimate:** ~5 hours
+- Backend: 2 hours
+- Frontend: 2 hours
+- Testing: 1 hour
+
+**Risk Level:** LOW
+- All data available
+- No complex algorithms
+- Proven patterns
+
+**Dependencies:**
+- ODDS_API_KEY configured ✅
+- nflVegasOdds table populated (run Jobs page refresh)
+- Neon database accessible ✅
 
 ---
 
 ## Conclusion
 
-**Problem:** Fully implemented feature blocked by database connection mismatch  
-**Solution:** Update Replit DATABASE_URL secret to match .env file  
-**Timeline:** 5-10 minutes to implement Option A  
-**Risk Level:** Low - configuration change only  
-**Code Quality:** High - all implementation is production-ready  
-**User Impact:** High - enables collaborative league management
+This feature is **100% achievable** with existing infrastructure. All required data exists in the Neon database (ep-old-fog), accessed via The Odds API integration. The implementation follows established patterns and requires no new external dependencies.
 
-The shareable league profiles feature is **architecturally sound** and **correctly implemented**. The only barrier is a fixable configuration issue. Once the DATABASE_URL secret is updated, the feature will work immediately without any code changes.
+**Next Step:** Implement Phase 1 (Backend) to create the API endpoint and matchup service.
