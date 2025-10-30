@@ -13,6 +13,9 @@
     "dev:server:debug:brk": "cross-env NODE_OPTIONS=--inspect-brk nodemon",
     "dev:server:debug:9230": "cross-env NODE_OPTIONS=--inspect=9230 nodemon"
   },
+  "engines": {
+	"node": ">=18.0.0 <22"
+	}
   "dependencies": {
     "@google/genai": "^1.16.0",
     "@hookform/resolvers": "^3.10.0",
