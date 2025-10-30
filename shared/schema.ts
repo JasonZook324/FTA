@@ -26,24 +26,6 @@ export const espnCredentials = pgTable("espn_credentials", {
   lastValidated: timestamp("last_validated"),
 });
 
-export const leagues = pgTable("leagues", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  espnLeagueId: text("espn_league_id").notNull(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  sport: text("sport").notNull(), // ffl, fba, fhk, flb
-  season: integer("season").notNull(),
-  teamCount: integer("team_count"),
-  currentWeek: integer("current_week"),
-  playoffTeams: integer("playoff_teams"),
-  scoringType: text("scoring_type"),
-  tradeDeadline: text("trade_deadline"),
-  settings: jsonb("settings"),
-  lastUpdated: timestamp("last_updated").defaultNow(),
-}, (table) => ({
-  uniqueLeaguePerUser: uniqueIndex("leagues_user_espn_season").on(table.userId, table.espnLeagueId, table.season),
-}));
-
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   espnTeamId: integer("espn_team_id").notNull(),
@@ -137,11 +119,6 @@ export const insertEspnCredentialsSchema = createInsertSchema(espnCredentials).o
   isValid: true,
   createdAt: true,
   lastValidated: true,
-});
-
-export const insertLeagueSchema = createInsertSchema(leagues).omit({
-  id: true,
-  lastUpdated: true,
 });
 
 export const insertTeamSchema = createInsertSchema(teams).omit({
@@ -310,8 +287,6 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type EspnCredentials = typeof espnCredentials.$inferSelect;
 export type InsertEspnCredentials = z.infer<typeof insertEspnCredentialsSchema>;
-export type League = typeof leagues.$inferSelect;
-export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = z.infer<typeof insertTeamSchema>;
 export type FantasyProsPlayer = typeof fantasyProsPlayers.$inferSelect;
@@ -423,7 +398,7 @@ export const insertNflTeamStatsSchema = createInsertSchema(nflTeamStats).omit({
 export const aiPromptResponses = pgTable("ai_prompt_responses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: "set null" }),
+  leagueId: varchar("league_id").references(() => leagueProfiles.id, { onDelete: "set null" }),
   teamId: integer("team_id"), // ESPN team ID, not FK (teams can change)
   
   // Prompt data
