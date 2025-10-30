@@ -10,8 +10,15 @@ export default async function () {
   ];
 
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
-    const cartographer = await import("@replit/vite-plugin-cartographer");
-    plugins.push(cartographer.default());
+    try {
+      const cartographerModule = await import("@replit/vite-plugin-cartographer");
+      const cartographer = cartographerModule.default || cartographerModule;
+      if (typeof cartographer === 'function') {
+        plugins.push(cartographer());
+      }
+    } catch (e) {
+      console.warn('Cartographer plugin not available:', e.message);
+    }
   }
 
   return defineConfig({
