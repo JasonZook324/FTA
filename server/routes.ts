@@ -4532,8 +4532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user has access to this league
-      const leagues = await storage.getLeagues(req.user.id);
-      const league = leagues.find(l => l.id === leagueId);
+      const league = await storage.getLeague(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
