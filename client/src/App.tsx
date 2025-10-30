@@ -133,7 +133,7 @@ function App() {
                   </div>
                 )} />
 
-                  <ProtectedRoute path="/streaming" component={() => (
+                  <AdminRoute path="/streaming" component={() => (
                     <div className="flex min-h-screen">
                       <Sidebar />
                       <div className="flex-1 flex flex-col lg:ml-0">
@@ -145,7 +145,7 @@ function App() {
                     </div>
                   )} />
               
-              <ProtectedRoute path="/ai-recommendations" component={() => (
+              <AdminRoute path="/ai-recommendations" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">
@@ -157,7 +157,7 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/trade-analyzer" component={() => (
+              <AdminRoute path="/trade-analyzer" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">

@@ -35,6 +35,23 @@ An in-memory storage option exists for development but is not used in production
 ### Authentication and Authorization
 A dual-layer authentication system is in place. User authentication uses `passport-local` with `bcrypt` for secure account management, and sessions are stored in PostgreSQL. All API routes are protected, ensuring data isolation per user. ESPN API authentication uses user-managed S2 session tokens and SWID stored in the database, allowing personalized access to ESPN's Fantasy API.
 
+**Role-Based Access Control (Updated - October 2025)**
+The application implements role-based access control with four user role levels:
+- **Role 0 (Standard User)**: Default role, access to basic features
+- **Role 1 (Paid User)**: Reserved for future paid features
+- **Role 2 (Developer)**: Full access to all features including advanced/experimental pages
+- **Role 9 (Administrator)**: Full administrative access to all features
+
+Restricted pages accessible only to Developers (role 2) and Administrators (role 9):
+- **AI Recommendations** (`/ai-recommendations`): AI-powered fantasy football recommendations
+- **Trade Analyzer** (`/trade-analyzer`): Advanced trade analysis tools
+- **Streaming** (`/streaming`): Kicker streaming analysis with Vegas odds integration
+- **Matchups** (`/matchups`): Detailed matchup analysis
+- **Jobs** (`/jobs`): Data refresh and maintenance jobs
+- **API Playground** (`/api-playground`): ESPN API testing interface
+
+The `AdminRoute` component (`client/src/lib/admin-route.tsx`) enforces these restrictions at the route level, displaying an "Access Denied" message for unauthorized users. The sidebar navigation (`client/src/components/sidebar.tsx`) dynamically hides restricted page links from users without proper permissions.
+
 ### Shareable League Credentials (New - October 2025)
 A collaborative feature allowing multiple users to access the same ESPN league without individually providing credentials:
 - **League Profiles**: Central storage for unique leagues (identified by ESPN league ID + season) with metadata automatically fetched from ESPN API
