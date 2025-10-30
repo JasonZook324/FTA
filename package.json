@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist"
+    "build": "npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
@@ -14,8 +14,8 @@
     "dev:server:debug:9230": "cross-env NODE_OPTIONS=--inspect=9230 nodemon"
   },
   "engines": {
-	"node": ">=18.0.0 <22"
-	},
+    "node": ">=18.0.0 <22"
+  },
   "dependencies": {
     "@google/genai": "^1.16.0",
     "@hookform/resolvers": "^3.10.0",
@@ -81,7 +81,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
     "vaul": "^1.1.2",
-	"vite": "^5.4.21",
+    "vite": "^5.4.21",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.24.2",
