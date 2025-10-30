@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
 
+const apiKey = process.env.OPENAI_API_KEY;
+console.log('OpenAI API Key loaded:', apiKey ? `${apiKey.substring(0, 20)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT FOUND');
+console.log('OpenAI API Key length:', apiKey?.length || 0);
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: apiKey,
 });
 
 export interface OpenAIPromptRequest {
