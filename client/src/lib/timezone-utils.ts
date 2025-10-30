@@ -45,16 +45,17 @@ export const STADIUM_TIMEZONES: Record<string, string> = {
 };
 
 /**
- * Formats a game time from UTC to local stadium time with day abbreviation
+ * Formats a game time from UTC to Eastern Time with day abbreviation
+ * All times are standardized to ET for consistency
  * Example outputs:
  * - "Sun 1:00 PM ET"
  * - "Mon 8:15 PM ET"
- * - "Thu 1:00 PM PT"
+ * - "Thu 8:20 PM ET"
  * 
  * @param gameTimeUtc - UTC timestamp of the game
- * @param teamAbbr - Team abbreviation to determine home stadium timezone
+ * @param teamAbbr - Team abbreviation (not used, kept for API compatibility)
  * @param gameDay - Day of the week (e.g., "Sun", "Mon", "Thu")
- * @returns Formatted string with day, time, and timezone abbreviation
+ * @returns Formatted string with day, time, and ET timezone
  */
 export function formatGameTime(
   gameTimeUtc: Date | string, 
@@ -63,10 +64,10 @@ export function formatGameTime(
 ): string {
   const gameDate = typeof gameTimeUtc === 'string' ? new Date(gameTimeUtc) : gameTimeUtc;
   
-  // Get stadium timezone for this team
-  const timezone = STADIUM_TIMEZONES[teamAbbr] || 'America/New_York';
+  // Always use Eastern Time for consistency
+  const timezone = 'America/New_York';
   
-  // Format time in local timezone
+  // Format time in Eastern Time
   const timeStr = gameDate.toLocaleTimeString('en-US', {
     timeZone: timezone,
     hour: 'numeric',
@@ -74,10 +75,7 @@ export function formatGameTime(
     hour12: true
   });
   
-  // Get timezone abbreviation (ET, PT, CT, MT, AZ)
-  const tzAbbr = getTimezoneAbbreviation(timezone, gameDate);
-  
-  return `${gameDay} ${timeStr} ${tzAbbr}`;
+  return `${gameDay} ${timeStr} ET`;
 }
 
 /**
