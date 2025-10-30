@@ -4801,6 +4801,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get NFL defensive rankings (OPRK) for a specific week
+  app.get("/api/nfl/defensive-rankings/:season/:week", requireAuth, async (req, res) => {
+    try {
+      const season = parseInt(req.params.season);
+      const week = parseInt(req.params.week);
+      
+      const rankingsMap = await storage.getDefensiveRankings(season, week);
+      
+      // Convert Map to object for JSON response
+      const rankings: Record<string, number> = {};
+      rankingsMap.forEach((rank, teamAbbr) => {
+        rankings[teamAbbr] = rank;
+      });
+      
+      res.json({ rankings });
+    } catch (error: any) {
+      console.error('Defensive rankings fetch error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to fetch defensive rankings',
+        rankings: {}
+      });
+    }
+  });
+
   // Kicker streaming recommendations
   app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
     try {
