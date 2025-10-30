@@ -1,11 +1,10 @@
 services:
   - type: web
     name: fta-app
-    env: node
-    buildCommand: ./build.sh
-    startCommand: npm start
-    autoDeploy: true
+    env: docker
     plan: free
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
