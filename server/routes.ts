@@ -2659,6 +2659,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         espnLeagueId
       );
 
+      // DEBUG: Log sample player data to investigate OPRK structure
+      if (playersData.players && playersData.players.length > 0) {
+        console.log('\n=== ESPN OPRK DEBUG ===');
+        console.log('Total players returned:', playersData.players.length);
+        
+        // Find a few different position players to see structure
+        const qb = playersData.players.find((p: any) => p.player?.defaultPositionId === 1);
+        const rb = playersData.players.find((p: any) => p.player?.defaultPositionId === 2);
+        const wr = playersData.players.find((p: any) => p.player?.defaultPositionId === 3);
+        
+        if (qb) {
+          console.log('\n--- Sample QB Data ---');
+          console.log('Name:', qb.player?.fullName);
+          console.log('Full player object keys:', Object.keys(qb.player || {}));
+          console.log('Stats keys:', Object.keys(qb.player?.stats || {}));
+          console.log('Player rankings:', JSON.stringify(qb.player?.playerRankings, null, 2));
+          console.log('Opponent rank (direct):', qb.player?.opponentRank);
+        }
+        
+        if (wr) {
+          console.log('\n--- Sample WR Data ---');
+          console.log('Name:', wr.player?.fullName);
+          console.log('Player rankings:', JSON.stringify(wr.player?.playerRankings, null, 2));
+          console.log('Opponent rank (direct):', wr.player?.opponentRank);
+        }
+        
+        console.log('\n=== END DEBUG ===\n');
+      }
+
       res.json(playersData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
