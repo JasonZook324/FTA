@@ -539,35 +539,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`ESPN API returned league: ${leagueData.settings?.name}, teams: ${leagueData.teams?.length}, members: ${leagueData.members?.length}`);
       
-      // Parse and store league information
-      const leagueInfo = {
-        userId,
-        espnLeagueId: espnLeagueId,
-        name: leagueData.settings?.name || `League ${espnLeagueId}`,
-        sport: 'ffl',
-        season: season,
-        teamCount: leagueData.teams?.length || 0,
-        currentWeek: leagueData.scoringPeriodId || 1,
-        playoffTeams: leagueData.settings?.playoffTeamCount || 6,
-        scoringType: leagueData.settings?.scoringType || "Head-to-Head Points",
-        tradeDeadline: leagueData.settings?.tradeDeadline || null,
-        settings: leagueData.settings || {}
-      };
-
-      // Upsert logic: check if league exists, update or create
-      const existingLeague = await storage.getLeagueByEspnId(userId, espnLeagueId, season);
+      // Update league profile with latest metadata
+      const updatedProfile = await storage.updateLeagueProfile(leagueProfile.id, {
+        name: leagueData.settings?.name || leagueProfile.name,
+        teamCount: leagueData.teams?.length || leagueProfile.teamCount,
+        currentWeek: leagueData.scoringPeriodId || leagueProfile.currentWeek,
+        playoffTeams: leagueData.settings?.playoffTeamCount || leagueProfile.playoffTeams,
+        scoringType: leagueData.settings?.scoringType || leagueProfile.scoringType,
+        tradeDeadline: leagueData.settings?.tradeDeadline || leagueProfile.tradeDeadline,
+        settings: leagueData.settings || leagueProfile.settings,
+        lastUpdated: new Date()
+      });
       
-      let league;
-      if (existingLeague) {
-        console.log(`Updating existing league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
-        league = await storage.updateLeague(existingLeague.id, leagueInfo);
-        if (!league) {
-          throw new Error("Failed to update existing league");
-        }
-      } else {
-        console.log(`Creating new league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
-        league = await storage.createLeague(leagueInfo);
-      }
+      console.log(`Updated league profile: ${updatedProfile?.name}`);
+      const league = updatedProfile;
 
       // Store teams using the FIXED logic with roster data for full team names
       if (leagueData.teams) {    
@@ -714,87 +699,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Continue with validation response even if update fails
       }
 
-      if (isValid && credentials.testLeagueId && credentials.testSeason) {
-        try {
-          console.log(`Auto-loading league: ${credentials.testLeagueId} for season ${credentials.testSeason}`);
-          
-          // Fetch league data from ESPN
-          const leagueData = await espnApiService.getLeagueData(
-            credentials,
-            'ffl', // Default to football
-            credentials.testSeason,
-            credentials.testLeagueId,
-            ['mTeam', 'mSettings']
-          );
-          
-          // Parse and store league information
-          const leagueInfo = {
-            userId,
-            espnLeagueId: credentials.testLeagueId,
-            name: leagueData.settings?.name || `League ${credentials.testLeagueId}`,
-            sport: 'ffl',
-            season: credentials.testSeason,
-            teamCount: leagueData.teams?.length || 0,
-            currentWeek: leagueData.scoringPeriodId || 1,
-            playoffTeams: leagueData.settings?.playoffTeamCount || 6,
-            scoringType: leagueData.settings?.scoringType || "Head-to-Head Points",
-            tradeDeadline: leagueData.settings?.tradeDeadline || null,
-            settings: leagueData.settings || {}
-          };
-
-          const league = await storage.createLeague(leagueInfo);
-          console.log(`Auto-loaded league: ${league.name}`);
-
-          // Store teams
-          if (leagueData.teams) {
-            for (const team of leagueData.teams) {
-              await storage.createTeam({
-                espnTeamId: team.id,
-                leagueId: league.id,
-                name: team.location + ' ' + team.nickname || `Team ${team.id}`,
-                owner: team.owners?.[0]?.displayName || team.owners?.[0]?.firstName + ' ' + team.owners?.[0]?.lastName,
-                abbreviation: team.abbrev,
-                logoUrl: team.logo,
-                wins: team.record?.overall?.wins || 0,
-                losses: team.record?.overall?.losses || 0,
-                ties: team.record?.overall?.ties || 0,
-                pointsFor: team.record?.overall?.pointsFor?.toString() || "0",
-                pointsAgainst: team.record?.overall?.pointsAgainst?.toString() || "0",
-                streak: `${team.record?.overall?.streakType || 'W'} ${team.record?.overall?.streakLength || 0}`,
-                rank: team.playoffSeed || team.rank || 0
-              });
-            }
-          }
-
-          res.json({ 
-            isValid, 
-            lastValidated: new Date(),
-            autoLoaded: true,
-            league: {
-              id: league.id,
-              name: league.name,
-              teamCount: leagueData.teams?.length || 0
-            }
-          });
-        } catch (autoLoadError: any) {
-          console.error('Auto-load league error:', autoLoadError);
-          // Still return success for validation, but indicate auto-load failed
-          res.json({ 
-            isValid, 
-            lastValidated: new Date(),
-            autoLoaded: false,
-            autoLoadError: autoLoadError.message
-          });
-        }
-      } else {
-        res.json({ isValid, lastValidated: new Date(), autoLoaded: false });
-      }
+      // Auto-load functionality removed - use league profiles instead
+      res.json({ isValid, lastValidated: new Date() });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Disconnect/logout route - clears ESPN credentials and all associated data
+  // Disconnect/logout route - clears personal ESPN credentials only
+  // Note: League profiles and memberships are preserved since they may be shared with other users
   app.delete("/api/espn-credentials", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -805,46 +718,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No ESPN credentials found to disconnect" });
       }
 
-      // Get all user's leagues to clean up associated data
-      const userLeagues = await storage.getLeagues(userId);
-      
-      // Delete all teams, matchups, and players for each league
-      for (const league of userLeagues) {
-        const teams = await storage.getTeams(league.id);
-        const matchups = await storage.getMatchups(league.id);
-        const allPlayers = await storage.getPlayers();
-        
-        // Delete teams, matchups, and players
-        for (const team of teams) {
-          await storage.deleteTeam(team.id);
-        }
-        for (const matchup of matchups) {
-          await storage.deleteMatchup(matchup.id);
-        }
-        
-        // Delete all players (global cleanup)
-        for (const player of allPlayers) {
-          await storage.deletePlayer(player.id);
-        }
-        
-        // Delete the league itself
-        await storage.deleteLeague(league.id);
-      }
-
       // Reset user's selected league
       await storage.updateUser(userId, { selectedLeagueId: null });
 
-      // Delete ESPN credentials
+      // Delete personal ESPN credentials
       await storage.deleteEspnCredentials(userId);
 
-      console.log(`Successfully disconnected user ${userId} and cleared all associated data`);
+      console.log(`Successfully disconnected user ${userId} from ESPN`);
       res.json({ 
-        message: "Successfully disconnected from ESPN account and cleared all data",
-        clearedItems: {
-          credentials: 1,
-          leagues: userLeagues.length,
-          totalItemsCleared: "All user data successfully removed"
-        }
+        message: "Successfully disconnected from ESPN account. Your league memberships have been preserved."
       });
     } catch (error: any) {
       console.error('Error during disconnect:', error);
@@ -1028,37 +910,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/leagues/:id/leave", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const leagueId = req.params.id;
+      const leagueProfileId = req.params.id;
       
-      // Get the league
-      const league = await storage.getLeague(leagueId);
+      // Verify the league profile exists
+      const leagueProfile = await storage.getLeagueProfile(leagueProfileId);
       
-      if (!league) {
+      if (!leagueProfile) {
         return res.status(404).json({ message: "League not found" });
       }
       
-      // Verify this is the user's league
-      if (league.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to delete this league" });
+      // Verify user is a member
+      const membership = await storage.getUserLeague(userId, leagueProfileId);
+      if (!membership) {
+        return res.status(403).json({ message: "You are not a member of this league" });
       }
       
-      // Delete the league
-      await storage.deleteLeague(leagueId);
+      // Remove user's membership
+      await storage.deleteUserLeague(userId, leagueProfileId);
       
       res.json({ 
-        message: "Successfully disconnected from league"
+        message: "Successfully left league"
       });
     } catch (error: any) {
-      console.error('Error disconnecting from league:', error);
+      console.error('Error leaving league:', error);
       res.status(500).json({ message: error.message });
     }
   });
 
-  // League routes
+  // League routes - Return user's league profiles
   app.get("/api/leagues", requireAuth, async (req: any, res) => {
     try {
-      const leagues = await storage.getLeagues(req.user.id);
-      res.json(leagues);
+      // Get user's league memberships
+      const userLeagues = await storage.getUserLeagues(req.user.id);
+      
+      // Get full league profile data for each membership
+      const leagues = await Promise.all(
+        userLeagues.map(async (ul) => {
+          const profile = await storage.getLeagueProfile(ul.leagueProfileId);
+          return profile;
+        })
+      );
+      
+      // Filter out any null results
+      const validLeagues = leagues.filter(l => l !== undefined);
+      
+      res.json(validLeagues);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1072,7 +968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ selectedLeague: null });
       }
 
-      const selectedLeague = await storage.getLeague(user.selectedLeagueId);
+      const selectedLeague = await storage.getLeagueProfile(user.selectedLeagueId);
       res.json({ selectedLeague });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1186,34 +1082,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw apiError;
       }
 
-      // Parse and store league information
-      const leagueInfo = {
-        userId,
-        espnLeagueId,
-        name: leagueData.settings?.name || `League ${espnLeagueId}`,
-        sport,
-        season: parseInt(season),
-        teamCount: leagueData.teams?.length || 0,
-        currentWeek: leagueData.scoringPeriodId || 1,
-        playoffTeams: leagueData.settings?.playoffTeamCount || 6,
-        scoringType: leagueData.settings?.scoringType || "Head-to-Head Points",
-        tradeDeadline: leagueData.settings?.tradeDeadline || null,
-        settings: leagueData.settings || {}
-      };
-
-      // Upsert logic: check if league exists, update or create
-      const existingLeague = await storage.getLeagueByEspnId(userId, espnLeagueId, parseInt(season));
-      
+      // Update or use existing league profile
       let league;
-      if (existingLeague) {
-        console.log(`Updating existing league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
-        league = await storage.updateLeague(existingLeague.id, leagueInfo);
-        if (!league) {
-          throw new Error("Failed to update existing league");
-        }
+      if (leagueProfile) {
+        // Update existing league profile
+        console.log(`Updating existing league profile: ${leagueProfile.name}`);
+        league = await storage.updateLeagueProfile(leagueProfile.id, {
+          name: leagueData.settings?.name || leagueProfile.name,
+          teamCount: leagueData.teams?.length || leagueProfile.teamCount,
+          currentWeek: leagueData.scoringPeriodId || leagueProfile.currentWeek,
+          playoffTeams: leagueData.settings?.playoffTeamCount || leagueProfile.playoffTeams,
+          scoringType: leagueData.settings?.scoringType || leagueProfile.scoringType,
+          tradeDeadline: leagueData.settings?.tradeDeadline || leagueProfile.tradeDeadline,
+          settings: leagueData.settings || leagueProfile.settings,
+          lastUpdated: new Date()
+        });
       } else {
-        console.log(`Creating new league: ESPN ID=${espnLeagueId}, Name="${leagueInfo.name}"`);
-        league = await storage.createLeague(leagueInfo);
+        // League profile doesn't exist - user should use the "Connect New League" flow instead
+        return res.status(400).json({ 
+          message: "League profile not found. Please use the 'Connect New League' feature to add this league first." 
+        });
       }
 
       // Store teams
@@ -1301,7 +1189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Standings route
   app.get("/api/leagues/:leagueId/standings", requireAuth, async (req: any, res) => {
     try {
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -1438,7 +1326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leagues/:leagueId/matchups", requireAuth, requireRole(2, 9), async (req: any, res) => {
     try {
       const { week } = req.query;
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -1465,7 +1353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Recommendations route
   app.post("/api/leagues/:leagueId/ai-recommendations", requireAuth, async (req: any, res) => {
     try {
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -1746,7 +1634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Question is required" });
       }
 
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2001,7 +1889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return slots[slotId] || `Slot_${slotId}`;
       };
 
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2201,7 +2089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Team ID is required" });
       }
 
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2496,7 +2384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Selected player is required" });
       }
 
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2607,7 +2495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Team ID is required" });
       }
 
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2712,7 +2600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rosters route
   app.get("/api/leagues/:leagueId/rosters", requireAuth, async (req: any, res) => {
     try {
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2748,7 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let espnLeagueId = undefined;
       
       if (leagueId) {
-        const league = await storage.getLeague(leagueId as string);
+        const league = await storage.getLeagueProfile(leagueId as string);
         if (league) {
           espnLeagueId = league.espnLeagueId.toString();
           // Use league profile credentials
@@ -2790,7 +2678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Waiver wire route - get available players not on any roster
   app.get("/api/leagues/:leagueId/waiver-wire", requireAuth, async (req: any, res) => {
     try {
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -2918,7 +2806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export waiver wire as CSV
   app.get("/api/leagues/:leagueId/waiver-wire/export", requireAuth, async (req: any, res) => {
     try {
-      const league = await storage.getLeague(req.params.leagueId);
+      const league = await storage.getLeagueProfile(req.params.leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -3136,7 +3024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/leagues/:id/roster-export', requireAuth, async (req: any, res) => {
     try {
       const leagueId = req.params.id;
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       
       if (!league) {
         return res.status(404).json({ message: 'League not found' });
@@ -3367,7 +3255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
       
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       
       if (!league) {
         return res.status(404).json({ message: 'League not found' });
@@ -3566,7 +3454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.id;
       const teamId = parseInt(req.params.teamId);
       
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -3647,7 +3535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeMatchupAnalysis: options.includeMatchupAnalysis
       });
       
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
@@ -3856,7 +3744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get league data from storage (works for both personal leagues and league profiles)
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       
       if (!league) {
         return res.status(404).json({ message: "League not found" });
@@ -4532,7 +4420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify user has access to this league
-      const league = await storage.getLeague(leagueId);
+      const league = await storage.getLeagueProfile(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
