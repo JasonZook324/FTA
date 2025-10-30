@@ -58,7 +58,7 @@ export default function Players() {
   });
 
   // Query waiver wire data
-  const { data: waiverWireData, isLoading: waiverWireLoading } = useQuery({
+  const { data: waiverWireData, isLoading: waiverWireLoading } = useQuery<{ players?: any[]; currentScoringPeriodId?: number }>({
     queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"],
     enabled: !!selectedLeagueId && viewMode === "waiver",
   });
@@ -429,6 +429,27 @@ export default function Players() {
     return getOpponentHelper(nflMatchups, teamAbbr) || "--";
   };
 
+  // Determine if a player's NFL team is on a BYE this week
+  const isByeWeekForPlayer = (playerData: any): boolean => {
+    const proTeamId = getProTeamId(playerData);
+    const teamAbbr = proTeamId ? getTeamAbbr(proTeamId) : null;
+    if (!teamAbbr) return false; // Don't mark FA/unknown teams as BYE
+
+    // Primary: if we have matchup data loaded and there's no entry for this team, it's a BYE
+    if (Array.isArray(nflMatchups) && nflMatchups.length > 0) {
+      const hasMatchup = nflMatchups.some((m: any) => m.teamAbbr === teamAbbr);
+      if (!hasMatchup) return true;
+    }
+
+    // Fallback heuristic (per requirement): no OPP, no STATUS, and PROJ = 0.0 => BYE
+    const opp = getOpponent(playerData);
+    const time = getGameTime(playerData);
+    const proj = getProjectedPoints(playerData);
+    const noOpp = !opp || opp === "--";
+    const noTime = !time || time === "--";
+    return noOpp && noTime && proj === "0.0";
+  };
+
   // Helper function to get game status/time
   const getGameStatus = (playerData: any) => {
     const player = playerData.player || playerData;
@@ -679,8 +700,6 @@ export default function Players() {
                       <TableHead className="font-semibold text-center">SCORE</TableHead>
                       <TableHead className="font-semibold text-center">OPRK</TableHead>
                       <TableHead className="font-semibold text-center">%ROST</TableHead>
-                      <TableHead className="font-semibold text-center">+/-</TableHead>
-                      <TableHead className="font-semibold text-center">FPTS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -719,17 +738,17 @@ export default function Players() {
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="text-xs font-medium text-blue-600">
-                            {getOpponent(player)}
+                            {isByeWeekForPlayer(player) ? 'BYE' : getOpponent(player)}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="text-xs">
-                            {getGameTime(player)}
+                            {isByeWeekForPlayer(player) ? 'BYE' : getGameTime(player)}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="text-xs font-medium">
-                            {getProjectedPoints(player)}
+                            {isByeWeekForPlayer(player) ? 'BYE' : getProjectedPoints(player)}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
@@ -747,16 +766,7 @@ export default function Players() {
                             {getOwnershipPercent(player)}%
                           </span>
                         </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-xs text-muted-foreground">
-                            --
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-xs font-medium">
-                            {getSeasonPoints(player)}
-                          </span>
-                        </TableCell>
+                        
                       </TableRow>
                     ))}
                   </TableBody>
