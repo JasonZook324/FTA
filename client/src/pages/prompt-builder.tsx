@@ -42,7 +42,7 @@ export default function PromptBuilder() {
     responseTime: number;
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("gpt-4o");
+  const [selectedModel, setSelectedModel] = useState("gpt-4-turbo");
 
   // Data inclusion options
   const [includeMyTeam, setIncludeMyTeam] = useState(true);
@@ -589,9 +589,9 @@ export default function PromptBuilder() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gpt-4o" data-testid="option-gpt-4o">GPT-4.1</SelectItem>
-                            <SelectItem value="gpt-4o-mini" data-testid="option-gpt-4o-mini">GPT-5</SelectItem>
-                            <SelectItem value="o3-mini" data-testid="option-o3-mini">O3</SelectItem>
+                            <SelectItem value="gpt-4" data-testid="option-gpt-4">GPT-4</SelectItem>
+                            <SelectItem value="gpt-4-turbo" data-testid="option-gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo" data-testid="option-gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

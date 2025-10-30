@@ -101,10 +101,10 @@ A comprehensive tool for generating detailed prompts to paste into AI assistants
 ### OpenAI Integration (New - October 2025)
 Direct integration with OpenAI's API allowing users to submit fantasy football prompts and receive AI analysis in real-time:
 - **In-App AI Analysis**: After generating a custom prompt, users can submit it directly to OpenAI without copying/pasting to external tools
-- **Model Selection**: Choose from three AI models:
-  - GPT-4.1 (gpt-4o): Most capable, best for complex analysis
-  - GPT-5 (gpt-4o-mini): Faster, more cost-effective
-  - O3 (o3-mini): Optimized for reasoning tasks
+- **Model Selection**: Choose from three AI models (default: GPT-4 Turbo):
+  - GPT-4 (gpt-4): Most capable, legacy model
+  - GPT-4 Turbo (gpt-4-turbo): Faster, more capable, default choice
+  - GPT-3.5 Turbo (gpt-3.5-turbo): Fastest, most cost-effective
 - **Request Tracking**: All AI interactions logged to `ai_prompt_responses` database table with full audit trail:
   - User ID, League ID, Team ID context
   - Complete prompt and response text
@@ -113,7 +113,7 @@ Direct integration with OpenAI's API allowing users to submit fantasy football p
 - **Error Handling**: Graceful handling of API errors, rate limits, and missing API keys with user-friendly error messages
 - **User Experience**: Loading states, formatted responses, token usage metrics, and response time display
 - **Database Schema**: New `ai_prompt_responses` table tracks all submissions for cost tracking and debugging
-- **Environment Variables**: Requires `OPENAI_API_KEY` to be set by user
+- **Security**: `OPENAI_API_KEY` must be stored in Replit Secrets (not .env file) for proper security
 - **API Endpoint**: POST `/api/leagues/:leagueId/submit-ai-prompt` with authentication and league access validation
 
 ## External Dependencies
