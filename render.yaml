@@ -1,18 +1,12 @@
 services:
   - type: web
     name: fta-app
-    env: node
-    buildCommand: npm run build
-    startCommand: npm start
-    autoDeploy: true
+    env: docker
     plan: free
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
       - key: SESSION_SECRET
         generateValue: true
-      # Add your secrets in the Render dashboard or here if committing:
-      # - key: GEMINI_API_KEY
-      # - key: FantasyProsApiKey
-      # - key: DATABASE_URL
-      #   value: "YOUR_NEON_CONNECTION_STRING"
