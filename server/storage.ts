@@ -1,14 +1,13 @@
 import { 
   type User, type InsertUser,
   type EspnCredentials, type InsertEspnCredentials,
-  type League, type InsertLeague,
   type Team, type InsertTeam,
   type Matchup, type InsertMatchup,
   type Player, type InsertPlayer,
   type LeagueProfile, type InsertLeagueProfile,
   type LeagueCredentials, type InsertLeagueCredentials,
   type UserLeague, type InsertUserLeague,
-  users, espnCredentials, leagues, teams, matchups, players,
+  users, espnCredentials, teams, matchups, players,
   leagueProfiles, leagueCredentials, userLeagues
 } from "@shared/schema";
 import { db } from "./db";
@@ -36,14 +35,6 @@ export interface IStorage {
   createEspnCredentials(credentials: InsertEspnCredentials): Promise<EspnCredentials>;
   updateEspnCredentials(userId: string, credentials: Partial<EspnCredentials>): Promise<EspnCredentials | undefined>;
   deleteEspnCredentials(userId: string): Promise<boolean>;
-
-  // League methods
-  getLeagues(userId: string): Promise<League[]>;
-  getLeague(id: string): Promise<League | undefined>;
-  getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined>;
-  createLeague(league: InsertLeague): Promise<League>;
-  updateLeague(id: string, league: Partial<League>): Promise<League | undefined>;
-  deleteLeague(id: string): Promise<boolean>;
 
   // Team methods
   getTeams(leagueId: string): Promise<Team[]>;
@@ -91,10 +82,12 @@ export class MemStorage implements IStorage {
   sessionStore: Store;
   private users: Map<string, User>;
   private espnCredentials: Map<string, EspnCredentials>;
-  private leagues: Map<string, League>;
   private teams: Map<string, Team>;
   private matchups: Map<string, Matchup>;
   private players: Map<string, Player>;
+  private leagueProfiles: Map<string, LeagueProfile>;
+  private leagueCredentials: Map<string, LeagueCredentials>;
+  private userLeagues: Map<string, UserLeague>;
 
   constructor() {
     this.sessionStore = new MemoryStore({
@@ -102,10 +95,12 @@ export class MemStorage implements IStorage {
     });
     this.users = new Map();
     this.espnCredentials = new Map();
-    this.leagues = new Map();
     this.teams = new Map();
     this.matchups = new Map();
     this.players = new Map();
+    this.leagueProfiles = new Map();
+    this.leagueCredentials = new Map();
+    this.userLeagues = new Map();
   }
 
   // User methods
@@ -122,7 +117,8 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const user: User = { 
-      ...insertUser, 
+      ...insertUser,
+      role: insertUser.role ?? 0,
       id, 
       selectedLeagueId: null,
       selectedTeamId: null,
@@ -178,57 +174,6 @@ export class MemStorage implements IStorage {
     
     this.espnCredentials.delete(existing.id);
     return true;
-  }
-
-  // League methods
-  async getLeagues(userId: string): Promise<League[]> {
-    return Array.from(this.leagues.values()).filter(
-      (league) => league.userId === userId,
-    );
-  }
-
-  async getLeague(id: string): Promise<League | undefined> {
-    return this.leagues.get(id);
-  }
-
-  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
-    return Array.from(this.leagues.values()).find(
-      (league) => league.userId === userId && league.espnLeagueId === espnLeagueId && league.season === season,
-    );
-  }
-
-  async createLeague(league: InsertLeague): Promise<League> {
-    const id = randomUUID();
-    const newLeague: League = { 
-      ...league, 
-      id,
-      lastUpdated: new Date(),
-      teamCount: league.teamCount ?? null,
-      currentWeek: league.currentWeek ?? null,
-      playoffTeams: league.playoffTeams ?? null,
-      scoringType: league.scoringType ?? null,
-      tradeDeadline: league.tradeDeadline ?? null,
-      settings: league.settings ?? null
-    };
-    this.leagues.set(id, newLeague);
-    return newLeague;
-  }
-
-  async updateLeague(id: string, updates: Partial<League>): Promise<League | undefined> {
-    const existing = this.leagues.get(id);
-    if (!existing) return undefined;
-    
-    const updated: League = { 
-      ...existing, 
-      ...updates,
-      lastUpdated: new Date()
-    };
-    this.leagues.set(id, updated);
-    return updated;
-  }
-
-  async deleteLeague(id: string): Promise<boolean> {
-    return this.leagues.delete(id);
   }
 
   // Team methods
@@ -484,63 +429,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(espnCredentials)
       .where(eq(espnCredentials.userId, userId));
-    return result.rowCount ? result.rowCount > 0 : false;
-  }
-
-  // League methods
-  async getLeagues(userId: string): Promise<League[]> {
-    return await db
-      .select()
-      .from(leagues)
-      .where(eq(leagues.userId, userId));
-  }
-
-  async getLeague(id: string): Promise<League | undefined> {
-    const [league] = await db.select().from(leagues).where(eq(leagues.id, id));
-    return league || undefined;
-  }
-
-  async getLeagueByEspnId(userId: string, espnLeagueId: string, season: number): Promise<League | undefined> {
-    const [league] = await db
-      .select()
-      .from(leagues)
-      .where(
-        and(
-          eq(leagues.userId, userId),
-          eq(leagues.espnLeagueId, espnLeagueId),
-          eq(leagues.season, season)
-        )
-      );
-    return league || undefined;
-  }
-
-  async createLeague(league: InsertLeague): Promise<League> {
-    const [newLeague] = await db
-      .insert(leagues)
-      .values({
-        ...league,
-        lastUpdated: new Date()
-      })
-      .returning();
-    return newLeague;
-  }
-
-  async updateLeague(id: string, updates: Partial<League>): Promise<League | undefined> {
-    const [updated] = await db
-      .update(leagues)
-      .set({
-        ...updates,
-        lastUpdated: new Date()
-      })
-      .where(eq(leagues.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deleteLeague(id: string): Promise<boolean> {
-    const result = await db
-      .delete(leagues)
-      .where(eq(leagues.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
