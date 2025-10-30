@@ -10,6 +10,8 @@ import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { useNFLMatchups, getOpponent as getOpponentHelper, getGameTime as getGameTimeHelper } from "@/hooks/use-nfl-matchups";
+import { formatGameTime } from "@/lib/timezone-utils";
 
 export default function Players() {
   const { user } = useAuth();
@@ -25,6 +27,13 @@ export default function Players() {
     queryKey: ["/api/leagues"],
     enabled: !!user,
   });
+
+  // Get current week from the first league
+  const currentWeek = leagues?.[0]?.currentWeek || 1;
+  
+  // Query NFL matchups for current week
+  const { data: matchupsData } = useNFLMatchups(parseInt(selectedSeason), currentWeek);
+  const nflMatchups = matchupsData?.matchups || [];
 
   // Auto-select the first league when leagues load
   useEffect(() => {
@@ -138,8 +147,22 @@ export default function Players() {
   // Helper function to get game time/status
   const getGameTime = (playerData: any) => {
     const player = playerData.player || playerData;
-    // For now, return a placeholder time
-    return "Sun 1:00 PM";
+    const proTeamId = getProTeamId(player);
+    
+    if (!proTeamId || nflMatchups.length === 0) {
+      return "--";
+    }
+    
+    // Get team abbreviation from proTeamId
+    const teamAbbr = getTeamAbbr(proTeamId);
+    if (!teamAbbr) return "--";
+    
+    // Get game time data from matchups
+    const gameTimeData = getGameTimeHelper(nflMatchups, teamAbbr);
+    if (!gameTimeData) return "--";
+    
+    // Format the time using timezone utils
+    return formatGameTime(gameTimeData.gameTimeUtc, teamAbbr, gameTimeData.gameDay);
   };
 
   // Helper function to get position rank based on opponent defense from live ESPN data
@@ -336,6 +359,12 @@ export default function Players() {
     return teamNames[teamId] || `Team ${teamId}`;
   };
 
+  // Helper function to get team abbreviation (alias for getTeamName)
+  const getTeamAbbr = (teamId: number): string | null => {
+    const abbr = getTeamName(teamId);
+    return abbr.startsWith('Team') ? null : abbr;
+  };
+
   // Helper function to get projected fantasy points
   const getProjectedPoints = (playerData: any) => {
     const player = playerData.player || playerData;
@@ -386,10 +415,18 @@ export default function Players() {
   // Helper function to get opponent team
   const getOpponent = (playerData: any) => {
     const player = playerData.player || playerData;
+    const proTeamId = getProTeamId(player);
     
-    // ESPN Fantasy API doesn't provide opponent data in player endpoints
-    // This would require NFL schedule data from a different source
-    return "N/A";
+    if (!proTeamId || nflMatchups.length === 0) {
+      return "--";
+    }
+    
+    // Get team abbreviation from proTeamId
+    const teamAbbr = getTeamAbbr(proTeamId);
+    if (!teamAbbr) return "--";
+    
+    // Get opponent from matchups (returns "vs OPP" or "@ OPP")
+    return getOpponentHelper(nflMatchups, teamAbbr) || "--";
   };
 
   // Helper function to get game status/time
