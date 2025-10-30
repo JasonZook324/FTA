@@ -14,7 +14,7 @@
     "dev:server:debug:9230": "cross-env NODE_OPTIONS=--inspect=9230 nodemon"
   },
   "engines": {
-    "node": ">=18.0.0 <22"
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",
