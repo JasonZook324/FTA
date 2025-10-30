@@ -35,6 +35,23 @@ An in-memory storage option exists for development but is not used in production
 ### Authentication and Authorization
 A dual-layer authentication system is in place. User authentication uses `passport-local` with `bcrypt` for secure account management, and sessions are stored in PostgreSQL. All API routes are protected, ensuring data isolation per user. ESPN API authentication uses user-managed S2 session tokens and SWID stored in the database, allowing personalized access to ESPN's Fantasy API.
 
+**Role-Based Access Control (Updated - October 2025)**
+The application implements role-based access control with four user role levels:
+- **Role 0 (Standard User)**: Default role, access to basic features
+- **Role 1 (Paid User)**: Reserved for future paid features
+- **Role 2 (Developer)**: Full access to all features including advanced/experimental pages
+- **Role 9 (Administrator)**: Full administrative access to all features
+
+Restricted pages accessible only to Developers (role 2) and Administrators (role 9):
+- **AI Recommendations** (`/ai-recommendations`): AI-powered fantasy football recommendations
+- **Trade Analyzer** (`/trade-analyzer`): Advanced trade analysis tools
+- **Streaming** (`/streaming`): Kicker streaming analysis with Vegas odds integration
+- **Matchups** (`/matchups`): Detailed matchup analysis
+- **Jobs** (`/jobs`): Data refresh and maintenance jobs
+- **API Playground** (`/api-playground`): ESPN API testing interface
+
+The `AdminRoute` component (`client/src/lib/admin-route.tsx`) enforces these restrictions at the route level, displaying an "Access Denied" message for unauthorized users. The sidebar navigation (`client/src/components/sidebar.tsx`) dynamically hides restricted page links from users without proper permissions.
+
 ### Shareable League Credentials (New - October 2025)
 A collaborative feature allowing multiple users to access the same ESPN league without individually providing credentials:
 - **League Profiles**: Central storage for unique leagues (identified by ESPN league ID + season) with metadata automatically fetched from ESPN API
@@ -96,6 +113,25 @@ A comprehensive tool for generating detailed prompts to paste into AI assistants
   - **Rankings & Projections**: Optional FantasyPros data when requested via checkboxes
 - **Team Name Fallback Logic**: Comprehensive fallback (location+nickname → location → nickname → name → owner's team → Team ID) ensures readable team names throughout
 - **Copy to Clipboard**: One-click copy functionality for generated prompts
+- **Direct OpenAI Integration** (New - October 2025): Submit prompts directly to OpenAI for instant AI analysis without leaving the app
+
+### OpenAI Integration (New - October 2025)
+Direct integration with OpenAI's API allowing users to submit fantasy football prompts and receive AI analysis in real-time:
+- **In-App AI Analysis**: After generating a custom prompt, users can submit it directly to OpenAI without copying/pasting to external tools
+- **Model Selection**: Choose from three AI models (default: GPT-4 Turbo):
+  - GPT-4 (gpt-4): Most capable, legacy model
+  - GPT-4 Turbo (gpt-4-turbo): Faster, more capable, default choice
+  - GPT-3.5 Turbo (gpt-3.5-turbo): Fastest, most cost-effective
+- **Request Tracking**: All AI interactions logged to `ai_prompt_responses` database table with full audit trail:
+  - User ID, League ID, Team ID context
+  - Complete prompt and response text
+  - Model used, tokens consumed, response time
+  - Status (success/error) and error messages
+- **Error Handling**: Graceful handling of API errors, rate limits, and missing API keys with user-friendly error messages
+- **User Experience**: Loading states, formatted responses, token usage metrics, and response time display
+- **Database Schema**: New `ai_prompt_responses` table tracks all submissions for cost tracking and debugging
+- **Security**: `OPENAI_API_KEY` must be stored in Replit Secrets (not .env file) for proper security
+- **API Endpoint**: POST `/api/leagues/:leagueId/submit-ai-prompt` with authentication and league access validation
 
 ## External Dependencies
 
@@ -115,3 +151,4 @@ A comprehensive tool for generating detailed prompts to paste into AI assistants
     -   ESPN Fantasy Sports API v3
     -   Fantasy Pros API (player data, rankings, projections)
     -   The Odds API (NFL betting lines)
+    -   OpenAI API (AI-powered fantasy analysis)

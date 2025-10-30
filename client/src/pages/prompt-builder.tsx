@@ -17,7 +17,9 @@ import {
   Loader2,
   Settings,
   Crown,
-  Globe
+  Globe,
+  Brain,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
@@ -29,6 +31,18 @@ export default function PromptBuilder() {
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+
+  // AI submission state
+  const [isSubmittingToAI, setIsSubmittingToAI] = useState(false);
+  const [aiResponse, setAiResponse] = useState<{
+    responseId: string;
+    responseText: string;
+    tokensUsed: number;
+    model: string;
+    responseTime: number;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState("gpt-4-turbo");
 
   // Data inclusion options
   const [includeMyTeam, setIncludeMyTeam] = useState(true);
@@ -140,6 +154,64 @@ export default function PromptBuilder() {
     }
   };
 
+  const handleSubmitToAI = async () => {
+    if (!selectedTeam) {
+      toast({
+        title: "Selection Required",
+        description: "Please select a team from the header first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!generatedPrompt || generatedPrompt.trim().length === 0) {
+      toast({
+        title: "No Prompt",
+        description: "Generate a prompt first before submitting to AI.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmittingToAI(true);
+    setAiError(null);
+    setAiResponse(null);
+
+    try {
+      const response = await fetch(`/api/leagues/${selectedTeam.leagueId}/submit-ai-prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId: selectedTeam.teamId,
+          promptText: generatedPrompt,
+          model: selectedModel,
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to get AI response');
+      }
+      
+      const result = await response.json();
+      setAiResponse(result);
+      
+      toast({
+        title: "AI Analysis Complete",
+        description: `Received response from ${result.model} (${result.tokensUsed} tokens)`,
+      });
+    } catch (error: any) {
+      setAiError(error.message);
+      toast({
+        title: "AI Submission Failed",
+        description: error.message || "Failed to get AI response",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingToAI(false);
+    }
+  };
+
   const positions = ["QB", "RB", "WR", "TE", "K", "DEF"];
   const nflTeams = [
     "ATL", "BUF", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB", "TEN", 
@@ -178,6 +250,7 @@ export default function PromptBuilder() {
                 </CardHeader>
                 <CardContent>
                   <Textarea
+                    data-testid="input-prompt"
                     placeholder="Enter your custom prompt or question here. The fantasy data you select below will be automatically included..."
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
@@ -199,6 +272,7 @@ export default function PromptBuilder() {
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="include-my-team" 
+                      data-testid="checkbox-my-team"
                       checked={includeMyTeam}
                       onCheckedChange={(checked) => setIncludeMyTeam(checked as boolean)}
                     />
@@ -463,6 +537,7 @@ export default function PromptBuilder() {
                 disabled={isGenerating || !customPrompt.trim()}
                 className="w-full"
                 size="lg"
+                data-testid="button-generate-prompt"
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -504,6 +579,87 @@ export default function PromptBuilder() {
                         {generatedPrompt}
                       </pre>
                     </div>
+
+                    {/* AI Model Selection and Submit Button */}
+                    <div className="mt-4 space-y-4">
+                      <div className="flex items-center gap-4">
+                        <label htmlFor="ai-model" className="text-sm font-medium">AI Model:</label>
+                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                          <SelectTrigger className="w-[200px]" id="ai-model" data-testid="select-ai-model">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gpt-4" data-testid="option-gpt-4">GPT-4</SelectItem>
+                            <SelectItem value="gpt-4-turbo" data-testid="option-gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo" data-testid="option-gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Button
+                        onClick={handleSubmitToAI}
+                        disabled={isSubmittingToAI || !generatedPrompt}
+                        className="w-full"
+                        data-testid="button-submit-ai"
+                      >
+                        {isSubmittingToAI ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing with AI...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="mr-2 h-4 w-4" />
+                            Get AI Analysis
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* AI Response Display */}
+              {aiResponse && (
+                <Card data-testid="card-ai-response">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      AI Analysis
+                      <Badge variant="outline" className="ml-auto">
+                        {aiResponse.model}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <div 
+                        className="whitespace-pre-wrap bg-muted p-4 rounded-lg"
+                        data-testid="text-ai-response"
+                      >
+                        {aiResponse.responseText}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                      <span>Tokens: {aiResponse.tokensUsed}</span>
+                      <span>•</span>
+                      <span>Response Time: {(aiResponse.responseTime / 1000).toFixed(2)}s</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Error Display */}
+              {aiError && (
+                <Card className="border-destructive" data-testid="card-ai-error">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-2 text-destructive">
+                      <AlertCircle className="h-5 w-5 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">AI Submission Failed</p>
+                        <p className="text-sm">{aiError}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -528,7 +684,7 @@ export default function PromptBuilder() {
                   </div>
                   <div className="flex items-start gap-3">
                     <Badge variant="outline" className="mt-0.5">4</Badge>
-                    <p>Copy the generated prompt and paste it into your AI portal (ChatGPT, Claude, etc.)</p>
+                    <p>Click "Get AI Analysis" to submit to OpenAI directly, or copy and paste into your AI portal</p>
                   </div>
                 </CardContent>
               </Card>
