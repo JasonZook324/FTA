@@ -376,6 +376,24 @@ export const nflTeamStats = pgTable("nfl_team_stats", {
   uniqueTeamSeasonWeek: uniqueIndex("nfl_team_stats_unique").on(table.season, table.week, table.teamAbbreviation),
 }));
 
+export const nflMatchups = pgTable("nfl_matchups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  season: integer("season").notNull(),
+  week: integer("week").notNull(),
+  teamAbbr: text("team_abbr").notNull(),
+  opponentAbbr: text("opponent_abbr").notNull(),
+  gameTimeUtc: timestamp("game_time_utc").notNull(),
+  isHome: boolean("is_home").notNull(),
+  gameDay: text("game_day"),
+  venue: text("venue"),
+  bookmakerSource: text("bookmaker_source"),
+  oddsSnapshotTs: timestamp("odds_snapshot_ts").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueTeamWeek: uniqueIndex("nfl_matchups_team_week").on(table.season, table.week, table.teamAbbr),
+}));
+
 export const insertNflStadiumSchema = createInsertSchema(nflStadiums).omit({
   id: true,
   createdAt: true,
@@ -392,6 +410,13 @@ export const insertNflTeamStatsSchema = createInsertSchema(nflTeamStats).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertNflMatchupSchema = createInsertSchema(nflMatchups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  oddsSnapshotTs: true,
 });
 
 // AI Prompt Responses - Store OpenAI conversation history
@@ -433,5 +458,7 @@ export type NflVegasOdds = typeof nflVegasOdds.$inferSelect;
 export type InsertNflVegasOdds = z.infer<typeof insertNflVegasOddsSchema>;
 export type NflTeamStats = typeof nflTeamStats.$inferSelect;
 export type InsertNflTeamStats = z.infer<typeof insertNflTeamStatsSchema>;
+export type NflMatchup = typeof nflMatchups.$inferSelect;
+export type InsertNflMatchup = z.infer<typeof insertNflMatchupSchema>;
 export type AiPromptResponse = typeof aiPromptResponses.$inferSelect;
 export type InsertAiPromptResponse = z.infer<typeof insertAiPromptResponseSchema>;

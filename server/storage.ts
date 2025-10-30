@@ -7,8 +7,10 @@ import {
   type LeagueProfile, type InsertLeagueProfile,
   type LeagueCredentials, type InsertLeagueCredentials,
   type UserLeague, type InsertUserLeague,
+  type NflMatchup, type InsertNflMatchup,
   users, espnCredentials, teams, matchups, players,
-  leagueProfiles, leagueCredentials, userLeagues
+  leagueProfiles, leagueCredentials, userLeagues,
+  nflMatchups, nflVegasOdds
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -73,6 +75,11 @@ export interface IStorage {
   getUserLeague(userId: string, leagueProfileId: string): Promise<UserLeague | undefined>;
   createUserLeague(userLeague: InsertUserLeague): Promise<UserLeague>;
   deleteUserLeague(userId: string, leagueProfileId: string): Promise<boolean>;
+
+  // NFL Matchups methods
+  refreshNflMatchups(season: number, week: number): Promise<{ success: boolean; recordCount: number; error?: string }>;
+  getNflMatchups(season: number, week: number): Promise<NflMatchup[]>;
+  normalizeTeamName(fullName: string): string | null;
 }
 
 const MemoryStore = createMemoryStore(session);
@@ -347,6 +354,18 @@ export class MemStorage implements IStorage {
 
   async deleteUserLeague(userId: string, leagueProfileId: string): Promise<boolean> {
     throw new Error("User leagues not supported in memory storage");
+  }
+
+  async refreshNflMatchups(season: number, week: number): Promise<{ success: boolean; recordCount: number; error?: string }> {
+    return { success: false, recordCount: 0, error: "NFL matchups not supported in memory storage" };
+  }
+
+  async getNflMatchups(season: number, week: number): Promise<NflMatchup[]> {
+    return [];
+  }
+
+  normalizeTeamName(fullName: string): string | null {
+    return null;
   }
 }
 
@@ -651,6 +670,156 @@ export class DatabaseStorage implements IStorage {
         eq(userLeagues.leagueProfileId, leagueProfileId)
       ));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // NFL Matchups methods
+  async refreshNflMatchups(season: number, week: number): Promise<{ success: boolean; recordCount: number; error?: string }> {
+    try {
+      console.log(`Refreshing NFL matchups for ${season} week ${week}...`);
+      
+      // Step 1: Fetch raw odds data from nflVegasOdds
+      const oddsData = await db
+        .select()
+        .from(nflVegasOdds)
+        .where(and(
+          eq(nflVegasOdds.season, season),
+          eq(nflVegasOdds.week, week)
+        ));
+      
+      if (oddsData.length === 0) {
+        return { success: false, recordCount: 0, error: "No odds data found for this week. Run 'Refresh Vegas Odds' first." };
+      }
+      
+      // Step 2: Deduplicate by gameId (multiple bookmakers = same game)
+      const gameMap = new Map<string, typeof nflVegasOdds.$inferSelect>();
+      for (const game of oddsData) {
+        if (!gameMap.has(game.gameId)) {
+          gameMap.set(game.gameId, game);
+        }
+      }
+      
+      // Step 3: Delete existing matchups for this week
+      await db.delete(nflMatchups)
+        .where(and(
+          eq(nflMatchups.season, season),
+          eq(nflMatchups.week, week)
+        ));
+      
+      // Step 4: Process each game into 2 matchup records (home + away)
+      const matchupRecords: InsertNflMatchup[] = [];
+      
+      for (const game of Array.from(gameMap.values())) {
+        if (!game.commenceTime) continue;
+        
+        // Normalize team names to abbreviations
+        const homeAbbr = this.normalizeTeamName(game.homeTeam);
+        const awayAbbr = this.normalizeTeamName(game.awayTeam);
+        
+        if (!homeAbbr || !awayAbbr) {
+          console.warn(`⚠ Skipping game: couldn't normalize teams ${game.homeTeam} vs ${game.awayTeam}`);
+          continue;
+        }
+        
+        // Determine game day from UTC timestamp
+        const gameDate = new Date(game.commenceTime);
+        const gameDay = gameDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+        
+        // Home team record
+        matchupRecords.push({
+          season,
+          week,
+          teamAbbr: homeAbbr,
+          opponentAbbr: awayAbbr,
+          gameTimeUtc: game.commenceTime,
+          isHome: true,
+          gameDay,
+          bookmakerSource: game.bookmaker,
+        });
+        
+        // Away team record
+        matchupRecords.push({
+          season,
+          week,
+          teamAbbr: awayAbbr,
+          opponentAbbr: homeAbbr,
+          gameTimeUtc: game.commenceTime,
+          isHome: false,
+          gameDay,
+          bookmakerSource: game.bookmaker,
+        });
+      }
+      
+      // Step 5: Bulk insert
+      if (matchupRecords.length > 0) {
+        await db.insert(nflMatchups).values(matchupRecords);
+      }
+      
+      console.log(`✓ Successfully created ${matchupRecords.length} matchup records for week ${week}`);
+      return { success: true, recordCount: matchupRecords.length };
+    } catch (error: any) {
+      console.error('Error refreshing NFL matchups:', error);
+      return { success: false, recordCount: 0, error: error.message };
+    }
+  }
+
+  async getNflMatchups(season: number, week: number): Promise<NflMatchup[]> {
+    return await db
+      .select()
+      .from(nflMatchups)
+      .where(and(
+        eq(nflMatchups.season, season),
+        eq(nflMatchups.week, week)
+      ));
+  }
+
+  normalizeTeamName(fullName: string): string | null {
+    const mapping: Record<string, string> = {
+      // AFC East
+      'Buffalo Bills': 'BUF',
+      'Miami Dolphins': 'MIA',
+      'New England Patriots': 'NE',
+      'New York Jets': 'NYJ',
+      // AFC North
+      'Baltimore Ravens': 'BAL',
+      'Cincinnati Bengals': 'CIN',
+      'Cleveland Browns': 'CLE',
+      'Pittsburgh Steelers': 'PIT',
+      // AFC South
+      'Houston Texans': 'HOU',
+      'Indianapolis Colts': 'IND',
+      'Jacksonville Jaguars': 'JAX',
+      'Tennessee Titans': 'TEN',
+      // AFC West
+      'Denver Broncos': 'DEN',
+      'Kansas City Chiefs': 'KC',
+      'Las Vegas Raiders': 'LV',
+      'Los Angeles Chargers': 'LAC',
+      'LA Chargers': 'LAC',
+      // NFC East
+      'Dallas Cowboys': 'DAL',
+      'New York Giants': 'NYG',
+      'Philadelphia Eagles': 'PHI',
+      'Washington Commanders': 'WAS',
+      'Washington': 'WAS',
+      // NFC North
+      'Chicago Bears': 'CHI',
+      'Detroit Lions': 'DET',
+      'Green Bay Packers': 'GB',
+      'Minnesota Vikings': 'MIN',
+      // NFC South
+      'Atlanta Falcons': 'ATL',
+      'Carolina Panthers': 'CAR',
+      'New Orleans Saints': 'NO',
+      'Tampa Bay Buccaneers': 'TB',
+      // NFC West
+      'Arizona Cardinals': 'ARI',
+      'Los Angeles Rams': 'LAR',
+      'LA Rams': 'LAR',
+      'San Francisco 49ers': 'SF',
+      'Seattle Seahawks': 'SEA'
+    };
+    
+    return mapping[fullName] || null;
   }
 }
 

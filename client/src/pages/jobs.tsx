@@ -36,6 +36,12 @@ export default function Jobs() {
   const [nflSteps, setNflSteps] = useState<JobStep[]>([]);
   const [nflRunning, setNflRunning] = useState(false);
 
+  // NFL Player Matchups parameters
+  const [matchupsSeason, setMatchupsSeason] = useState("2025");
+  const [matchupsWeek, setMatchupsWeek] = useState("");
+  const [matchupsRunning, setMatchupsRunning] = useState(false);
+  const [matchupsMessage, setMatchupsMessage] = useState("");
+
   // Set default week to current week when league data loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
@@ -44,7 +50,10 @@ export default function Jobs() {
     if (currentLeague?.currentWeek && !nflWeek) {
       setNflWeek(currentLeague.currentWeek.toString());
     }
-  }, [currentLeague?.currentWeek, fpWeek, nflWeek]);
+    if (currentLeague?.currentWeek && !matchupsWeek) {
+      setMatchupsWeek(currentLeague.currentWeek.toString());
+    }
+  }, [currentLeague?.currentWeek, fpWeek, nflWeek, matchupsWeek]);
 
   async function runJob(endpoint: string, body?: any): Promise<{ success: boolean; message: string }> {
     try {
@@ -189,6 +198,28 @@ export default function Jobs() {
     const allSuccess = nflSteps.every(s => s.status === 'completed');
     if (allSuccess) {
       setStatus("✓ All NFL kicker streaming data refreshed successfully!");
+    }
+  }
+
+  async function runPlayerMatchupsJob() {
+    if (!matchupsWeek) {
+      setMatchupsMessage("Please enter a week number");
+      return;
+    }
+
+    setMatchupsRunning(true);
+    setMatchupsMessage("Refreshing NFL player matchups...");
+
+    const result = await runJob("/api/jobs/nfl-refresh-matchups", {
+      season: parseInt(matchupsSeason),
+      week: parseInt(matchupsWeek)
+    });
+
+    setMatchupsRunning(false);
+    if (result.success) {
+      setMatchupsMessage(`✓ ${result.message}`);
+    } else {
+      setMatchupsMessage(`✗ ${result.message}`);
     }
   }
 
@@ -379,6 +410,72 @@ export default function Jobs() {
           {!nflWeek && (
             <p className="text-sm text-muted-foreground text-center">
               Please enter a week number to refresh NFL data
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NFL Player Matchups Refresh */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            <CardTitle>NFL Player Matchups</CardTitle>
+          </div>
+          <CardDescription>
+            Refresh player opponent and game time data for the Players page
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="matchups-season">Season</Label>
+              <Input
+                id="matchups-season"
+                data-testid="input-matchups-season"
+                type="number"
+                value={matchupsSeason}
+                onChange={(e) => setMatchupsSeason(e.target.value)}
+                placeholder="2025"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="matchups-week">Week</Label>
+              <Input
+                id="matchups-week"
+                data-testid="input-matchups-week"
+                type="number"
+                value={matchupsWeek}
+                onChange={(e) => setMatchupsWeek(e.target.value)}
+                placeholder={currentLeague?.currentWeek ? `Current: ${currentLeague.currentWeek}` : "Enter week"}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Status Message */}
+          {matchupsMessage && (
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm">{matchupsMessage}</p>
+            </div>
+          )}
+
+          {/* Refresh Button */}
+          <Button
+            data-testid="button-refresh-matchups"
+            disabled={matchupsRunning || !matchupsWeek}
+            onClick={runPlayerMatchupsJob}
+            className="w-full"
+            size="lg"
+          >
+            {matchupsRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Refresh Player Matchups
+          </Button>
+          {!matchupsWeek && (
+            <p className="text-sm text-muted-foreground text-center">
+              Please enter a week number to refresh matchups
             </p>
           )}
         </CardContent>

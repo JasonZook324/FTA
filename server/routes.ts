@@ -4748,6 +4748,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/jobs/nfl-refresh-matchups", requireAuth, async (req, res) => {
+    try {
+      const { season = 2025, week = 1 } = req.body;
+      const result = await storage.refreshNflMatchups(season, week);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} NFL matchup records for week ${week}`,
+          recordCount: result.recordCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh NFL matchups' });
+      }
+    } catch (error: any) {
+      console.error('NFL matchups refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh NFL matchups' });
+    }
+  });
+
   // Cleanup endpoint to remove all Vegas odds data (use before refreshing)
   app.post("/api/jobs/nfl-cleanup-vegas-odds", requireAuth, async (req, res) => {
     try {
@@ -4761,6 +4780,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Cleanup error:', error);
       res.status(500).json({ message: error.message || 'Failed to cleanup Vegas odds data' });
+    }
+  });
+
+  // Get NFL matchups for a specific week
+  app.get("/api/nfl/matchups/:season/:week", requireAuth, async (req, res) => {
+    try {
+      const season = parseInt(req.params.season);
+      const week = parseInt(req.params.week);
+      
+      const matchups = await storage.getNflMatchups(season, week);
+      
+      res.json({ matchups });
+    } catch (error: any) {
+      console.error('NFL matchups fetch error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to fetch NFL matchups',
+        matchups: []
+      });
     }
   });
 
