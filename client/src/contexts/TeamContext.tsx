@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest } from '@/lib/queryClient';
 import { useQuery } from '@tanstack/react-query';
-import type { User, League } from '@shared/schema';
+import type { User, LeagueProfile } from '@shared/schema';
 
 interface SelectedTeam {
   teamId: number;
@@ -21,6 +21,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [selectedTeam, setSelectedTeamState] = useState<SelectedTeam | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Query the user's selected team from database
   const { data: userData } = useQuery<User>({
@@ -29,10 +30,20 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   });
 
   // Query leagues to get team name
-  const { data: leagues } = useQuery<League[]>({
+  const { data: leagues } = useQuery<LeagueProfile[]>({
     queryKey: ['/api/leagues'],
     enabled: !!user,
   });
+
+  // Reset context when user changes (login/logout or switch user)
+  useEffect(() => {
+    const userId = user?.id || null;
+    if (userId !== currentUserId) {
+      setSelectedTeamState(null);
+      setIsInitialized(false);
+      setCurrentUserId(userId);
+    }
+  }, [user?.id, currentUserId]);
 
   // Initialize selected team from database or localStorage
   useEffect(() => {
@@ -81,15 +92,23 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
 
     function loadFromLocalStorage() {
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('selectedTeam');
+      if (typeof window !== 'undefined' && user) {
+        // Use user-specific localStorage key
+        const localStorageKey = `selectedTeam_${user.id}`;
+        const stored = localStorage.getItem(localStorageKey);
         if (stored) {
           try {
             setSelectedTeamState(JSON.parse(stored));
           } catch (error) {
             console.error('Failed to parse stored team:', error);
-            localStorage.removeItem('selectedTeam');
+            localStorage.removeItem(localStorageKey);
           }
+        }
+        
+        // Clean up old non-user-specific key if it exists
+        const oldKey = localStorage.getItem('selectedTeam');
+        if (oldKey) {
+          localStorage.removeItem('selectedTeam');
         }
       }
       setIsInitialized(true);
@@ -99,13 +118,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const setSelectedTeam = async (team: SelectedTeam | null) => {
     setSelectedTeamState(team);
     
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
+    // Save to user-specific localStorage
+    if (typeof window !== 'undefined' && user) {
+      const localStorageKey = `selectedTeam_${user.id}`;
       if (team) {
-        localStorage.setItem('selectedTeam', JSON.stringify(team));
+        localStorage.setItem(localStorageKey, JSON.stringify(team));
       } else {
-        localStorage.removeItem('selectedTeam');
+        localStorage.removeItem(localStorageKey);
       }
+      
+      // Clean up old non-user-specific key if it exists
+      localStorage.removeItem('selectedTeam');
     }
 
     // Save to database if user is logged in
