@@ -7,12 +7,18 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
+  // Email captured at registration; stored in lowercase (normalized at server)
+  // Kept nullable for backward compatibility with existing rows
+  email: text("email"),
   password: text("password").notNull(),
   role: integer("role").notNull().default(0), // 0=Standard User, 1=Paid User, 2=Developer, 9=Administrator
   selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
   selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Basic unique constraint (case-sensitive). We also add a case-insensitive unique index via migration.
+  uniqueEmail: uniqueIndex("users_email_unique").on(table.email),
+}));
 
 export const espnCredentials = pgTable("espn_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

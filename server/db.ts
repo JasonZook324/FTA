@@ -47,4 +47,9 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 10000, // Return an error after 10 seconds if connection not available
 });
-export const db = drizzle({ client: pool, schema, logger: true });
+// Control SQL logging via env. Default: enabled only in development unless explicitly overridden.
+const drizzleLog = (
+  process.env.DRIZZLE_LOG === 'true' ||
+  (process.env.NODE_ENV === 'development' && process.env.DRIZZLE_LOG !== 'false')
+);
+export const db = drizzle({ client: pool, schema, logger: drizzleLog });
