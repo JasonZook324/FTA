@@ -14,8 +14,24 @@ import { Activity } from "lucide-react";
 import { useEffect } from "react";
 
 const loginSchema = insertUserSchema.pick({ username: true, password: true });
+// Require and validate email on registration; normalize to lowercase
+// Add confirmPassword and ensure it matches password
+const registerSchema = insertUserSchema
+  .extend({
+    email: z
+      .string({ required_error: "Email is required" })
+      .email("Please enter a valid email address")
+      .transform((v) => v.trim().toLowerCase()),
+    confirmPassword: z
+      .string({ required_error: "Please confirm your password" })
+      .min(6, "Password must be at least 6 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
 type LoginFormData = z.infer<typeof loginSchema>;
-type RegisterFormData = z.infer<typeof insertUserSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -30,10 +46,12 @@ export default function AuthPage() {
   });
 
   const registerForm = useForm<RegisterFormData>({
-    resolver: zodResolver(insertUserSchema),
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       username: "",
       password: "",
+      confirmPassword: "",
+      email: "",
     },
   });
 
@@ -48,7 +66,9 @@ export default function AuthPage() {
   };
 
   const handleRegister = (data: RegisterFormData) => {
-    registerMutation.mutate(data);
+    const { confirmPassword, ...payload } = data;
+    // Do not send confirmPassword to the server
+    registerMutation.mutate(payload as any);
   };
 
   return (
@@ -78,11 +98,11 @@ export default function AuthPage() {
                 <CardContent>
                   <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-username">Username</Label>
+                      <Label htmlFor="login-username">Username or Email</Label>
                       <Input
                         id="login-username"
                         data-testid="input-login-username"
-                        placeholder="Enter your username"
+                        placeholder="Enter your username or email"
                         {...loginForm.register("username")}
                       />
                       {loginForm.formState.errors.username && (
@@ -130,6 +150,21 @@ export default function AuthPage() {
                 <CardContent>
                   <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
                     <div className="space-y-2">
+                      <Label htmlFor="register-email">Email</Label>
+                      <Input
+                        id="register-email"
+                        data-testid="input-register-email"
+                        type="email"
+                        placeholder="you@example.com"
+                        {...registerForm.register("email")}
+                      />
+                      {registerForm.formState.errors.email && (
+                        <p className="text-sm text-destructive">
+                          {registerForm.formState.errors.email.message as string}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="register-username">Username</Label>
                       <Input
                         id="register-username"
@@ -155,6 +190,21 @@ export default function AuthPage() {
                       {registerForm.formState.errors.password && (
                         <p className="text-sm text-destructive">
                           {registerForm.formState.errors.password.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="register-confirm-password">Confirm Password</Label>
+                      <Input
+                        id="register-confirm-password"
+                        data-testid="input-register-confirm-password"
+                        type="password"
+                        placeholder="Re-enter your password"
+                        {...registerForm.register("confirmPassword")}
+                      />
+                      {registerForm.formState.errors.confirmPassword && (
+                        <p className="text-sm text-destructive">
+                          {registerForm.formState.errors.confirmPassword.message as string}
                         </p>
                       )}
                     </div>

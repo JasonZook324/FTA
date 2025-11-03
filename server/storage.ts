@@ -10,10 +10,10 @@ import {
   type NflMatchup, type InsertNflMatchup,
   users, espnCredentials, teams, matchups, players,
   leagueProfiles, leagueCredentials, userLeagues,
-  nflMatchups, nflVegasOdds
+  nflMatchups, nflVegasOdds, nflTeamStats
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import session from "express-session";
 import type { Store } from "express-session";
@@ -29,6 +29,7 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
 
@@ -80,6 +81,9 @@ export interface IStorage {
   refreshNflMatchups(season: number, week: number): Promise<{ success: boolean; recordCount: number; error?: string }>;
   getNflMatchups(season: number, week: number): Promise<NflMatchup[]>;
   normalizeTeamName(fullName: string): string | null;
+  
+  // NFL Defensive Rankings (OPRK) methods
+  getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>>;
 }
 
 const MemoryStore = createMemoryStore(session);
@@ -116,8 +120,16 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
+    const u = username.toLowerCase();
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => (user.username || "").toLowerCase() === u,
+    );
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const e = email.toLowerCase();
+    return Array.from(this.users.values()).find(
+      (user) => (user as any).email && (user as any).email.toLowerCase() === e,
     );
   }
 
@@ -129,7 +141,8 @@ export class MemStorage implements IStorage {
       id, 
       selectedLeagueId: null,
       selectedTeamId: null,
-      createdAt: new Date()
+      createdAt: new Date(),
+      email: (insertUser as any).email ?? null
     };
     this.users.set(id, user);
     return user;
@@ -367,6 +380,11 @@ export class MemStorage implements IStorage {
   normalizeTeamName(fullName: string): string | null {
     return null;
   }
+
+  async getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>> {
+    // MemStorage doesn't support this - return empty map
+    return new Map();
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -386,7 +404,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    // Use case-insensitive match so login is not case sensitive
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(ilike(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(ilike(users.email, email));
     return user || undefined;
   }
 
@@ -820,6 +850,50 @@ export class DatabaseStorage implements IStorage {
     };
     
     return mapping[fullName] || null;
+  }
+
+  async getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>> {
+    try {
+      // Build query conditions
+      const conditions = [eq(nflTeamStats.season, season)];
+      if (week !== undefined && week !== null) {
+        conditions.push(eq(nflTeamStats.week, week));
+      }
+
+      // Fetch team stats for the season/week
+      const teamStats = await db
+        .select()
+        .from(nflTeamStats)
+        .where(and(...conditions));
+
+      if (teamStats.length === 0) {
+        console.warn(`No team stats found for season ${season}, week ${week || 'season'}`);
+        return new Map();
+      }
+
+      // Calculate points allowed per game for each team
+      const teamDefenseStats = teamStats.map(stat => ({
+        teamAbbr: stat.teamAbbreviation,
+        pointsAllowedPerGame: stat.gamesPlayed && stat.gamesPlayed > 0
+          ? (stat.pointsAllowed || 0) / stat.gamesPlayed
+          : stat.pointsAllowed || 0
+      }));
+
+      // Sort by points allowed per game (ascending = better defense)
+      teamDefenseStats.sort((a, b) => a.pointsAllowedPerGame - b.pointsAllowedPerGame);
+
+      // Assign ranks (1 = best defense/toughest matchup, 32 = worst defense/easiest matchup)
+      const rankingsMap = new Map<string, number>();
+      teamDefenseStats.forEach((stat, index) => {
+        rankingsMap.set(stat.teamAbbr, index + 1);
+      });
+
+      console.log(`Calculated defensive rankings for ${rankingsMap.size} teams`);
+      return rankingsMap;
+    } catch (error: any) {
+      console.error('Error calculating defensive rankings:', error);
+      return new Map();
+    }
   }
 }
 

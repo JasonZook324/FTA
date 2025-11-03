@@ -13,6 +13,9 @@ import { db } from "./db";
 import * as schema from "@shared/schema";
 import { sql } from "drizzle-orm";
 
+// Toggle verbose route logging at runtime without code changes
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
+
 // ESPN API service
 class EspnApiService {
   private readonly baseUrl = "https://lm-api-reads.fantasy.espn.com/apis/v3/games";
@@ -3501,7 +3504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         day: 'numeric' 
       });
 
-      console.log(`Optimizing lineup for team ${teamId} - Week ${nflWeek}, Date: ${formattedDate}`);
+  if (DEBUG_LOGS) console.log(`Optimizing lineup for team ${teamId} - Week ${nflWeek}, Date: ${formattedDate}`);
 
       // Call Gemini AI to optimize lineup
       const optimization = await geminiService.optimizeLineup(
@@ -3718,7 +3721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const finalPrompt = promptSections.join('\n');
 
-      console.log(`Generated optimize lineup prompt with ${promptSections.length} sections`);
+  if (DEBUG_LOGS) console.log(`Generated optimize lineup prompt with ${promptSections.length} sections`);
 
       res.json({ prompt: finalPrompt });
     } catch (error: any) {
@@ -3733,7 +3736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { leagueId } = req.params;
       const { teamId, customPrompt, options } = req.body;
 
-      console.log(`Generating custom prompt for league ${leagueId}, team ${teamId}`);
+  if (DEBUG_LOGS) console.log(`Generating custom prompt for league ${leagueId}, team ${teamId}`);
       console.log('Context data options received:', {
         includeFantasyPros: options.includeFantasyPros,
         includeVegasOdds: options.includeVegasOdds,
@@ -4216,7 +4219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Custom prompt: Found ${takenPlayerIds.size} taken players out of ${playersData.players?.length || 0} total players`);
         
         // Debug: Log sample player data structure
-        if (playersData.players && playersData.players.length > 0) {
+        if (DEBUG_LOGS && playersData.players && playersData.players.length > 0) {
           console.log('Sample player data structure:', JSON.stringify(playersData.players[0], null, 2));
           console.log('Player has proTeamId:', playersData.players[0]?.proTeamId);
           console.log('Player has defaultPositionId:', playersData.players[0]?.defaultPositionId);
@@ -4231,7 +4234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const isNotTaken = !takenPlayerIds.has(player.id);
           const hasValidTeam = proTeamId && proTeamId > 0;
           
-          console.log(`Player ${player?.fullName || player?.id}: proTeamId=${proTeamId}, isNotTaken=${isNotTaken}, hasValidTeam=${hasValidTeam}`);
+          if (DEBUG_LOGS) console.log(`Player ${player?.fullName || player?.id}: proTeamId=${proTeamId}, isNotTaken=${isNotTaken}, hasValidTeam=${hasValidTeam}`);
           
           return isNotTaken && hasValidTeam;
         });
@@ -4239,7 +4242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Custom prompt: ${availablePlayers.length} available players after filtering taken players`);
         
         // Debug: Log sample available player
-        if (availablePlayers.length > 0) {
+        if (DEBUG_LOGS && availablePlayers.length > 0) {
           console.log('Sample available player:', JSON.stringify(availablePlayers[0], null, 2));
         }
 
@@ -4397,7 +4400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const finalPrompt = promptSections.join('\n');
 
-      console.log(`Generated custom prompt with ${promptSections.length} sections`);
+  if (DEBUG_LOGS) console.log(`Generated custom prompt with ${promptSections.length} sections`);
 
       res.json({ prompt: finalPrompt });
     } catch (error: any) {
@@ -4671,12 +4674,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clear existing stadium data
       await db.delete(schema.nflStadiums);
       
-      // Insert stadium data
-      let insertedCount = 0;
-      for (const stadium of stadiumData) {
-        await db.insert(schema.nflStadiums).values(stadium);
-        insertedCount++;
-      }
+      // Insert stadium data in bulk to reduce round-trips
+      await db.insert(schema.nflStadiums).values(stadiumData);
+      const insertedCount = stadiumData.length;
       
       res.json({ 
         message: `Successfully loaded ${insertedCount} NFL stadiums`,
@@ -4801,6 +4801,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get NFL defensive rankings (OPRK) for a specific week
+  app.get("/api/nfl/defensive-rankings/:season/:week", requireAuth, async (req, res) => {
+    try {
+      const season = parseInt(req.params.season);
+      const week = parseInt(req.params.week);
+      
+      const rankingsMap = await storage.getDefensiveRankings(season, week);
+      
+      // Convert Map to object for JSON response
+      const rankings: Record<string, number> = {};
+      rankingsMap.forEach((rank, teamAbbr) => {
+        rankings[teamAbbr] = rank;
+      });
+      
+      res.json({ rankings });
+    } catch (error: any) {
+      console.error('Defensive rankings fetch error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to fetch defensive rankings',
+        rankings: {}
+      });
+    }
+  });
+
   // Kicker streaming recommendations
   app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
     try {
@@ -4825,6 +4849,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Database viewer endpoints
   app.get("/api/db/tables", requireAuth, async (req, res) => {
     try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'Database browser is disabled in production' });
+      }
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
       
@@ -4845,6 +4872,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/db/tables/:tableName/columns", requireAuth, async (req, res) => {
     try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'Database browser is disabled in production' });
+      }
       const { tableName } = req.params;
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
@@ -4870,6 +4900,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/db/tables/:tableName/query", requireAuth, async (req, res) => {
     try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'Database browser is disabled in production' });
+      }
       const { tableName } = req.params;
       const { filters = {}, limit = 100, offset = 0 } = req.body;
       const { db } = await import('./db');
@@ -4934,9 +4967,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use provided API key or fallback to environment variable
       const effectiveApiKey = apiKey || process.env.FantasyProsApiKey;
       
-      console.log('Fantasy Pros Proxy - API Key provided:', !!apiKey);
-      console.log('Fantasy Pros Proxy - Using env API key:', !apiKey && !!process.env.FantasyProsApiKey);
-      console.log('Fantasy Pros Proxy - Effective API key exists:', !!effectiveApiKey);
+      if (DEBUG_LOGS) {
+        console.log('Fantasy Pros Proxy - API Key provided:', !!apiKey);
+        console.log('Fantasy Pros Proxy - Using env API key:', !apiKey && !!process.env.FantasyProsApiKey);
+        console.log('Fantasy Pros Proxy - Effective API key exists:', !!effectiveApiKey);
+      }
 
       if (!effectiveApiKey || !endpoint) {
         return res.status(400).json({ message: "API key and endpoint are required" });
@@ -4998,9 +5033,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
 
-      console.log('Fantasy Pros - Requesting URL:', url);
-      console.log('Fantasy Pros - Method:', requestMethod);
-      console.log('Fantasy Pros - Headers:', options.headers);
+      if (DEBUG_LOGS) {
+        console.log('Fantasy Pros - Requesting URL:', url);
+        console.log('Fantasy Pros - Method:', requestMethod);
+        console.log('Fantasy Pros - Headers:', options.headers);
+      }
 
       const response = await fetch(url, options);
       
@@ -5014,8 +5051,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         responseData = await response.text();
       }
 
-      console.log('Fantasy Pros - Response status:', response.status);
-      console.log('Fantasy Pros - Response data:', responseData);
+      if (DEBUG_LOGS) {
+        console.log('Fantasy Pros - Response status:', response.status);
+        console.log('Fantasy Pros - Response data:', responseData);
+      }
 
       res.status(response.status).json({
         status: response.status,

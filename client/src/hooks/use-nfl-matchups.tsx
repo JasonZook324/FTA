@@ -41,3 +41,28 @@ export function getGameTime(matchups: NflMatchup[], teamAbbr: string): { gameTim
   const matchup = matchups.find(m => m.teamAbbr === teamAbbr);
   return matchup ? { gameTimeUtc: matchup.gameTimeUtc, gameDay: matchup.gameDay } : null;
 }
+
+/**
+ * Hook to fetch NFL defensive rankings (OPRK) for a specific season and week
+ * Returns team abbreviation -> defensive rank (1-32, lower = tougher defense)
+ */
+export function useDefensiveRankings(season: number, week: number) {
+  return useQuery<{ rankings: Record<string, number> }>({
+    queryKey: ['/api/nfl/defensive-rankings', season, week],
+    enabled: !!(season && week),
+    staleTime: 60 * 60 * 1000, // 1 hour - defensive rankings change infrequently
+  });
+}
+
+/**
+ * Helper function to get defensive rank for opponent
+ * Returns rank 1-32 (1 = toughest defense, 32 = easiest defense)
+ */
+export function getOpponentRank(rankings: Record<string, number>, opponentAbbr: string | null): number | null {
+  if (!opponentAbbr || !rankings) return null;
+  
+  // Strip "vs " or "@ " prefix if present
+  const cleanAbbr = opponentAbbr.replace(/^(vs |@ )/, '');
+  
+  return rankings[cleanAbbr] ?? null;
+}
