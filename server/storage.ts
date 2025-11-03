@@ -13,7 +13,7 @@ import {
   nflMatchups, nflVegasOdds, nflTeamStats
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import session from "express-session";
 import type { Store } from "express-session";
@@ -29,6 +29,7 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
 
@@ -119,8 +120,16 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
+    const u = username.toLowerCase();
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => (user.username || "").toLowerCase() === u,
+    );
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const e = email.toLowerCase();
+    return Array.from(this.users.values()).find(
+      (user) => (user as any).email && (user as any).email.toLowerCase() === e,
     );
   }
 
@@ -132,7 +141,8 @@ export class MemStorage implements IStorage {
       id, 
       selectedLeagueId: null,
       selectedTeamId: null,
-      createdAt: new Date()
+      createdAt: new Date(),
+      email: (insertUser as any).email ?? null
     };
     this.users.set(id, user);
     return user;
@@ -394,7 +404,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    // Use case-insensitive match so login is not case sensitive
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(ilike(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(ilike(users.email, email));
     return user || undefined;
   }
 
