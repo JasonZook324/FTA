@@ -13,6 +13,12 @@ if (!SENDGRID_API_KEY) {
   console.log('✅ SendGrid initialized successfully');
 }
 
+// Log APP_URL for debugging (especially important for production)
+console.log(`📧 Email verification links will use: ${APP_URL}`);
+if (APP_URL.includes('localhost') && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️  WARNING: APP_URL is set to localhost but NODE_ENV is production! Update APP_URL in your production environment.');
+}
+
 interface EmailOptions {
   to: string;
   subject: string;

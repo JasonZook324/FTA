@@ -27,7 +27,10 @@ APP_URL=http://localhost:5000
 - **SENDGRID_API_KEY** (Required): Your SendGrid API key
 - **SENDGRID_FROM_EMAIL** (Required): The "from" email address that appears in verification emails. This must be a verified sender in your SendGrid account.
 - **APP_NAME** (Optional): The application name shown in emails. Default: "Fantasy Tracker"
-- **APP_URL** (Optional): The base URL of your application. Default: "http://localhost:5000"
+- **APP_URL** (Required for Production): The base URL of your application. 
+  - **Development**: `http://localhost:5000`
+  - **Production**: `https://fantasytoolboxai.com` (no trailing slash)
+  - ⚠️ **CRITICAL**: Update this in production or verification links will break!
 
 ## Database Schema
 
