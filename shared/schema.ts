@@ -29,6 +29,15 @@ export const emailVerifications = pgTable("email_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const espnCredentials = pgTable("espn_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -472,6 +481,11 @@ export const insertEmailVerificationSchema = createInsertSchema(emailVerificatio
   createdAt: true,
 });
 
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type NflStadium = typeof nflStadiums.$inferSelect;
 export type InsertNflStadium = z.infer<typeof insertNflStadiumSchema>;
 export type NflVegasOdds = typeof nflVegasOdds.$inferSelect;
@@ -484,3 +498,5 @@ export type AiPromptResponse = typeof aiPromptResponses.$inferSelect;
 export type InsertAiPromptResponse = z.infer<typeof insertAiPromptResponseSchema>;
 export type EmailVerification = typeof emailVerifications.$inferSelect;
 export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;

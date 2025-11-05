@@ -530,6 +530,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password Reset routes
+  
+  // Request password reset - send email with reset link
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email is required' 
+        });
+      }
+
+      const { createAndSendPasswordResetToken } = await import('./passwordReset');
+      const result = await createAndSendPasswordResetToken(email.trim().toLowerCase());
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false, 
+          message: result.error || 'Failed to send password reset email' 
+        });
+      }
+
+      // Always return success to prevent email enumeration
+      res.json({ 
+        success: true, 
+        message: 'If an account exists with that email address, a password reset link has been sent. Please check your inbox and spam folder.' 
+      });
+    } catch (error) {
+      console.error('Error in forgot-password route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // Verify password reset token
+  app.get("/api/verify-reset-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Reset token is required' 
+        });
+      }
+
+      const { verifyPasswordResetToken } = await import('./passwordReset');
+      const result = await verifyPasswordResetToken(token);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false, 
+          message: result.error || 'Invalid or expired reset token' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Token is valid'
+      });
+    } catch (error) {
+      console.error('Error in verify-reset-token route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // Reset password with valid token
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Token and new password are required' 
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Password must be at least 6 characters' 
+        });
+      }
+
+      const { verifyPasswordResetToken, markTokenAsUsed } = await import('./passwordReset');
+      
+      // Verify the token
+      const verifyResult = await verifyPasswordResetToken(token);
+      
+      if (!verifyResult.success || !verifyResult.userId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: verifyResult.error || 'Invalid or expired reset token' 
+        });
+      }
+
+      // Hash the new password
+      const SALT_ROUNDS = 10;
+      const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+      // Update the user's password
+      await db.update(schema.users)
+        .set({ password: hashedPassword })
+        .where(sql`${schema.users.id} = ${verifyResult.userId}`);
+
+      // Mark token as used
+      await markTokenAsUsed(token);
+
+      console.log(`✅ Password reset successful for user ${verifyResult.userId}`);
+
+      res.json({ 
+        success: true, 
+        message: 'Password has been reset successfully! You can now log in with your new password.' 
+      });
+    } catch (error) {
+      console.error('Error in reset-password route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
   // Admin-only routes
   // Middleware to check if user is admin (role 9 only)
   const requireAdmin = (req: any, res: any, next: any) => {
