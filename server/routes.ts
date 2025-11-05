@@ -12,6 +12,12 @@ import { setupAuth } from "./auth";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { sql } from "drizzle-orm";
+import { 
+  verifyEmailToken, 
+  resendVerificationEmail, 
+  isEmailVerified,
+  createAndSendVerificationToken 
+} from './emailVerification';
 
 // Toggle verbose route logging at runtime without code changes
 const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
@@ -386,6 +392,142 @@ function requireRole(...allowed: number[]) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes (register, login, logout, /api/user)
   setupAuth(app);
+
+  // Email Verification routes
+  
+  // Verify email with token
+  app.get("/api/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Verification token is required' 
+        });
+      }
+
+      const result = await verifyEmailToken(token);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false, 
+          message: result.error || 'Email verification failed' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Email verified successfully!',
+        userId: result.userId
+      });
+    } catch (error) {
+      console.error('Error in verify-email route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // Resend verification email
+  app.post("/api/resend-verification", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const result = await resendVerificationEmail(userId);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          success: false, 
+          message: result.error || 'Failed to resend verification email' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Verification email sent successfully! Please check your inbox and spam folder.' 
+      });
+    } catch (error) {
+      console.error('Error in resend-verification route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // Public endpoint: Resend verification email by email/username (for users who can't log in)
+  app.post("/api/resend-verification-public", async (req, res) => {
+    try {
+      const { emailOrUsername } = req.body;
+
+      if (!emailOrUsername) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Email or username is required' 
+        });
+      }
+
+      const identifier = emailOrUsername.trim();
+      
+      // Try to find user by username or email
+      let user = await storage.getUserByUsername(identifier);
+      if (!user) {
+        user = await storage.getUserByEmail(identifier.toLowerCase());
+      }
+
+      // For security, don't reveal if user exists or not
+      if (!user || !user.email) {
+        return res.json({ 
+          success: true, 
+          message: 'If an account exists with that email/username, a verification email has been sent. Please check your inbox and spam folder.' 
+        });
+      }
+
+      // Check if already verified
+      const verified = await isEmailVerified(user.id);
+      if (verified) {
+        return res.json({ 
+          success: true, 
+          message: 'Your email is already verified. You can now log in.' 
+        });
+      }
+
+      // Send verification email
+      const result = await createAndSendVerificationToken(user.id, user.email, user.username);
+      
+      res.json({ 
+        success: true, 
+        message: 'Verification email sent successfully! Please check your inbox and spam folder.' 
+      });
+    } catch (error) {
+      console.error('Error in public resend-verification route:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // Check if email is verified
+  app.get("/api/email-verification-status", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const verified = await isEmailVerified(userId);
+      
+      res.json({ 
+        verified,
+        email: req.user.email 
+      });
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
 
   // ESPN Credentials routes
   app.post("/api/espn-credentials", requireAuth, async (req: any, res) => {

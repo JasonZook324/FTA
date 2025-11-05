@@ -16,6 +16,7 @@ import PromptBuilder from "@/pages/prompt-builder";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
+import VerifyEmailPage from "@/pages/verify-email";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -35,6 +36,9 @@ function App() {
             <Switch>
               {/* Public auth route */}
               <Route path="/auth" component={AuthPage} />
+              
+              {/* Public email verification route */}
+              <Route path="/verify-email" component={VerifyEmailPage} />
               
               {/* Protected routes with sidebar and header */}
               <ProtectedRoute path="/" component={() => (
