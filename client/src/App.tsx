@@ -17,6 +17,7 @@ import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
 import VerifyEmailPage from "@/pages/verify-email";
+import ResetPasswordPage from "@/pages/reset-password";
 import ManageMembers from "@/pages/manage-members";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
@@ -40,6 +41,9 @@ function App() {
               
               {/* Public email verification route */}
               <Route path="/verify-email" component={VerifyEmailPage} />
+              
+              {/* Public password reset route */}
+              <Route path="/reset-password" component={ResetPasswordPage} />
               
               {/* Protected routes with sidebar and header */}
               <ProtectedRoute path="/" component={() => (

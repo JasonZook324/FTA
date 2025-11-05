@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ForgotPasswordDialog } from "@/components/forgot-password-dialog";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -112,7 +113,10 @@ export default function AuthPage() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="login-password">Password</Label>
+                        <ForgotPasswordDialog />
+                      </div>
                       <Input
                         id="login-password"
                         data-testid="input-login-password"
