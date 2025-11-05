@@ -20,6 +20,15 @@ export const users = pgTable("users", {
   uniqueEmail: uniqueIndex("users_email_unique").on(table.email),
 }));
 
+export const emailVerifications = pgTable("email_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verified: boolean("verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const espnCredentials = pgTable("espn_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -458,6 +467,11 @@ export const insertAiPromptResponseSchema = createInsertSchema(aiPromptResponses
   createdAt: true,
 });
 
+export const insertEmailVerificationSchema = createInsertSchema(emailVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type NflStadium = typeof nflStadiums.$inferSelect;
 export type InsertNflStadium = z.infer<typeof insertNflStadiumSchema>;
 export type NflVegasOdds = typeof nflVegasOdds.$inferSelect;
@@ -468,3 +482,5 @@ export type NflMatchup = typeof nflMatchups.$inferSelect;
 export type InsertNflMatchup = z.infer<typeof insertNflMatchupSchema>;
 export type AiPromptResponse = typeof aiPromptResponses.$inferSelect;
 export type InsertAiPromptResponse = z.infer<typeof insertAiPromptResponseSchema>;
+export type EmailVerification = typeof emailVerifications.$inferSelect;
+export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSchema>;
