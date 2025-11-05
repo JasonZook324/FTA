@@ -3,7 +3,7 @@ import sgMail from '@sendgrid/mail';
 // Initialize SendGrid with API key from environment
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@yourdomain.com';
-const APP_NAME = process.env.APP_NAME || 'Fantasy Tracker';
+const APP_NAME = process.env.APP_NAME || 'Fantasy Toolbox AI';
 const APP_URL = process.env.APP_URL || 'http://localhost:5000';
 
 if (!SENDGRID_API_KEY) {
