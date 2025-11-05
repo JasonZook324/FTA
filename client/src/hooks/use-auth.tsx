@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { userMessageFromError } from "../lib/format-error";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -15,7 +16,7 @@ type AuthContextType = {
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  registerMutation: UseMutationResult<{ message: string }, Error, InsertUser>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -46,30 +47,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Provide friendly, actionable messaging
+      const message = userMessageFromError(error, "We couldn't log you in. Please check your credentials and try again.");
       toast({
         title: "Login failed",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
   });
 
-  const registerMutation = useMutation({
+  const registerMutation = useMutation<{ message: string }, Error, InsertUser>({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (result) => {
+      // Do not auto-login; guide user to verify email
       toast({
-        title: "Account created!",
-        description: `Welcome to ESPN Fantasy Manager, ${user.username}!`,
+        title: "Verify your email",
+        description: result?.message || "We sent you a verification email. Please verify to activate your account.",
       });
     },
     onError: (error: Error) => {
+      const message = userMessageFromError(error, "We couldn't create your account. Please check your details and try again.");
       toast({
         title: "Registration failed",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -90,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onError: (error: Error) => {
       toast({
         title: "Logout failed",
-        description: error.message,
+        description: userMessageFromError(error, "We couldn't log you out. Please try again."),
         variant: "destructive",
       });
     },
