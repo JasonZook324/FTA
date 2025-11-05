@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Complete
 
-Email verification has been successfully implemented in your Fantasy Tracker application using SendGrid.
+Email verification has been successfully implemented in your Fantasy Toolbox AI application using SendGrid.
 
 ## 📁 Files Created/Modified
 
@@ -26,7 +26,7 @@ Add these to your `.env` file:
 ```env
 SENDGRID_API_KEY=your_api_key_here
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-APP_NAME=Fantasy Tracker
+APP_NAME=Fantasy Toolbox AI
 APP_URL=http://localhost:5000
 ```
 

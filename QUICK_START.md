@@ -22,7 +22,7 @@ Add these to your `.env` file:
 ```env
 SENDGRID_API_KEY=SG.your_actual_api_key_here
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-APP_NAME=Fantasy Tracker
+APP_NAME=Fantasy Toolbox AI
 # For local development:
 APP_URL=http://localhost:5000
 # For production, change to:
