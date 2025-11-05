@@ -23,10 +23,15 @@ Add these to your `.env` file:
 SENDGRID_API_KEY=SG.your_actual_api_key_here
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 APP_NAME=Fantasy Tracker
+# For local development:
 APP_URL=http://localhost:5000
+# For production, change to:
+# APP_URL=https://fantasytoolboxai.com
 ```
 
-**Important**: Replace the placeholder values with your actual credentials!
+**Important**: 
+- Replace the placeholder values with your actual credentials!
+- ⚠️ **For production deployment**, update `APP_URL` to your actual domain (e.g., `https://fantasytoolboxai.com`) without a trailing slash
 
 ## Step 4: Test the Implementation
 
