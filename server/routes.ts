@@ -7,6 +7,7 @@ import {
   type EspnCredentials 
 } from "@shared/schema";
 import { z } from "zod";
+import bcrypt from "bcrypt";
 import { geminiService } from './geminiService';
 import { setupAuth } from "./auth";
 import { db } from "./db";
@@ -526,6 +527,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: 'Internal server error' 
       });
+    }
+  });
+
+  // Admin-only routes
+  // Middleware to check if user is admin (role 9 only)
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    if (req.user.role !== 9) {
+      return res.status(403).json({ message: "Access denied. Administrator privileges required." });
+    }
+    next();
+  };
+
+  // Get all users with email verification data
+  app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
+    try {
+      const usersWithVerification = await db
+        .select({
+          id: schema.users.id,
+          username: schema.users.username,
+          email: schema.users.email,
+          role: schema.users.role,
+          selectedLeagueId: schema.users.selectedLeagueId,
+          selectedTeamId: schema.users.selectedTeamId,
+          createdAt: schema.users.createdAt,
+          verified: schema.emailVerifications.verified,
+          verificationCreatedAt: schema.emailVerifications.createdAt,
+          verificationExpiresAt: schema.emailVerifications.expiresAt,
+        })
+        .from(schema.users)
+        .leftJoin(
+          schema.emailVerifications,
+          sql`${schema.emailVerifications.userId} = ${schema.users.id} AND ${schema.emailVerifications.verified} = true`
+        )
+        .orderBy(schema.users.createdAt);
+
+      res.json(usersWithVerification);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  // Update user (admin only)
+  app.patch("/api/admin/users/:userId", requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const updateSchema = z.object({
+        username: z.string().min(3).optional(),
+        email: z.string().email().optional(),
+        role: z.number().min(0).max(9).optional(),
+        password: z.string().min(6).optional(),
+      });
+
+      const updates = updateSchema.parse(req.body);
+
+      // Don't allow admin to modify their own role
+      if (userId === req.user.id && updates.role !== undefined) {
+        return res.status(400).json({ message: "Cannot modify your own role" });
+      }
+
+      // Check if username already exists (if updating username)
+      if (updates.username) {
+        const existingUser = await db
+          .select()
+          .from(schema.users)
+          .where(sql`LOWER(${schema.users.username}) = LOWER(${updates.username}) AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        
+        if (existingUser.length > 0) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      }
+
+      // Check if email already exists (if updating email)
+      if (updates.email) {
+        const normalizedEmail = updates.email.toLowerCase();
+        const existingEmail = await db
+          .select()
+          .from(schema.users)
+          .where(sql`${schema.users.email} = ${normalizedEmail} AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        
+        if (existingEmail.length > 0) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        updates.email = normalizedEmail;
+      }
+
+      // Hash password if provided
+      if (updates.password) {
+        const hashedPassword = await bcrypt.hash(updates.password, 10);
+        (updates as any).password = hashedPassword;
+      }
+
+      const updatedUser = await db
+        .update(schema.users)
+        .set(updates)
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      if (updatedUser.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(updatedUser[0]);
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      if (error?.issues) {
+        return res.status(400).json({ message: error.issues[0]?.message || "Invalid input" });
+      }
+      res.status(500).json({ message: 'Failed to update user' });
+    }
+  });
+
+  // Delete user (admin only)
+  app.delete("/api/admin/users/:userId", requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Don't allow admin to delete themselves
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const deletedUser = await db
+        .delete(schema.users)
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      if (deletedUser.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ message: "User deleted successfully", user: deletedUser[0] });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
     }
   });
 

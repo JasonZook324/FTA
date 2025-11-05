@@ -5,9 +5,11 @@ import { Redirect, Route } from "wouter";
 export function AdminRoute({
   path,
   component: Component,
+  adminOnly = false, // If true, only role 9 (admin) can access; if false, role 9 or 2 (admin/dev) can access
 }: {
   path: string;
   component: () => React.JSX.Element;
+  adminOnly?: boolean;
 }) {
   const { user, isLoading } = useAuth();
 
@@ -29,10 +31,12 @@ export function AdminRoute({
     );
   }
 
-  // Check if user is admin (role 9) or developer (role 2)
-  const isAdminOrDeveloper = user.role === 9 || user.role === 2;
+  // Check access based on adminOnly flag
+  const hasAccess = adminOnly 
+    ? user.role === 9 // Admin only
+    : (user.role === 9 || user.role === 2); // Admin or Developer
   
-  if (!isAdminOrDeveloper) {
+  if (!hasAccess) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen">
