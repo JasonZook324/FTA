@@ -17,6 +17,7 @@ import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
 import VerifyEmailPage from "@/pages/verify-email";
+import ManageMembers from "@/pages/manage-members";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -191,6 +192,17 @@ function App() {
                   <div className="flex-1 flex flex-col lg:ml-0">
                     <main className="flex-1 overflow-y-auto">
                       <ApiPlayground />
+                    </main>
+                  </div>
+                </div>
+              )} />
+              
+              <AdminRoute path="/manage-members" adminOnly={true} component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <main className="flex-1 overflow-y-auto">
+                      <ManageMembers />
                     </main>
                   </div>
                 </div>
