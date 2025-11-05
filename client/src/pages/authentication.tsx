@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertLeagueSchema, type League } from "@shared/schema";
+import { insertLeagueProfileSchema, type LeagueProfile } from "@shared/schema";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -49,7 +49,7 @@ export default function Authentication() {
   const [activeTab, setActiveTab] = useState<string>("join");
 
   // Query user leagues
-  const { data: leagues } = useQuery<League[]>({
+  const { data: leagues } = useQuery<LeagueProfile[]>({
     queryKey: ["/api/leagues"],
     enabled: !!userId,
   });
@@ -128,7 +128,7 @@ export default function Authentication() {
       {/* Header Bar */}
       <header className="bg-card border-b border-border px-6 py-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Authentication</h2>
+          <h2 className="text-2xl font-bold text-foreground">League Setup</h2>
           <p className="text-muted-foreground">Join or connect shareable ESPN fantasy leagues</p>
         </div>
       </header>

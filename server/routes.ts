@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertEspnCredentialsSchema,
-  insertLeagueSchema,
+  insertLeagueProfileSchema,
   type EspnCredentials 
 } from "@shared/schema";
 import { z } from "zod";
@@ -46,15 +46,12 @@ class EspnApiService {
       }
       
       const testUrl = `${this.baseUrl}/ffl/seasons/${credentials.testSeason}/segments/0/leagues/${credentials.testLeagueId}?view=mTeam`;
-      console.log(`ESPN API test URL:`, testUrl);
       
       try {
         const response = await fetch(testUrl, { 
           method: 'GET',
           headers: this.getHeaders(credentials)
         });
-        
-        console.log(`ESPN API response status:`, response.status);
         
         // Invalid credentials return 401 Unauthorized - definitive proof credentials are bad
         if (response.status === 401) {
@@ -78,7 +75,6 @@ class EspnApiService {
         if (response.status === 404) {
           try {
             const errorData = await response.json();
-            console.log(`ESPN API validation - Got 404, checking response:`, errorData);
             
             // Check if the error message indicates authentication issues
             if (errorData.messages && errorData.messages.some((msg: any) => 
@@ -970,6 +966,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Updated league profile: ${updatedProfile?.name}`);
       const league = updatedProfile;
+      
+      if (!league) {
+        return res.status(500).json({ message: "Failed to update league profile" });
+      }
 
       // Store teams using the FIXED logic with roster data for full team names
       if (leagueData.teams) {    
@@ -1514,6 +1514,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           settings: leagueData.settings || leagueProfile.settings,
           lastUpdated: new Date()
         });
+        
+        if (!league) {
+          return res.status(500).json({ message: "Failed to update league profile" });
+        }
       } else {
         // League profile doesn't exist - user should use the "Connect New League" flow instead
         return res.status(400).json({ 
@@ -1748,10 +1752,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const credentials = await storage.getEspnCredentials(league.userId);
-      if (!credentials || !credentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required" });
+      const leagueCredentials = await storage.getLeagueCredentials(league.id);
+      if (!leagueCredentials || !leagueCredentials.isValid) {
+        return res.status(401).json({ message: "Valid ESPN credentials required for this league" });
       }
+      
+      // Convert LeagueCredentials to EspnCredentials format for API service
+      const credentials = {
+        id: leagueCredentials.id,
+        userId: leagueCredentials.addedByUserId,
+        espnS2: leagueCredentials.espnS2,
+        swid: leagueCredentials.swid,
+        testLeagueId: null,
+        testSeason: null,
+        isValid: leagueCredentials.isValid,
+        createdAt: leagueCredentials.createdAt,
+        lastValidated: leagueCredentials.lastValidated
+      };
 
       const matchupsData = await espnApiService.getMatchups(
         credentials,
