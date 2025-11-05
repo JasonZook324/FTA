@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { z } from "zod";
 import { User as SelectUser } from "@shared/schema";
+import { createAndSendVerificationToken, isEmailVerified } from "./emailVerification";
 
 declare global {
   namespace Express {
@@ -55,8 +56,19 @@ export function setupAuth(app: Express) {
         }
 
         if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
+          return done(null, false, { message: "Invalid username or password" });
         }
+
+        // Check if email is verified (only if user has an email)
+        if (user.email) {
+          const verified = await isEmailVerified(user.id);
+          if (!verified) {
+            return done(null, false, { 
+              message: "Please verify your email address before logging in. Check your inbox and spam folder for the verification email."
+            });
+          }
+        }
+
         return done(null, user);
       } catch (e) {
         return done(e);
@@ -66,8 +78,15 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: string, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
+    try {
+      const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
+      done(null, user);
+    } catch (error) {
+      done(error, false);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
@@ -100,9 +119,27 @@ export function setupAuth(app: Express) {
         role: parsed.role ?? 0,
       } as any);
 
+      // Send verification email (don't fail registration if email fails)
+      const emailResult = await createAndSendVerificationToken(
+        user.id,
+        parsed.email,
+        parsed.username
+      );
+
+      if (!emailResult.success) {
+        console.warn(`Failed to send verification email to ${parsed.email}:`, emailResult.error);
+        // Continue with registration even if email fails
+      }
+
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        res.status(201).json({
+          ...user,
+          emailVerificationSent: emailResult.success,
+          message: emailResult.success 
+            ? 'Registration successful! Please check your email (including spam folder) to verify your account.' 
+            : 'Registration successful! However, we could not send a verification email. Please try resending it from your account.'
+        });
       });
     } catch (error: any) {
       if (error?.issues) {
@@ -116,7 +153,10 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
       if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
+        // Return the specific error message from the strategy (e.g., email verification required)
+        return res.status(401).json({ 
+          message: info?.message || "Invalid username or password" 
+        });
       }
       req.login(user, (err) => {
         if (err) return next(err);
