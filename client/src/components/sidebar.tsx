@@ -51,7 +51,7 @@ const useThemeSafe = () => {
 };
 
 const navigation = [
-  { name: "Fantasy Manager", href: "/authentication", icon: Key },
+  { name: "League Setup", href: "/authentication", icon: Key },
   { name: "Standings", href: "/standings", icon: BarChart3 },
   { name: "Team Rosters", href: "/rosters", icon: Users },
   { name: "Matchups", href: "/matchups", icon: Calendar },
@@ -97,7 +97,7 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto",
+        "fixed lg:static inset-y-0 left-0 z-40 w-94 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )} data-testid="sidebar">
       {/* Logo and Header */}
@@ -107,8 +107,8 @@ export default function Sidebar() {
             <Volleyball className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">ESPN Fantasy</h1>
-            <p className="text-xs text-muted-foreground">API Manager</p>
+            <h1 className="text-lg font-bold text-foreground">Fantasy Toolbox AI</h1>
+            <p className="text-xs text-muted-foreground">Your Playbook Just Got Smarter</p>
           </div>
         </div>
       </div>

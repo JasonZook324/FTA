@@ -78,7 +78,7 @@ export default function AuthPage() {
         <div className="w-full max-w-md">
           <div className="flex items-center gap-2 mb-8">
             <Activity className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">ESPN Fantasy Manager</h1>
+            <h1 className="text-2xl font-bold">Fantasy Toolbox AI</h1>
           </div>
 
           <Tabs defaultValue="login" className="w-full">
@@ -92,7 +92,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Welcome back</CardTitle>
                   <CardDescription>
-                    Log in to manage your ESPN Fantasy leagues
+                    Log in to manage your Fantasy Toolbox AI leagues
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -144,7 +144,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Create an account</CardTitle>
                   <CardDescription>
-                    Get started with ESPN Fantasy Manager
+                    Get started with Fantasy Toolbox AI
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -227,7 +227,8 @@ export default function AuthPage() {
       {/* Right side - Hero section */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/20 to-primary/5 items-center justify-center p-12">
         <div className="max-w-lg space-y-6">
-          <h2 className="text-4xl font-bold">Manage Your Fantasy League</h2>
+          <h2 className="text-4xl font-bold">Fantasy Toolbox AI</h2>
+          <p className="text-xl text-muted-foreground italic">Your Playbook Just Got Smarter</p>
           <div className="space-y-4 text-lg text-muted-foreground">
             <p className="flex items-start gap-3">
               <span className="text-primary mt-1">✓</span>
