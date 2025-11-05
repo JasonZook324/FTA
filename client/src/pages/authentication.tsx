@@ -128,7 +128,7 @@ export default function Authentication() {
       {/* Header Bar */}
       <header className="bg-card border-b border-border px-6 py-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">ESPN Fantasy Manager</h2>
+          <h2 className="text-2xl font-bold text-foreground">Authentication</h2>
           <p className="text-muted-foreground">Join or connect shareable ESPN fantasy leagues</p>
         </div>
       </header>
