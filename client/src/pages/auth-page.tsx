@@ -12,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { Activity } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const loginSchema = insertUserSchema.pick({ username: true, password: true });
 // Require and validate email on registration; normalize to lowercase
@@ -37,6 +37,42 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, setLocation] = useLocation();
+  
+  // Theme detection
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') {
+        return saved;
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  
+  // Listen for theme changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+  
+  // Preload both banner images
+  useEffect(() => {
+    const lightImg = new Image();
+    const darkImg = new Image();
+    lightImg.src = '/banner_light.png';
+    darkImg.src = '/banner_dark.png';
+  }, []);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -73,16 +109,18 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - Auth forms */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8">
-            <Activity className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Fantasy Toolbox AI</h1>
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-8">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center mb-8">
+          <img 
+            src={theme === 'light' ? '/banner_light.png' : '/banner_dark.png'}
+            alt="Fantasy Toolbox AI" 
+            className="h-64 w-auto transition-opacity duration-150"
+            key={theme}
+          />
+        </div>
 
-          <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
               <TabsTrigger value="register" data-testid="tab-register">Register</TabsTrigger>
@@ -225,34 +263,33 @@ export default function AuthPage() {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
 
-      {/* Right side - Hero section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/20 to-primary/5 items-center justify-center p-12">
-        <div className="max-w-lg space-y-6">
-          <h2 className="text-4xl font-bold">Fantasy Toolbox AI</h2>
-          <p className="text-xl text-muted-foreground italic">Your Playbook Just Got Smarter</p>
-          <div className="space-y-4 text-lg text-muted-foreground">
-            <p className="flex items-start gap-3">
-              <span className="text-primary mt-1">✓</span>
-              <span>Connect your ESPN credentials and import all your leagues</span>
-            </p>
-            <p className="flex items-start gap-3">
-              <span className="text-primary mt-1">✓</span>
-              <span>Get AI-powered recommendations and trade analysis</span>
-            </p>
-            <p className="flex items-start gap-3">
-              <span className="text-primary mt-1">✓</span>
-              <span>Export waiver wire and roster data to CSV</span>
-            </p>
-            <p className="flex items-start gap-3">
-              <span className="text-primary mt-1">✓</span>
-              <span>View detailed standings, matchups, and team rosters</span>
-            </p>
-          </div>
+          {/* Feature Card - moved below login/register */}
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="text-2xl">Fantasy Toolbox AI</CardTitle>
+              <CardDescription className="text-base italic">Your Playbook Just Got Smarter</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="flex items-start gap-3 text-sm">
+                <span className="text-primary mt-1">✓</span>
+                <span>Connect your ESPN credentials and import all your leagues</span>
+              </p>
+              <p className="flex items-start gap-3 text-sm">
+                <span className="text-primary mt-1">✓</span>
+                <span>Get AI-powered recommendations and trade analysis</span>
+              </p>
+              <p className="flex items-start gap-3 text-sm">
+                <span className="text-primary mt-1">✓</span>
+                <span>Export waiver wire and roster data to CSV</span>
+              </p>
+              <p className="flex items-start gap-3 text-sm">
+                <span className="text-primary mt-1">✓</span>
+                <span>View detailed standings, matchups, and team rosters</span>
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
     </div>
   );
 }

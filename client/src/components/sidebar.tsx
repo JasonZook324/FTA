@@ -71,6 +71,14 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useThemeSafe();
   const { user, logoutMutation } = useAuth();
   
+  // Preload both logo images
+  useEffect(() => {
+    const lightImg = new Image();
+    const darkImg = new Image();
+    lightImg.src = '/logo_light.png';
+    darkImg.src = '/logo_dark.png';
+  }, []);
+  
   const handleLogout = () => {
     logoutMutation.mutate();
     setIsOpen(false);
@@ -104,9 +112,12 @@ export default function Sidebar() {
       {/* Logo and Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Volleyball className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img 
+            src={theme === 'light' ? '/logo_light.png' : '/logo_dark.png'}
+            alt="Fantasy Toolbox AI Logo" 
+            className="w-16 h-16 rounded-lg object-cover transition-opacity duration-150"
+            key={theme}
+          />
           <div>
             <h1 className="text-lg font-bold text-foreground">Fantasy Toolbox AI</h1>
             <p className="text-xs text-muted-foreground">Your Playbook Just Got Smarter</p>
