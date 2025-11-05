@@ -19,6 +19,8 @@ import {
   Crown,
   Globe,
   Brain,
+  Eye,
+  EyeOff,
   AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +33,7 @@ export default function PromptBuilder() {
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [showPrompt, setShowPrompt] = useState(false);
 
   // AI submission state
   const [isSubmittingToAI, setIsSubmittingToAI] = useState(false);
@@ -42,7 +45,8 @@ export default function PromptBuilder() {
     responseTime: number;
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState("gpt-4-turbo");
+  // Use a widely available default and still allow overriding
+  const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
 
   // Data inclusion options
   const [includeMyTeam, setIncludeMyTeam] = useState(true);
@@ -120,6 +124,7 @@ export default function PromptBuilder() {
       
       const result = await response.json();
       setGeneratedPrompt(result.prompt);
+  setShowPrompt(false); // hide by default to save space
       
       toast({
         title: "Prompt Generated",
@@ -560,25 +565,46 @@ export default function PromptBuilder() {
                       </CardTitle>
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={copyToClipboard}
+                        variant="ghost"
+                        onClick={() => setShowPrompt(!showPrompt)}
                         className="flex items-center gap-2"
+                        data-testid="button-toggle-prompt-visibility"
                       >
-                        {copied ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                        {copied ? "Copied!" : "Copy"}
+                        {showPrompt ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPrompt ? "Hide prompt" : "Show prompt"}
                       </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <pre className="whitespace-pre-wrap text-sm font-mono">
-                        {generatedPrompt}
-                      </pre>
-                    </div>
+                    {showPrompt ? (
+                      <div className="space-y-3">
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={copyToClipboard}
+                            className="flex items-center gap-2"
+                            data-testid="button-copy-prompt"
+                          >
+                            {copied ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                            {copied ? "Copied!" : "Copy"}
+                          </Button>
+                        </div>
+                        <div className="bg-muted p-4 rounded-lg">
+                          <pre className="whitespace-pre-wrap text-sm font-mono">
+                            {generatedPrompt}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground" data-testid="text-prompt-hidden">
+                        Prompt hidden to save space. Click "Show prompt" if you want to review or copy it.
+                      </p>
+                    )}
 
                     {/* AI Model Selection and Submit Button */}
                     <div className="mt-4 space-y-4">
@@ -589,9 +615,11 @@ export default function PromptBuilder() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gpt-4" data-testid="option-gpt-4">GPT-4</SelectItem>
-                            <SelectItem value="gpt-4-turbo" data-testid="option-gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo" data-testid="option-gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                            <SelectItem value="gpt-4o" data-testid="option-gpt-4o">GPT-4o</SelectItem>
+                            <SelectItem value="gpt-4o-mini" data-testid="option-gpt-4o-mini">GPT-4o mini</SelectItem>
+                            <SelectItem value="gpt-4" data-testid="option-gpt-4">GPT-4 (legacy)</SelectItem>
+                            <SelectItem value="gpt-4-turbo" data-testid="option-gpt-4-turbo">GPT-4 Turbo (legacy)</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo" data-testid="option-gpt-3.5-turbo">GPT-3.5 Turbo (legacy)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
