@@ -3,11 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Sparkles, Loader2, Copy, Check } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { useTeam } from "@/contexts/TeamContext";
+import { Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTeam } from "@/contexts/TeamContext";
 
 interface TeamRosterProps {
   data: any;
@@ -18,42 +16,7 @@ interface TeamRosterProps {
 export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProps) {
   const { toast } = useToast();
   const { selectedTeam } = useTeam();
-  const [optimizingTeamId, setOptimizingTeamId] = useState<number | null>(null);
-  const [optimizationResult, setOptimizationResult] = useState<any>(null);
-  const [isOptimizing, setIsOptimizing] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const handleOptimizeLineup = async (teamId: number) => {
-    try {
-      setIsOptimizing(true);
-      
-      // Default options that make sense for lineup optimization
-      const options = {
-        includeFantasyPros: true,       // Expert rankings are crucial for lineup decisions
-        includeVegasOdds: true,         // Vegas lines help with game flow predictions
-        includeInjuryReports: true,     // Critical for lineup decisions
-        includeWeatherData: false,      // Less critical for weekly optimization
-        includeNewsUpdates: true,       // Breaking news affects lineups
-        includeMatchupAnalysis: true    // Matchup analysis is essential for start/sit
-      };
-
-      const response = await apiRequest("POST", `/api/leagues/${leagueId}/teams/${teamId}/optimize-lineup-prompt`, {
-        body: JSON.stringify({ options })
-      });
-      const result = await response.json();
-      setOptimizationResult(result);
-      setOptimizingTeamId(teamId);
-    } catch (error: any) {
-      console.error('Failed to generate lineup prompt:', error);
-      toast({
-        title: "Failed to generate prompt",
-        description: error.message || 'Unknown error',
-        variant: "destructive",
-      });
-    } finally {
-      setIsOptimizing(false);
-    }
-  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -175,7 +138,11 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
         const ownerName = getOwnerInfo(team);
         
         return (
-          <Card key={team.id} data-testid={`card-team-${team.id}`}>
+          <Card 
+            key={team.id} 
+            data-testid={`card-team-${team.id}`}
+            className={selectedTeam?.teamId === team.id ? "ring-2 ring-primary shadow-lg" : ""}
+          >
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -194,36 +161,18 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
-                      window.open(url, '_blank');
-                    }}
-                    data-testid={`button-export-team-${team.id}`}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export CSV
-                  </Button>
-                  {selectedTeam?.teamId === team.id && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleOptimizeLineup(team.id)}
-                      disabled={isOptimizing}
-                      data-testid={`button-optimize-team-${team.id}`}
-                    >
-                      {isOptimizing ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4 mr-2" />
-                      )}
-                      Optimize Lineup
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `/api/leagues/${leagueId}/teams/${team.id}/roster-export?t=${Date.now()}`;
+                    window.open(url, '_blank');
+                  }}
+                  data-testid={`button-export-team-${team.id}`}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -318,45 +267,6 @@ export default function TeamRoster({ data, isLoading, leagueId }: TeamRosterProp
           </Card>
         );
       })}
-
-      {/* Optimization Dialog */}
-      <Dialog open={optimizingTeamId !== null} onOpenChange={(open) => !open && setOptimizingTeamId(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                AI Lineup Optimization Prompt
-              </span>
-              {optimizationResult?.prompt && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyToClipboard(optimizationResult.prompt)}
-                  data-testid="button-copy-lineup-prompt"
-                >
-                  {copied ? (
-                    <><Check className="h-4 w-4 mr-2" /> Copied</>
-                  ) : (
-                    <><Copy className="h-4 w-4 mr-2" /> Copy Prompt</>
-                  )}
-                </Button>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              Copy this prompt and paste it into ChatGPT, Claude, or your preferred AI assistant to get lineup optimization recommendations
-            </DialogDescription>
-          </DialogHeader>
-
-          {optimizationResult?.prompt && (
-            <div className="mt-4">
-              <div className="p-4 bg-muted rounded-lg border border-border max-h-96 overflow-y-auto">
-                <pre className="text-sm whitespace-pre-wrap font-mono">{optimizationResult.prompt}</pre>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
