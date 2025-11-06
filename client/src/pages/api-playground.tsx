@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -94,6 +95,7 @@ export default function ApiPlayground() {
   const [copied, setCopied] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string>("players");
   const [endpointParams, setEndpointParams] = useState<Record<string, string>>({});
+  const [isCustomUrl, setIsCustomUrl] = useState<boolean>(false);
   const { toast } = useToast();
 
   // Database viewer state
@@ -111,6 +113,28 @@ export default function ApiPlayground() {
       queryParams: "",
       body: "",
     },
+  });
+
+  // Initialize manual mode and custom endpoint from localStorage
+  // and keep the endpoint in sync depending on the mode
+  // We intentionally keep this light-weight without extra deps
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useState(() => {
+    try {
+      const savedManual = localStorage.getItem('apiPlayground.isCustomUrl');
+      const savedEndpoint = localStorage.getItem('apiPlayground.customEndpoint');
+      if (savedManual === 'true') {
+        setIsCustomUrl(true);
+        if (savedEndpoint) {
+          form.setValue('endpoint', savedEndpoint);
+        }
+      } else {
+        // Ensure endpoint matches current defaults when not manual
+        const url = buildEndpointUrlFor(selectedEndpoint, endpointParams);
+        form.setValue('endpoint', url || form.getValues('endpoint'));
+      }
+    } catch {}
+    return undefined;
   });
 
   // Build endpoint URL from selected endpoint and parameters
@@ -149,8 +173,10 @@ export default function ApiPlayground() {
     setEndpointParams(defaultParams);
     
     // Update form endpoint value
-    const url = buildEndpointUrlFor(endpoint, defaultParams);
-    form.setValue("endpoint", url);
+    if (!isCustomUrl) {
+      const url = buildEndpointUrlFor(endpoint, defaultParams);
+      form.setValue("endpoint", url);
+    }
   };
 
   const buildEndpointUrlFor = (endpoint: string, params: Record<string, string>) => {
@@ -178,8 +204,10 @@ export default function ApiPlayground() {
   const handleParamChange = (paramName: string, value: string) => {
     const newParams = { ...endpointParams, [paramName]: value };
     setEndpointParams(newParams);
-    const url = buildEndpointUrlFor(selectedEndpoint, newParams);
-    form.setValue("endpoint", url);
+    if (!isCustomUrl) {
+      const url = buildEndpointUrlFor(selectedEndpoint, newParams);
+      form.setValue("endpoint", url);
+    }
   };
 
   const onSubmit = async (data: ApiRequestForm) => {
@@ -187,6 +215,17 @@ export default function ApiPlayground() {
     setResponse(null);
 
     try {
+      // Basic URL validation
+      try {
+        const test = new URL(data.endpoint);
+        if (!(test.protocol === 'http:' || test.protocol === 'https:')) {
+          throw new Error('Endpoint must start with http or https');
+        }
+      } catch (e: any) {
+        toast({ title: 'Invalid URL', description: e.message || 'Please provide a valid URL', variant: 'destructive' });
+        setIsLoading(false);
+        return;
+      }
       // Use backend proxy to avoid CORS issues
       const res = await fetch('/api/fantasy-pros-proxy', {
         method: 'POST',
@@ -244,19 +283,19 @@ export default function ApiPlayground() {
   };
 
   // Fetch tables
-  const { data: tablesData } = useQuery({
+  const { data: tablesData } = useQuery<{ tables?: any[] }>({
     queryKey: ['/api/db/tables'],
     enabled: true,
   });
 
   // Fetch columns for selected table
-  const { data: columnsData } = useQuery({
+  const { data: columnsData } = useQuery<{ columns?: any[] }>({
     queryKey: ['/api/db/tables', selectedTable, 'columns'],
     enabled: !!selectedTable,
   });
 
   // Fetch table data with filters
-  const { data: tableData, isLoading: isLoadingData, refetch: refetchTableData } = useQuery({
+  const { data: tableData, isLoading: isLoadingData, refetch: refetchTableData } = useQuery<{ data?: any[]; total?: number; hasMore?: boolean }>({
     queryKey: ['/api/db/tables', selectedTable, 'data', filters, page],
     queryFn: async () => {
       if (!selectedTable) return null;
@@ -425,16 +464,48 @@ export default function ApiPlayground() {
                       name="endpoint"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Generated Endpoint URL</FormLabel>
+                          <div className="flex items-center justify-between">
+                            <FormLabel>Endpoint URL</FormLabel>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Edit URL manually</span>
+                              <Switch
+                                checked={isCustomUrl}
+                                onCheckedChange={(checked) => {
+                                  setIsCustomUrl(!!checked);
+                                  // When turning off manual mode, regenerate from current params
+                                  if (!checked) {
+                                    const url = buildEndpointUrlFor(selectedEndpoint, endpointParams);
+                                    form.setValue('endpoint', url);
+                                    localStorage.removeItem('apiPlayground.customEndpoint');
+                                  } else {
+                                    // Persist current value as custom
+                                    localStorage.setItem('apiPlayground.customEndpoint', form.getValues('endpoint'));
+                                  }
+                                  localStorage.setItem('apiPlayground.isCustomUrl', String(!!checked));
+                                }}
+                                data-testid="switch-edit-url"
+                              />
+                            </div>
+                          </div>
                           <FormControl>
                             <Input 
-                              {...field}
+                              value={field.value}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                if (isCustomUrl) {
+                                  localStorage.setItem('apiPlayground.customEndpoint', e.target.value);
+                                }
+                              }}
                               data-testid="input-endpoint"
                               className="font-mono text-sm"
-                              readOnly
+                              readOnly={!isCustomUrl}
                             />
                           </FormControl>
-                          <FormDescription>Auto-generated from selected endpoint and parameters</FormDescription>
+                          <FormDescription>
+                            {isCustomUrl 
+                              ? 'Manual mode: editing URL directly (not overwritten by parameter changes).'
+                              : 'Auto-generated from selected endpoint and parameters'}
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -678,7 +749,7 @@ export default function ApiPlayground() {
                             <TableBody>
                               {tableData.data.map((row: any, idx: number) => (
                                 <TableRow key={idx} data-testid={`row-data-${idx}`}>
-                                  {columnsData.columns.map((column: any, colIdx: number) => {
+                                  {columnsData?.columns?.map((column: any, colIdx: number) => {
                                     const value = row[column.column_name];
                                     let cellValue = '-';
                                     
@@ -721,7 +792,7 @@ export default function ApiPlayground() {
                                           </DialogDescription>
                                         </DialogHeader>
                                         <div className="space-y-3">
-                                          {columnsData.columns.map((column: any) => {
+                                          {columnsData?.columns?.map((column: any) => {
                                             const value = row[column.column_name];
                                             let displayValue = '-';
                                             
@@ -757,9 +828,11 @@ export default function ApiPlayground() {
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, tableData.total)} of {tableData.total} rows
-                        </p>
+                        {typeof tableData?.total === 'number' && (
+                          <p className="text-sm text-muted-foreground">
+                            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, tableData.total)} of {tableData.total} rows
+                          </p>
+                        )}
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
