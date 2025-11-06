@@ -42,6 +42,12 @@ export default function Jobs() {
   const [matchupsRunning, setMatchupsRunning] = useState(false);
   const [matchupsMessage, setMatchupsMessage] = useState("");
 
+  // Defensive Rankings Validation parameters
+  const [defRankSeason, setDefRankSeason] = useState("2025");
+  const [defRankWeek, setDefRankWeek] = useState("");
+  const [defRankValidating, setDefRankValidating] = useState(false);
+  const [defRankResult, setDefRankResult] = useState<any>(null);
+
   // Set default week to current week when league data loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
@@ -53,7 +59,10 @@ export default function Jobs() {
     if (currentLeague?.currentWeek && !matchupsWeek) {
       setMatchupsWeek(currentLeague.currentWeek.toString());
     }
-  }, [currentLeague?.currentWeek, fpWeek, nflWeek, matchupsWeek]);
+    if (currentLeague?.currentWeek && !defRankWeek) {
+      setDefRankWeek(currentLeague.currentWeek.toString());
+    }
+  }, [currentLeague?.currentWeek, fpWeek, nflWeek, matchupsWeek, defRankWeek]);
 
   async function runJob(endpoint: string, body?: any): Promise<{ success: boolean; message: string }> {
     try {
@@ -221,6 +230,24 @@ export default function Jobs() {
     } else {
       setMatchupsMessage(`✗ ${result.message}`);
     }
+  }
+
+  async function validateDefensiveRankings() {
+    setDefRankValidating(true);
+    setDefRankResult(null);
+
+    try {
+      const res = await fetch(`/api/nfl/defensive-rankings/validate/${defRankSeason}/${defRankWeek}`);
+      const data = await res.json();
+      setDefRankResult(data);
+    } catch (err: any) {
+      setDefRankResult({
+        error: true,
+        message: err.message || "Failed to validate defensive rankings"
+      });
+    }
+
+    setDefRankValidating(false);
   }
 
   const getStepProgress = (steps: JobStep[]) => {
@@ -476,6 +503,136 @@ export default function Jobs() {
           {!matchupsWeek && (
             <p className="text-sm text-muted-foreground text-center">
               Please enter a week number to refresh matchups
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Defensive Rankings Validation */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            <CardTitle>Defensive Rankings Validation</CardTitle>
+          </div>
+          <CardDescription>
+            Validate NFL defensive rankings data coverage and identify missing teams
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="defrank-season">Season</Label>
+              <Input
+                id="defrank-season"
+                data-testid="input-defrank-season"
+                type="number"
+                value={defRankSeason}
+                onChange={(e) => setDefRankSeason(e.target.value)}
+                placeholder="2025"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="defrank-week">Week</Label>
+              <Input
+                id="defrank-week"
+                data-testid="input-defrank-week"
+                type="number"
+                value={defRankWeek}
+                onChange={(e) => setDefRankWeek(e.target.value)}
+                placeholder={currentLeague?.currentWeek ? `Current: ${currentLeague.currentWeek}` : "Enter week"}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Validation Results */}
+          {defRankResult && (
+            <div className="space-y-3 p-4 bg-muted rounded-md">
+              {defRankResult.error ? (
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">{defRankResult.message}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Status:</span>
+                    <div className="flex items-center gap-2">
+                      {defRankResult.isComplete ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <span className="text-green-600 font-medium">Complete</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          <span className="text-yellow-600 font-medium">Incomplete</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Teams with data:</span>
+                      <span className="ml-2 font-medium">{defRankResult.coverage?.teamsWithData}/{defRankResult.coverage?.totalTeams}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total mappings:</span>
+                      <span className="ml-2 font-medium">{defRankResult.totalMappings}</span>
+                    </div>
+                  </div>
+
+                  {defRankResult.coverage?.teamsMissingData?.length > 0 && (
+                    <div className="mt-3">
+                      <span className="text-sm font-medium text-destructive">Missing teams:</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {defRankResult.coverage.teamsMissingData.map((team: string) => (
+                          <span key={team} className="px-2 py-1 bg-destructive/10 text-destructive rounded text-xs">
+                            {team}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        ℹ️ Missing teams need to be added to the nflTeamStats table. Run the "Refresh All Kicker Streaming Data" job above to sync NFL team statistics.
+                      </p>
+                    </div>
+                  )}
+
+                  {defRankResult.coverage?.duplicateRanks?.length > 0 && (
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                      <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">⚠️ Duplicate Ranks Found:</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        {defRankResult.coverage.duplicateRanks.map((dup: any) => (
+                          <div key={dup.rank}>
+                            Rank #{dup.rank}: {dup.teams.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Validate Button */}
+          <Button
+            data-testid="button-validate-defrank"
+            disabled={defRankValidating || !defRankWeek}
+            onClick={validateDefensiveRankings}
+            className="w-full"
+            size="lg"
+          >
+            {defRankValidating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Validate Defensive Rankings
+          </Button>
+          {!defRankWeek && (
+            <p className="text-sm text-muted-foreground text-center">
+              Please enter a week number to validate
             </p>
           )}
         </CardContent>

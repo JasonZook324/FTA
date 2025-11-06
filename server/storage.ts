@@ -854,6 +854,8 @@ export class DatabaseStorage implements IStorage {
 
   async getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>> {
     try {
+      const { normalizeTeamAbbreviation, TEAM_ABBREVIATION_MAP } = await import('../shared/teamAbbreviations');
+      
       // Build query conditions
       const conditions = [eq(nflTeamStats.season, season)];
       if (week !== undefined && week !== null) {
@@ -872,12 +874,16 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Calculate points allowed per game for each team
-      const teamDefenseStats = teamStats.map(stat => ({
-        teamAbbr: stat.teamAbbreviation,
-        pointsAllowedPerGame: stat.gamesPlayed && stat.gamesPlayed > 0
-          ? (stat.pointsAllowed || 0) / stat.gamesPlayed
-          : stat.pointsAllowed || 0
-      }));
+      const teamDefenseStats = teamStats.map(stat => {
+        const canonical = normalizeTeamAbbreviation(stat.teamAbbreviation) || stat.teamAbbreviation;
+        return {
+          teamAbbr: canonical,
+          originalAbbr: stat.teamAbbreviation,
+          pointsAllowedPerGame: stat.gamesPlayed && stat.gamesPlayed > 0
+            ? (stat.pointsAllowed || 0) / stat.gamesPlayed
+            : stat.pointsAllowed || 0
+        };
+      });
 
       // Sort by points allowed per game (ascending = better defense)
       teamDefenseStats.sort((a, b) => a.pointsAllowedPerGame - b.pointsAllowedPerGame);
@@ -885,10 +891,18 @@ export class DatabaseStorage implements IStorage {
       // Assign ranks (1 = best defense/toughest matchup, 32 = worst defense/easiest matchup)
       const rankingsMap = new Map<string, number>();
       teamDefenseStats.forEach((stat, index) => {
-        rankingsMap.set(stat.teamAbbr, index + 1);
+        const rank = index + 1;
+        // Store rank for canonical abbreviation
+        rankingsMap.set(stat.teamAbbr, rank);
+        
+        // Also store rank for all variants of this team
+        const variants = TEAM_ABBREVIATION_MAP[stat.teamAbbr] || [];
+        variants.forEach(variant => {
+          rankingsMap.set(variant, rank);
+        });
       });
 
-      console.log(`Calculated defensive rankings for ${rankingsMap.size} teams`);
+      console.log(`Calculated defensive rankings for ${teamDefenseStats.length} teams with ${rankingsMap.size} total mappings`);
       return rankingsMap;
     } catch (error: any) {
       console.error('Error calculating defensive rankings:', error);
