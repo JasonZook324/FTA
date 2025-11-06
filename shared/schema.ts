@@ -38,6 +38,21 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const logs = pgTable("logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  level: text("level").notNull(), // 'debug', 'info', 'warn', 'error', 'fatal'
+  message: text("message").notNull(),
+  errorCode: text("error_code"),
+  source: text("source").notNull(), // e.g., 'routes.ts', 'emailService.ts', 'middleware'
+  stack: text("stack"), // Stack trace for errors
+  metadata: jsonb("metadata"), // Additional context as JSON
+  userAgent: text("user_agent"),
+  ip: text("ip"),
+  requestId: varchar("request_id"), // For correlating logs from same request
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
 export const espnCredentials = pgTable("espn_credentials", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -486,6 +501,13 @@ export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTo
   createdAt: true,
 });
 
+export const insertLogSchema = createInsertSchema(logs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type Log = typeof logs.$inferSelect;
+export type InsertLog = z.infer<typeof insertLogSchema>;
 export type NflStadium = typeof nflStadiums.$inferSelect;
 export type InsertNflStadium = z.infer<typeof insertNflStadiumSchema>;
 export type NflVegasOdds = typeof nflVegasOdds.$inferSelect;
