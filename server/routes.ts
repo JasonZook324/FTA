@@ -5256,6 +5256,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Data validation endpoint - check coverage of defensive rankings
+  app.get("/api/nfl/defensive-rankings/validate/:season/:week", requireAuth, async (req, res) => {
+    try {
+      const season = parseInt(req.params.season);
+      const week = parseInt(req.params.week);
+      
+      const { normalizeTeamAbbreviation } = await import('../shared/teamAbbreviations');
+      
+      // Get the rankings
+      const rankingsMap = await storage.getDefensiveRankings(season, week);
+      
+      // Expected 32 NFL teams
+      const expectedTeams = [
+        'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
+        'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+        'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG',
+        'NYJ', 'PHI', 'PIT', 'SF', 'SEA', 'TB', 'TEN', 'WAS'
+      ];
+      
+      const coverage = {
+        totalTeams: expectedTeams.length,
+        teamsWithData: 0,
+        teamsMissingData: [] as string[],
+        duplicateRanks: [] as Array<{rank: number, teams: string[]}>,
+        rankDistribution: {} as Record<number, string[]>
+      };
+      
+      // Check which teams have data
+      expectedTeams.forEach(team => {
+        const hasData = rankingsMap.has(team);
+        if (hasData) {
+          coverage.teamsWithData++;
+          const rank = rankingsMap.get(team)!;
+          if (!coverage.rankDistribution[rank]) {
+            coverage.rankDistribution[rank] = [];
+          }
+          coverage.rankDistribution[rank].push(team);
+        } else {
+          coverage.teamsMissingData.push(team);
+        }
+      });
+      
+      // Find duplicate ranks (should not happen)
+      Object.entries(coverage.rankDistribution).forEach(([rank, teams]) => {
+        if (teams.length > 1) {
+          coverage.duplicateRanks.push({ rank: parseInt(rank), teams });
+        }
+      });
+      
+      res.json({
+        season,
+        week,
+        coverage,
+        isComplete: coverage.teamsMissingData.length === 0,
+        totalMappings: rankingsMap.size
+      });
+    } catch (error: any) {
+      console.error('Defensive rankings validation error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to validate defensive rankings'
+      });
+    }
+  });
+
   // Kicker streaming recommendations
   app.get("/api/kicker-streaming", requireAuth, async (req, res) => {
     try {

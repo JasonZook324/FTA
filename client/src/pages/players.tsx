@@ -175,20 +175,20 @@ export default function Players() {
     
     // Get the player's pro team ID
     const proTeamId = getProTeamId(player);
-    if (!proTeamId) return "--";
+    if (!proTeamId) return "N/A";
     
     // Get team abbreviation
     const teamAbbr = getTeamAbbr(proTeamId);
-    if (!teamAbbr) return "--";
+    if (!teamAbbr) return "N/A";
     
     // Get opponent from matchups
     const opponent = getOpponentHelper(nflMatchups, teamAbbr);
-    if (!opponent) return "--";
+    if (!opponent) return "N/A";
     
     // Look up defensive ranking for opponent
     const rank = getOpponentRank(defensiveRankings, opponent);
     
-    return rank !== null ? rank.toString() : "--";
+    return rank !== null ? rank.toString() : "N/A";
   };
 
   // Helper function to get position rank color based on actual ranking
