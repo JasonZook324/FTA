@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -62,6 +62,7 @@ const navigation = [
   { name: "API Playground", href: "/api-playground", icon: FlaskConical },
   { name: "Jobs", href: "/jobs", icon: Volleyball },
   { name: "Streaming", href: "/streaming", icon: PlayCircle },
+  { name: "OPRK Sandbox", href: "/oprk-sandbox", icon: TestTube, adminOnly: true },
   { name: "Manage Members", href: "/manage-members", icon: UserCog },
 ];
 
@@ -134,6 +135,11 @@ export default function Sidebar() {
               const adminOnlyPages = ['API Playground', 'Jobs', 'Matchups', 'AI Recommendations', 'Trade Analyzer', 'Streaming'];
               if (adminOnlyPages.includes(item.name)) {
                 // Allow access for Admin (role 9) or Developer (role 2)
+                return user?.role === 9 || user?.role === 2;
+              }
+              
+              // Hide OPRK Sandbox for non-admin/developer users
+              if (item.adminOnly) {
                 return user?.role === 9 || user?.role === 2;
               }
               
