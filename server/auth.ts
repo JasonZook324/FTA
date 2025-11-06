@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { User as SelectUser } from "@shared/schema";
 import { createAndSendVerificationToken, isEmailVerified } from "./emailVerification";
+import { logger } from "./logger";
 
 declare global {
   namespace Express {
@@ -103,12 +104,24 @@ export function setupAuth(app: Express) {
       // Check username uniqueness (case-insensitive)
       const existingUser = await storage.getUserByUsername(parsed.username);
       if (existingUser) {
+        logger.warn(`Registration failed: Username already exists`, {
+          source: 'auth.register',
+          req,
+          errorCode: 'USERNAME_EXISTS',
+          metadata: { username: parsed.username },
+        });
         return res.status(400).json({ message: "Username already exists" });
       }
 
       // Check email uniqueness (case-insensitive)
       const existingEmail = await storage.getUserByEmail(parsed.email);
       if (existingEmail) {
+        logger.warn(`Registration failed: Email already in use`, {
+          source: 'auth.register',
+          req,
+          errorCode: 'EMAIL_EXISTS',
+          metadata: { email: parsed.email },
+        });
         return res.status(400).json({ message: "Email already in use" });
       }
 
@@ -119,6 +132,13 @@ export function setupAuth(app: Express) {
         role: parsed.role ?? 0,
       } as any);
 
+      logger.info(`User registered successfully: ${user.username}`, {
+        source: 'auth.register',
+        userId: user.id,
+        req,
+        metadata: { username: user.username, email: parsed.email },
+      });
+
       // Send verification email (don't fail registration if email fails)
       const emailResult = await createAndSendVerificationToken(
         user.id,
@@ -127,12 +147,26 @@ export function setupAuth(app: Express) {
       );
 
       if (!emailResult.success) {
-        console.warn(`Failed to send verification email to ${parsed.email}:`, emailResult.error);
+        logger.error(`Failed to send verification email`, emailResult.error || new Error('Unknown error'), {
+          source: 'auth.register',
+          userId: user.id,
+          req,
+          errorCode: 'EMAIL_SEND_FAILED',
+          metadata: { email: parsed.email },
+        });
         // Continue with registration even if email fails
       }
 
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          logger.error(`Login after registration failed`, err, {
+            source: 'auth.register',
+            userId: user.id,
+            req,
+            errorCode: 'LOGIN_AFTER_REGISTER_FAILED',
+          });
+          return next(err);
+        }
         res.status(201).json({
           ...user,
           emailVerificationSent: emailResult.success,
@@ -143,31 +177,86 @@ export function setupAuth(app: Express) {
       });
     } catch (error: any) {
       if (error?.issues) {
+        // Don't log validation errors - too noisy
         return res.status(400).json({ message: error.issues[0]?.message || "Invalid input" });
       }
+      logger.error(`Registration error`, error, {
+        source: 'auth.register',
+        req,
+        errorCode: 'REGISTRATION_ERROR',
+      });
       next(error);
     }
   });
 
   app.post("/api/login", (req, res, next) => {
+    const username = req.body.username;
+
     passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
-      if (err) return next(err);
+      if (err) {
+        logger.error(`Login authentication error`, err, {
+          source: 'auth.login',
+          req,
+          errorCode: 'LOGIN_AUTH_ERROR',
+          metadata: { username },
+        });
+        return next(err);
+      }
+      
       if (!user) {
+        // Only log failed login attempts, not every attempt
+        logger.warn(`Login failed for username: ${username}`, {
+          source: 'auth.login',
+          req,
+          errorCode: 'LOGIN_FAILED',
+          metadata: { username, reason: info?.message },
+        });
         // Return the specific error message from the strategy (e.g., email verification required)
         return res.status(401).json({ 
           message: info?.message || "Invalid username or password" 
         });
       }
+      
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          logger.error(`Login session creation failed`, err, {
+            source: 'auth.login',
+            userId: user.id,
+            req,
+            errorCode: 'LOGIN_SESSION_ERROR',
+            metadata: { username: user.username },
+          });
+          return next(err);
+        }
+        
+        // Log successful logins
+        logger.info(`User logged in: ${user.username}`, {
+          source: 'auth.login',
+          userId: user.id,
+          req,
+          metadata: { username: user.username },
+        });
+        
         res.status(200).json(user);
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
+    const userId = (req.user as SelectUser)?.id;
+    const username = (req.user as SelectUser)?.username;
+    
+    // Don't log every logout, only if there's an error
     req.logout((err) => {
-      if (err) return next(err);
+      if (err) {
+        logger.error(`Logout error`, err, {
+          source: 'auth.logout',
+          userId,
+          req,
+          errorCode: 'LOGOUT_ERROR',
+        });
+        return next(err);
+      }
       res.sendStatus(200);
     });
   });

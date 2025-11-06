@@ -3,6 +3,7 @@ import { db } from './db';
 import { passwordResetTokens, users } from '@shared/schema';
 import { eq, and, gt } from 'drizzle-orm';
 import { sendPasswordResetEmail } from './emailService';
+import { logger } from './logger';
 
 const TOKEN_EXPIRY_HOURS = 1; // Password reset tokens expire in 1 hour for security
 
@@ -35,7 +36,7 @@ export async function createAndSendPasswordResetToken(
 
     // Don't reveal whether the email exists or not (security best practice)
     if (!user) {
-      console.log(`Password reset requested for non-existent email: ${email}`);
+      // Don't log this - it's expected behavior for security
       return { 
         success: true 
         // We return success even if the email doesn't exist to prevent email enumeration
@@ -48,6 +49,12 @@ export async function createAndSendPasswordResetToken(
     const verified = await isEmailVerified(user.id);
     
     if (!verified) {
+      logger.warn(`Password reset attempted for unverified email`, {
+        source: 'passwordReset.create',
+        userId: user.id,
+        errorCode: 'EMAIL_NOT_VERIFIED',
+        metadata: { username: user.username },
+      });
       return {
         success: false,
         error: 'Email address has not been verified. Please verify your email first.',
@@ -79,10 +86,22 @@ export async function createAndSendPasswordResetToken(
       used: false,
     });
 
+    logger.info(`Password reset token created`, {
+      source: 'passwordReset.create',
+      userId: user.id,
+      metadata: { username: user.username },
+    });
+
     // Send password reset email (token in plain text)
     const emailSent = await sendPasswordResetEmail(email, user.username, token);
 
     if (!emailSent) {
+      logger.error(`Failed to send password reset email`, new Error('Email send failed'), {
+        source: 'passwordReset.create',
+        userId: user.id,
+        errorCode: 'PASSWORD_RESET_EMAIL_FAILED',
+        metadata: { username: user.username },
+      });
       return {
         success: false,
         error: 'Failed to send password reset email. Please try again later.',
