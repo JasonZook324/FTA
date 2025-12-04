@@ -189,8 +189,9 @@ async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<
     return { success: true, records: [] };
   }
   
-  // Use FP's dedicated DST endpoint for real IDs and names
-  const dstEndpoint = `https://api.fantasypros.com/public/v2/nfl/players?season=${season}&position=DST`;
+  // Use FP's players endpoint with DST position filter
+  // Must use same base URL format as main players endpoint (with /json/ in path)
+  const dstEndpoint = `${FP_BASE_URL}/NFL/players?position=DST`;
   console.log(`Fetching DST players from: ${dstEndpoint}`);
   
   let dstData;
