@@ -50,10 +50,12 @@ export default function Jobs() {
 
   // Unified Player Data parameters
   const [unifiedSport, setUnifiedSport] = useState("NFL");
-  const [unifiedSeason, setUnifiedSeason] = useState("2024");
-  const [unifiedScoringType, setUnifiedScoringType] = useState("PPR");
+  const [unifiedSeason, setUnifiedSeason] = useState(new Date().getFullYear().toString());
   const [unifiedSteps, setUnifiedSteps] = useState<JobStep[]>([]);
   const [unifiedRunning, setUnifiedRunning] = useState(false);
+  
+  // Get scoring type from the user's league settings
+  const leagueScoringType = currentLeague?.scoringType || "PPR";
 
   // Set default week to current week when league data loads
   useEffect(() => {
@@ -284,7 +286,7 @@ export default function Jobs() {
       { 
         endpoint: "/api/jobs/unified-refresh-defense-stats", 
         name: "Refresh Defense Stats",
-        body: { sport: unifiedSport, season: parseInt(unifiedSeason), scoringType: unifiedScoringType }
+        body: { sport: unifiedSport, season: parseInt(unifiedSeason), scoringType: leagueScoringType }
       },
       { 
         endpoint: "/api/jobs/unified-build-crosswalk", 
@@ -754,17 +756,11 @@ export default function Jobs() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="unified-scoring">Scoring Type</Label>
-              <Select value={unifiedScoringType} onValueChange={setUnifiedScoringType}>
-                <SelectTrigger id="unified-scoring" data-testid="select-unified-scoring">
-                  <SelectValue placeholder="Select scoring" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PPR">PPR</SelectItem>
-                  <SelectItem value="HALF_PPR">Half PPR</SelectItem>
-                  <SelectItem value="STD">Standard</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Scoring Type</Label>
+              <div className="h-10 px-3 py-2 bg-muted/50 border border-input rounded-md flex items-center text-sm">
+                {leagueScoringType}
+                <span className="ml-2 text-xs text-muted-foreground">(from league settings)</span>
+              </div>
             </div>
           </div>
 
