@@ -306,6 +306,27 @@ export async function refreshDefenseStats(
   }
 }
 
+function normalizeNameForCanonicalKey(name: string): string {
+  let normalized = name.toLowerCase().trim();
+  
+  const suffixes = [
+    ' iv', ' iii', ' ii', ' v',
+    ' jr.', ' jr', ' junior',
+    ' sr.', ' sr', ' senior',
+  ];
+  
+  for (const suffix of suffixes) {
+    if (normalized.endsWith(suffix)) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+  
+  return normalized
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/\s+/g, '');
+}
+
 function normalizeForCanonicalKey(str: string): string {
   return str
     .toLowerCase()
@@ -314,13 +335,12 @@ function normalizeForCanonicalKey(str: string): string {
 }
 
 function createCanonicalKey(firstName: string | null, lastName: string | null, team: string | null, position: string | null): string {
-  const parts = [
-    normalizeForCanonicalKey(firstName || ''),
-    normalizeForCanonicalKey(lastName || ''),
-    normalizeForCanonicalKey(team || ''),
-    normalizeForCanonicalKey(position || '')
-  ];
-  return parts.join('');
+  const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+  const normalizedName = normalizeNameForCanonicalKey(fullName);
+  const normalizedTeam = normalizeForCanonicalKey(team || '');
+  const normalizedPosition = normalizeForCanonicalKey(position || '');
+  
+  return `${normalizedName}${normalizedTeam}${normalizedPosition}`;
 }
 
 export async function buildCrosswalk(
