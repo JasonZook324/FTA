@@ -1122,20 +1122,24 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFpPlayersWithoutEspnMatch(): Promise<{ deleted: number }> {
     // Delete FP players that don't have a matching ESPN player
-    // Match is based on canonical key: normalized name + team + position
+    // Match is based on normalized name (stripping suffixes like II, Jr., Sr.) + team + position
+    // Common suffix patterns: II, III, IV, V, Jr., Jr, Sr., Sr
+    // Note: Using double backslash for regex escape in JS template literal
+    const suffixPattern = '\\s+(II|III|IV|V|Jr\\.?|Sr\\.?|Junior|Senior)$';
     const result = await db.execute(sql`
       DELETE FROM fp_player_data fp
       WHERE NOT EXISTS (
         SELECT 1 FROM espn_player_data espn
         WHERE espn.sport = fp.sport
           AND espn.season = fp.season
-          AND UPPER(TRIM(espn.full_name)) = UPPER(TRIM(fp.full_name))
           AND UPPER(espn.team) = UPPER(fp.team)
           AND (
             UPPER(espn.position) = UPPER(fp.position)
             OR (UPPER(espn.position) = 'DEF' AND UPPER(fp.position) = 'DST')
             OR (UPPER(espn.position) = 'DST' AND UPPER(fp.position) = 'DEF')
           )
+          AND UPPER(TRIM(REGEXP_REPLACE(espn.full_name, ${suffixPattern}, '', 'i'))) 
+            = UPPER(TRIM(REGEXP_REPLACE(fp.full_name, ${suffixPattern}, '', 'i')))
       )
     `);
     return { deleted: result.rowCount || 0 };
