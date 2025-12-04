@@ -23,7 +23,14 @@ The frontend is a React 18 application with TypeScript, built with a component-b
 - **Jobs Page**: Provides automated, sequential data refresh workflows with visual progress tracking for tasks like refreshing NFL Kicker Streaming data and Fantasy Pros data.
 - **AI Prompt Builder**: Generates customizable prompts for AI assistants, including league settings, team rosters, waiver wire players, matchups, and standings. It automatically enriches player listings with injury status, news headlines, and optional rankings/projections.
 - **OpenAI Integration**: Allows direct submission of generated prompts to OpenAI's API for in-app AI analysis, with model selection (GPT-4 Turbo, GPT-4, GPT-3.5 Turbo), request tracking, and robust error handling.
-- **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system includes `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk` tables, and a `players_master` materialized view. It also calculates OPRK (Opponent Rank) for NFL defenses. DST (Defense/Special Teams) data is fetched from FP's dedicated `/players?position=DST` endpoint with fallback to synthetic entries for any missing teams.
+- **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system includes:
+  - Database tables: `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk`
+  - Materialized view: `players_master` combining all player data with rankings, projections, and matchups
+  - **Two-Pass Matching Strategy**: First pass matches by exact name+team+position; second pass uses fuzzy matching (name+position only) with team as a soft signal. This handles players with outdated team info (trades, free agent signings).
+  - **Match Confidence Levels**: `exact` (full match), `fuzzy` (team mismatch logged), `unmatched` (no FP match - legitimate data gaps)
+  - DST data formatted as "{Nickname} D/ST" (e.g., "Eagles D/ST") for consistent matching
+  - No synthetic/fallback data - unmatched players remain with null `fp_player_id`
+  - Achieves ~82% match rate (634 of 777 ESPN players matched to FP for NFL 2024)
 - **Data Parity Validation**: The Jobs page includes a Data Parity Validation section to analyze ESPN vs FantasyPros data matching, showing match rates, position breakdowns, and unmatched players. This helps monitor data quality between the two sources.
 
 ## External Dependencies

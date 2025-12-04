@@ -317,7 +317,8 @@ export async function refreshFpPlayers(
     };
 
     // Fantasy-relevant positions only (matches ESPN's fantasy API)
-    const fantasyPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DST']);
+    // Note: DEF/DST are handled separately by fetchFpDstPlayers with proper name formatting
+    const fantasyPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
 
     const playerRecords: InsertFpPlayerData[] = [];
     let skippedNonFantasy = 0;
@@ -377,10 +378,10 @@ export async function refreshFpPlayers(
     console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy, added ${dstResult.records.length} DST)`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
     
-    // After upserting, remove FP players that don't have an ESPN match
-    // This ensures FP data only includes players that ESPN considers fantasy-relevant
-    const deleteResult = await storage.deleteFpPlayersWithoutEspnMatch();
-    console.log(`Removed ${deleteResult.deleted} FP players without ESPN match`);
+    // NOTE: We no longer delete FP players without ESPN match pre-crosswalk
+    // This was causing valid FP players with outdated team info to be deleted
+    // before they could be matched by name+position in the crosswalk.
+    // The crosswalk now handles matching more flexibly.
 
     console.log(`✓ FP players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
     return { 
@@ -477,6 +478,7 @@ function normalizeForCanonicalKey(str: string): string {
     .replace(/\s+/g, '');
 }
 
+// Create canonical key with team+position (for exact matching)
 function createCanonicalKey(firstName: string | null, lastName: string | null, team: string | null, position: string | null): string {
   const fullName = `${firstName || ''} ${lastName || ''}`.trim();
   const normalizedName = normalizeNameForCanonicalKey(fullName);
@@ -486,10 +488,26 @@ function createCanonicalKey(firstName: string | null, lastName: string | null, t
   return `${normalizedName}${normalizedTeam}${normalizedPosition}`;
 }
 
+// Create a name+position only key (for fuzzy matching when teams differ)
+function createNamePositionKey(firstName: string | null, lastName: string | null, position: string | null): string {
+  const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+  const normalizedName = normalizeNameForCanonicalKey(fullName);
+  const normalizedPosition = normalizeForCanonicalKey(position || '');
+  
+  return `${normalizedName}${normalizedPosition}`;
+}
+
+// Normalize position for matching (DEF/DST equivalence)
+function normalizePosition(pos: string | null): string {
+  const p = (pos || '').toUpperCase();
+  if (p === 'DST') return 'DEF';
+  return p;
+}
+
 export async function buildCrosswalk(
   sport: string = 'NFL',
   season: number = 2024
-): Promise<{ success: boolean; recordCount: number; matched: number; unmatched: number; error?: string }> {
+): Promise<{ success: boolean; recordCount: number; matched: number; unmatched: number; teamMismatches: number; error?: string }> {
   try {
     console.log(`Building player crosswalk for ${sport} ${season}...`);
 
@@ -502,6 +520,7 @@ export async function buildCrosswalk(
         recordCount: 0, 
         matched: 0, 
         unmatched: 0, 
+        teamMismatches: 0,
         error: `No ESPN players found for ${sport} ${season}. Run "Refresh ESPN Players" first.` 
       };
     }
@@ -512,56 +531,106 @@ export async function buildCrosswalk(
         recordCount: 0, 
         matched: 0, 
         unmatched: 0, 
+        teamMismatches: 0,
         error: `No FP players found for ${sport} ${season}. Run "Refresh FP Players" first.` 
       };
     }
 
-    const fpPlayerMap = new Map<string, typeof fpPlayers[0]>();
+    // Build two maps for FP players:
+    // 1. Exact match map (name+team+position)
+    // 2. Fuzzy match map (name+position only, for team mismatch fallback)
+    const fpExactMap = new Map<string, typeof fpPlayers[0]>();
+    const fpFuzzyMap = new Map<string, typeof fpPlayers[0][]>();
+    
     for (const fp of fpPlayers) {
-      const key = createCanonicalKey(fp.firstName, fp.lastName, fp.team, fp.position);
-      fpPlayerMap.set(key, fp);
+      const exactKey = createCanonicalKey(fp.firstName, fp.lastName, fp.team, fp.position);
+      fpExactMap.set(exactKey, fp);
+      
+      // For fuzzy matching, normalize position (DEF/DST)
+      const fuzzyKey = createNamePositionKey(fp.firstName, fp.lastName, normalizePosition(fp.position));
+      if (!fpFuzzyMap.has(fuzzyKey)) {
+        fpFuzzyMap.set(fuzzyKey, []);
+      }
+      fpFuzzyMap.get(fuzzyKey)!.push(fp);
     }
 
     const crosswalkRecords: InsertPlayerCrosswalk[] = [];
-    let matched = 0;
+    const matchedFpIds = new Set<string>();
+    let exactMatched = 0;
+    let fuzzyMatched = 0;
     let unmatched = 0;
 
+    // Pass 1: Match ESPN players to FP players
     for (const espn of espnPlayers) {
-      const canonicalKey = createCanonicalKey(espn.firstName, espn.lastName, espn.team, espn.position);
-      const fpMatch = fpPlayerMap.get(canonicalKey);
-
+      const exactKey = createCanonicalKey(espn.firstName, espn.lastName, espn.team, espn.position);
+      
+      // Try exact match first (name+team+position)
+      let fpMatch = fpExactMap.get(exactKey);
+      let matchType: 'exact' | 'fuzzy' | 'unmatched' = 'exact';
+      let teamMismatchNote: string | null = null;
+      
       if (fpMatch) {
-        crosswalkRecords.push({
-          canonicalKey,
-          sport,
-          season,
-          espnPlayerId: espn.espnPlayerId,
-          fpPlayerId: fpMatch.fpPlayerId,
-          matchConfidence: 'exact',
-          manualOverride: false,
-          notes: null
-        });
-        matched++;
+        matchedFpIds.add(fpMatch.fpPlayerId);
+        exactMatched++;
       } else {
-        crosswalkRecords.push({
-          canonicalKey,
-          sport,
-          season,
-          espnPlayerId: espn.espnPlayerId,
-          fpPlayerId: null,
-          matchConfidence: 'unmatched',
-          manualOverride: false,
-          notes: `No FP match found for ${espn.fullName} (${espn.team} ${espn.position})`
-        });
-        unmatched++;
+        // Try fuzzy match (name+position only, ignore team)
+        const fuzzyKey = createNamePositionKey(espn.firstName, espn.lastName, normalizePosition(espn.position));
+        const fuzzyMatches = fpFuzzyMap.get(fuzzyKey) || [];
+        
+        // Filter to unmatched FP players
+        const availableMatches = fuzzyMatches.filter(fp => !matchedFpIds.has(fp.fpPlayerId));
+        
+        if (availableMatches.length === 1) {
+          // Single match - use it with team mismatch note
+          fpMatch = availableMatches[0];
+          matchedFpIds.add(fpMatch.fpPlayerId);
+          matchType = 'fuzzy';
+          teamMismatchNote = `Team mismatch: ESPN(${espn.team}) vs FP(${fpMatch.team})`;
+          fuzzyMatched++;
+        } else if (availableMatches.length > 1) {
+          // Multiple matches - try to find best match by team similarity
+          const teamMatch = availableMatches.find(fp => 
+            (fp.team || '').toUpperCase() === (espn.team || '').toUpperCase()
+          );
+          if (teamMatch) {
+            fpMatch = teamMatch;
+            matchedFpIds.add(fpMatch.fpPlayerId);
+            exactMatched++;
+          } else {
+            // Use first available if no team match
+            fpMatch = availableMatches[0];
+            matchedFpIds.add(fpMatch.fpPlayerId);
+            matchType = 'fuzzy';
+            teamMismatchNote = `Team mismatch: ESPN(${espn.team}) vs FP(${fpMatch.team}). ${availableMatches.length} candidates.`;
+            fuzzyMatched++;
+          }
+        } else {
+          matchType = 'unmatched';
+          unmatched++;
+        }
       }
+
+      const canonicalKey = createCanonicalKey(espn.firstName, espn.lastName, espn.team, espn.position);
+      
+      crosswalkRecords.push({
+        canonicalKey,
+        sport,
+        season,
+        espnPlayerId: espn.espnPlayerId,
+        fpPlayerId: fpMatch?.fpPlayerId || null,
+        matchConfidence: matchType,
+        manualOverride: false,
+        notes: matchType === 'unmatched' 
+          ? `No FP match found for ${espn.fullName} (${espn.team} ${espn.position})`
+          : teamMismatchNote
+      });
     }
 
+    // Pass 2: Add unmatched FP players (FP-only)
+    let fpOnly = 0;
     for (const fp of fpPlayers) {
-      const canonicalKey = createCanonicalKey(fp.firstName, fp.lastName, fp.team, fp.position);
-      const alreadyMatched = crosswalkRecords.find(r => r.fpPlayerId === fp.fpPlayerId);
-      
-      if (!alreadyMatched) {
+      if (!matchedFpIds.has(fp.fpPlayerId)) {
+        const canonicalKey = createCanonicalKey(fp.firstName, fp.lastName, fp.team, fp.position);
         crosswalkRecords.push({
           canonicalKey,
           sport,
@@ -570,25 +639,30 @@ export async function buildCrosswalk(
           fpPlayerId: fp.fpPlayerId,
           matchConfidence: 'unmatched',
           manualOverride: false,
-          notes: `No ESPN match found for ${fp.fullName} (${fp.team} ${fp.position})`
+          notes: `FP-only: No ESPN match for ${fp.fullName} (${fp.team} ${fp.position})`
         });
+        fpOnly++;
         unmatched++;
       }
     }
 
-    console.log(`Processing ${crosswalkRecords.length} crosswalk records (${matched} matched, ${unmatched} unmatched)...`);
+    const totalMatched = exactMatched + fuzzyMatched;
+    console.log(`Crosswalk matching: ${exactMatched} exact, ${fuzzyMatched} fuzzy/team-mismatch, ${unmatched} unmatched (${fpOnly} FP-only)`);
+    console.log(`Processing ${crosswalkRecords.length} crosswalk records...`);
+    
     const result = await storage.bulkUpsertPlayerCrosswalk(crosswalkRecords);
 
     console.log(`✓ Crosswalk build complete: ${result.inserted} inserted, ${result.updated} updated`);
     return { 
       success: true, 
       recordCount: result.inserted + result.updated,
-      matched,
-      unmatched
+      matched: totalMatched,
+      unmatched,
+      teamMismatches: fuzzyMatched
     };
   } catch (error: any) {
     console.error('Error building crosswalk:', error);
-    return { success: false, recordCount: 0, matched: 0, unmatched: 0, error: error.message };
+    return { success: false, recordCount: 0, matched: 0, unmatched: 0, teamMismatches: 0, error: error.message };
   }
 }
 

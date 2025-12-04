@@ -55,9 +55,10 @@ current_matchups AS (
   FROM nfl_matchups
   ORDER BY season, team_abbr, week DESC
 ),
--- Get the most recent defense vs position stats (season average or latest week)
+-- Get the most recent defense vs position stats - PPR by default, fallback to any available
+-- Uses DISTINCT ON without scoring_type to avoid row multiplication in joins
 current_defense_stats AS (
-  SELECT DISTINCT ON (sport, season, defense_team, position, scoring_type)
+  SELECT DISTINCT ON (sport, season, defense_team, position)
     sport,
     season,
     defense_team,
@@ -67,7 +68,9 @@ current_defense_stats AS (
     scoring_type,
     week
   FROM defense_vs_position_stats
-  ORDER BY sport, season, defense_team, position, scoring_type, week DESC NULLS LAST
+  ORDER BY sport, season, defense_team, position, 
+    CASE scoring_type WHEN 'PPR' THEN 0 WHEN 'HALF' THEN 1 ELSE 2 END,
+    week DESC NULLS LAST
 )
 SELECT 
   xw.id as crosswalk_id,
