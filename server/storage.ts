@@ -3,17 +3,21 @@ import {
   type EspnCredentials, type InsertEspnCredentials,
   type Team, type InsertTeam,
   type Matchup, type InsertMatchup,
-  type Player, type InsertPlayer,
   type LeagueProfile, type InsertLeagueProfile,
   type LeagueCredentials, type InsertLeagueCredentials,
   type UserLeague, type InsertUserLeague,
   type NflMatchup, type InsertNflMatchup,
-  users, espnCredentials, teams, matchups, players,
+  type EspnPlayerData, type InsertEspnPlayerData,
+  type FpPlayerData, type InsertFpPlayerData,
+  type DefenseVsPositionStats, type InsertDefenseVsPositionStats,
+  type PlayerCrosswalk, type InsertPlayerCrosswalk,
+  users, espnCredentials, teams, matchups,
   leagueProfiles, leagueCredentials, userLeagues,
-  nflMatchups, nflVegasOdds, nflTeamStats
+  nflMatchups, nflVegasOdds, nflTeamStats,
+  espnPlayerData, fpPlayerData, defenseVsPositionStats, playerCrosswalk
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ilike } from "drizzle-orm";
+import { eq, and, ilike, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import session from "express-session";
 import type { Store } from "express-session";
@@ -52,13 +56,6 @@ export interface IStorage {
   updateMatchup(id: string, matchup: Partial<Matchup>): Promise<Matchup | undefined>;
   deleteMatchup(id: string): Promise<boolean>;
 
-  // Player methods
-  getPlayers(): Promise<Player[]>;
-  getPlayer(espnPlayerId: number): Promise<Player | undefined>;
-  createPlayer(player: InsertPlayer): Promise<Player>;
-  updatePlayer(id: string, player: Partial<Player>): Promise<Player | undefined>;
-  deletePlayer(id: string): Promise<boolean>;
-
   // League Profile methods (shareable leagues)
   getAllLeagueProfiles(): Promise<LeagueProfile[]>;
   getLeagueProfile(id: string): Promise<LeagueProfile | undefined>;
@@ -84,6 +81,43 @@ export interface IStorage {
   
   // NFL Defensive Rankings (OPRK) methods
   getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>>;
+
+  // ============================================
+  // UNIFIED PLAYER DATA METHODS
+  // ============================================
+
+  // ESPN Player Data methods
+  getEspnPlayerData(sport: string, season: number): Promise<EspnPlayerData[]>;
+  getEspnPlayerById(sport: string, season: number, espnPlayerId: number): Promise<EspnPlayerData | undefined>;
+  upsertEspnPlayerData(data: InsertEspnPlayerData): Promise<EspnPlayerData>;
+  bulkUpsertEspnPlayerData(dataList: InsertEspnPlayerData[]): Promise<{ inserted: number; updated: number }>;
+  deleteEspnPlayerData(sport: string, season: number): Promise<number>;
+
+  // FP Player Data methods
+  getFpPlayerData(sport: string, season: number): Promise<FpPlayerData[]>;
+  getFpPlayerById(sport: string, season: number, fpPlayerId: string): Promise<FpPlayerData | undefined>;
+  upsertFpPlayerData(data: InsertFpPlayerData): Promise<FpPlayerData>;
+  bulkUpsertFpPlayerData(dataList: InsertFpPlayerData[]): Promise<{ inserted: number; updated: number }>;
+  deleteFpPlayerData(sport: string, season: number): Promise<number>;
+
+  // Defense vs Position Stats methods
+  getDefenseVsPositionStats(sport: string, season: number, scoringType?: string): Promise<DefenseVsPositionStats[]>;
+  upsertDefenseVsPositionStats(data: InsertDefenseVsPositionStats): Promise<DefenseVsPositionStats>;
+  bulkUpsertDefenseVsPositionStats(dataList: InsertDefenseVsPositionStats[]): Promise<{ inserted: number; updated: number }>;
+  deleteDefenseVsPositionStats(sport: string, season: number): Promise<number>;
+
+  // Player Crosswalk methods
+  getPlayerCrosswalk(sport: string, season: number): Promise<PlayerCrosswalk[]>;
+  getCrosswalkByCanonicalKey(sport: string, season: number, canonicalKey: string): Promise<PlayerCrosswalk | undefined>;
+  getCrosswalkByEspnId(sport: string, season: number, espnPlayerId: number): Promise<PlayerCrosswalk | undefined>;
+  getCrosswalkByFpId(sport: string, season: number, fpPlayerId: string): Promise<PlayerCrosswalk | undefined>;
+  upsertPlayerCrosswalk(data: InsertPlayerCrosswalk): Promise<PlayerCrosswalk>;
+  bulkUpsertPlayerCrosswalk(dataList: InsertPlayerCrosswalk[]): Promise<{ inserted: number; updated: number }>;
+  deletePlayerCrosswalk(sport: string, season: number): Promise<number>;
+
+  // Players Master View methods
+  refreshPlayersMasterView(): Promise<{ success: boolean; rowCount: number; error?: string }>;
+  getPlayersMaster(sport: string, season: number, filters?: { team?: string; position?: string }): Promise<any[]>;
 }
 
 const MemoryStore = createMemoryStore(session);
@@ -95,7 +129,6 @@ export class MemStorage implements IStorage {
   private espnCredentials: Map<string, EspnCredentials>;
   private teams: Map<string, Team>;
   private matchups: Map<string, Matchup>;
-  private players: Map<string, Player>;
   private leagueProfiles: Map<string, LeagueProfile>;
   private leagueCredentials: Map<string, LeagueCredentials>;
   private userLeagues: Map<string, UserLeague>;
@@ -108,7 +141,6 @@ export class MemStorage implements IStorage {
     this.espnCredentials = new Map();
     this.teams = new Map();
     this.matchups = new Map();
-    this.players = new Map();
     this.leagueProfiles = new Map();
     this.leagueCredentials = new Map();
     this.userLeagues = new Map();
@@ -282,44 +314,6 @@ export class MemStorage implements IStorage {
     return this.matchups.delete(id);
   }
 
-  // Player methods
-  async getPlayers(): Promise<Player[]> {
-    return Array.from(this.players.values());
-  }
-
-  async getPlayer(espnPlayerId: number): Promise<Player | undefined> {
-    return Array.from(this.players.values()).find(
-      (player) => player.espnPlayerId === espnPlayerId,
-    );
-  }
-
-  async createPlayer(player: InsertPlayer): Promise<Player> {
-    const id = randomUUID();
-    const newPlayer: Player = { 
-      ...player, 
-      id,
-      team: player.team ?? null,
-      position: player.position ?? null,
-      isActive: player.isActive ?? null,
-      stats: player.stats ?? null
-    };
-    this.players.set(id, newPlayer);
-    return newPlayer;
-  }
-
-  async updatePlayer(id: string, updates: Partial<Player>): Promise<Player | undefined> {
-    const existing = this.players.get(id);
-    if (!existing) return undefined;
-    
-    const updated: Player = { ...existing, ...updates };
-    this.players.set(id, updated);
-    return updated;
-  }
-
-  async deletePlayer(id: string): Promise<boolean> {
-    return this.players.delete(id);
-  }
-
   // League Profile methods (not implemented in memory storage)
   async getAllLeagueProfiles(): Promise<LeagueProfile[]> {
     throw new Error("League profiles not supported in memory storage");
@@ -384,6 +378,102 @@ export class MemStorage implements IStorage {
   async getDefensiveRankings(season: number, week?: number): Promise<Map<string, number>> {
     // MemStorage doesn't support this - return empty map
     return new Map();
+  }
+
+  // ============================================
+  // UNIFIED PLAYER DATA METHODS (MemStorage stubs)
+  // ============================================
+
+  async getEspnPlayerData(sport: string, season: number): Promise<EspnPlayerData[]> {
+    throw new Error("ESPN player data not supported in memory storage");
+  }
+
+  async getEspnPlayerById(sport: string, season: number, espnPlayerId: number): Promise<EspnPlayerData | undefined> {
+    throw new Error("ESPN player data not supported in memory storage");
+  }
+
+  async upsertEspnPlayerData(data: InsertEspnPlayerData): Promise<EspnPlayerData> {
+    throw new Error("ESPN player data not supported in memory storage");
+  }
+
+  async bulkUpsertEspnPlayerData(dataList: InsertEspnPlayerData[]): Promise<{ inserted: number; updated: number }> {
+    throw new Error("ESPN player data not supported in memory storage");
+  }
+
+  async deleteEspnPlayerData(sport: string, season: number): Promise<number> {
+    throw new Error("ESPN player data not supported in memory storage");
+  }
+
+  async getFpPlayerData(sport: string, season: number): Promise<FpPlayerData[]> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async getFpPlayerById(sport: string, season: number, fpPlayerId: string): Promise<FpPlayerData | undefined> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async upsertFpPlayerData(data: InsertFpPlayerData): Promise<FpPlayerData> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async bulkUpsertFpPlayerData(dataList: InsertFpPlayerData[]): Promise<{ inserted: number; updated: number }> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async deleteFpPlayerData(sport: string, season: number): Promise<number> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async getDefenseVsPositionStats(sport: string, season: number, scoringType?: string): Promise<DefenseVsPositionStats[]> {
+    throw new Error("Defense vs position stats not supported in memory storage");
+  }
+
+  async upsertDefenseVsPositionStats(data: InsertDefenseVsPositionStats): Promise<DefenseVsPositionStats> {
+    throw new Error("Defense vs position stats not supported in memory storage");
+  }
+
+  async bulkUpsertDefenseVsPositionStats(dataList: InsertDefenseVsPositionStats[]): Promise<{ inserted: number; updated: number }> {
+    throw new Error("Defense vs position stats not supported in memory storage");
+  }
+
+  async deleteDefenseVsPositionStats(sport: string, season: number): Promise<number> {
+    throw new Error("Defense vs position stats not supported in memory storage");
+  }
+
+  async getPlayerCrosswalk(sport: string, season: number): Promise<PlayerCrosswalk[]> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async getCrosswalkByCanonicalKey(sport: string, season: number, canonicalKey: string): Promise<PlayerCrosswalk | undefined> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async getCrosswalkByEspnId(sport: string, season: number, espnPlayerId: number): Promise<PlayerCrosswalk | undefined> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async getCrosswalkByFpId(sport: string, season: number, fpPlayerId: string): Promise<PlayerCrosswalk | undefined> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async upsertPlayerCrosswalk(data: InsertPlayerCrosswalk): Promise<PlayerCrosswalk> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async bulkUpsertPlayerCrosswalk(dataList: InsertPlayerCrosswalk[]): Promise<{ inserted: number; updated: number }> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async deletePlayerCrosswalk(sport: string, season: number): Promise<number> {
+    throw new Error("Player crosswalk not supported in memory storage");
+  }
+
+  async refreshPlayersMasterView(): Promise<{ success: boolean; rowCount: number; error?: string }> {
+    return { success: false, rowCount: 0, error: "Players master view not supported in memory storage" };
+  }
+
+  async getPlayersMaster(sport: string, season: number, filters?: { team?: string; position?: string }): Promise<any[]> {
+    throw new Error("Players master view not supported in memory storage");
   }
 }
 
@@ -558,43 +648,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(matchups)
       .where(eq(matchups.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
-  }
-
-  // Player methods
-  async getPlayers(): Promise<Player[]> {
-    return await db.select().from(players);
-  }
-
-  async getPlayer(espnPlayerId: number): Promise<Player | undefined> {
-    const [player] = await db
-      .select()
-      .from(players)
-      .where(eq(players.espnPlayerId, espnPlayerId));
-    return player || undefined;
-  }
-
-  async createPlayer(player: InsertPlayer): Promise<Player> {
-    const [newPlayer] = await db
-      .insert(players)
-      .values(player)
-      .returning();
-    return newPlayer;
-  }
-
-  async updatePlayer(id: string, updates: Partial<Player>): Promise<Player | undefined> {
-    const [updated] = await db
-      .update(players)
-      .set(updates)
-      .where(eq(players.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deletePlayer(id: string): Promise<boolean> {
-    const result = await db
-      .delete(players)
-      .where(eq(players.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
@@ -908,6 +961,413 @@ export class DatabaseStorage implements IStorage {
       console.error('Error calculating defensive rankings:', error);
       return new Map();
     }
+  }
+
+  // ============================================
+  // UNIFIED PLAYER DATA METHODS (DatabaseStorage)
+  // ============================================
+
+  // ESPN Player Data methods
+  async getEspnPlayerData(sport: string, season: number): Promise<EspnPlayerData[]> {
+    return await db
+      .select()
+      .from(espnPlayerData)
+      .where(and(
+        eq(espnPlayerData.sport, sport),
+        eq(espnPlayerData.season, season)
+      ));
+  }
+
+  async getEspnPlayerById(sport: string, season: number, espnPlayerId: number): Promise<EspnPlayerData | undefined> {
+    const [player] = await db
+      .select()
+      .from(espnPlayerData)
+      .where(and(
+        eq(espnPlayerData.sport, sport),
+        eq(espnPlayerData.season, season),
+        eq(espnPlayerData.espnPlayerId, espnPlayerId)
+      ));
+    return player || undefined;
+  }
+
+  async upsertEspnPlayerData(data: InsertEspnPlayerData): Promise<EspnPlayerData> {
+    const existing = await this.getEspnPlayerById(data.sport, data.season, data.espnPlayerId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(espnPlayerData)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(espnPlayerData.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [inserted] = await db
+        .insert(espnPlayerData)
+        .values(data)
+        .returning();
+      return inserted;
+    }
+  }
+
+  async bulkUpsertEspnPlayerData(dataList: InsertEspnPlayerData[]): Promise<{ inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const data of dataList) {
+      const existing = await this.getEspnPlayerById(data.sport, data.season, data.espnPlayerId);
+      
+      if (existing) {
+        await db
+          .update(espnPlayerData)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(espnPlayerData.id, existing.id));
+        updated++;
+      } else {
+        await db.insert(espnPlayerData).values(data);
+        inserted++;
+      }
+    }
+    
+    return { inserted, updated };
+  }
+
+  async deleteEspnPlayerData(sport: string, season: number): Promise<number> {
+    const result = await db
+      .delete(espnPlayerData)
+      .where(and(
+        eq(espnPlayerData.sport, sport),
+        eq(espnPlayerData.season, season)
+      ));
+    return result.rowCount || 0;
+  }
+
+  // FP Player Data methods
+  async getFpPlayerData(sport: string, season: number): Promise<FpPlayerData[]> {
+    return await db
+      .select()
+      .from(fpPlayerData)
+      .where(and(
+        eq(fpPlayerData.sport, sport),
+        eq(fpPlayerData.season, season)
+      ));
+  }
+
+  async getFpPlayerById(sport: string, season: number, fpPlayerId: string): Promise<FpPlayerData | undefined> {
+    const [player] = await db
+      .select()
+      .from(fpPlayerData)
+      .where(and(
+        eq(fpPlayerData.sport, sport),
+        eq(fpPlayerData.season, season),
+        eq(fpPlayerData.fpPlayerId, fpPlayerId)
+      ));
+    return player || undefined;
+  }
+
+  async upsertFpPlayerData(data: InsertFpPlayerData): Promise<FpPlayerData> {
+    const existing = await this.getFpPlayerById(data.sport, data.season, data.fpPlayerId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(fpPlayerData)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(fpPlayerData.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [inserted] = await db
+        .insert(fpPlayerData)
+        .values(data)
+        .returning();
+      return inserted;
+    }
+  }
+
+  async bulkUpsertFpPlayerData(dataList: InsertFpPlayerData[]): Promise<{ inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const data of dataList) {
+      const existing = await this.getFpPlayerById(data.sport, data.season, data.fpPlayerId);
+      
+      if (existing) {
+        await db
+          .update(fpPlayerData)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(fpPlayerData.id, existing.id));
+        updated++;
+      } else {
+        await db.insert(fpPlayerData).values(data);
+        inserted++;
+      }
+    }
+    
+    return { inserted, updated };
+  }
+
+  async deleteFpPlayerData(sport: string, season: number): Promise<number> {
+    const result = await db
+      .delete(fpPlayerData)
+      .where(and(
+        eq(fpPlayerData.sport, sport),
+        eq(fpPlayerData.season, season)
+      ));
+    return result.rowCount || 0;
+  }
+
+  // Defense vs Position Stats methods
+  async getDefenseVsPositionStats(sport: string, season: number, scoringType?: string): Promise<DefenseVsPositionStats[]> {
+    const conditions = [
+      eq(defenseVsPositionStats.sport, sport),
+      eq(defenseVsPositionStats.season, season)
+    ];
+    
+    if (scoringType) {
+      conditions.push(eq(defenseVsPositionStats.scoringType, scoringType));
+    }
+    
+    return await db
+      .select()
+      .from(defenseVsPositionStats)
+      .where(and(...conditions));
+  }
+
+  async upsertDefenseVsPositionStats(data: InsertDefenseVsPositionStats): Promise<DefenseVsPositionStats> {
+    // Build unique key conditions
+    const conditions = [
+      eq(defenseVsPositionStats.sport, data.sport),
+      eq(defenseVsPositionStats.season, data.season),
+      eq(defenseVsPositionStats.defenseTeam, data.defenseTeam),
+      eq(defenseVsPositionStats.position, data.position)
+    ];
+    
+    // Handle week (can be null for season averages)
+    if (data.week !== null && data.week !== undefined) {
+      conditions.push(eq(defenseVsPositionStats.week, data.week));
+    }
+    
+    // Handle scoringType (can be null)
+    if (data.scoringType) {
+      conditions.push(eq(defenseVsPositionStats.scoringType, data.scoringType));
+    }
+    
+    const [existing] = await db
+      .select()
+      .from(defenseVsPositionStats)
+      .where(and(...conditions));
+    
+    if (existing) {
+      const [updated] = await db
+        .update(defenseVsPositionStats)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(defenseVsPositionStats.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [inserted] = await db
+        .insert(defenseVsPositionStats)
+        .values(data)
+        .returning();
+      return inserted;
+    }
+  }
+
+  async bulkUpsertDefenseVsPositionStats(dataList: InsertDefenseVsPositionStats[]): Promise<{ inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const data of dataList) {
+      const conditions = [
+        eq(defenseVsPositionStats.sport, data.sport),
+        eq(defenseVsPositionStats.season, data.season),
+        eq(defenseVsPositionStats.defenseTeam, data.defenseTeam),
+        eq(defenseVsPositionStats.position, data.position)
+      ];
+      
+      if (data.week !== null && data.week !== undefined) {
+        conditions.push(eq(defenseVsPositionStats.week, data.week));
+      }
+      
+      if (data.scoringType) {
+        conditions.push(eq(defenseVsPositionStats.scoringType, data.scoringType));
+      }
+      
+      const [existing] = await db
+        .select()
+        .from(defenseVsPositionStats)
+        .where(and(...conditions));
+      
+      if (existing) {
+        await db
+          .update(defenseVsPositionStats)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(defenseVsPositionStats.id, existing.id));
+        updated++;
+      } else {
+        await db.insert(defenseVsPositionStats).values(data);
+        inserted++;
+      }
+    }
+    
+    return { inserted, updated };
+  }
+
+  async deleteDefenseVsPositionStats(sport: string, season: number): Promise<number> {
+    const result = await db
+      .delete(defenseVsPositionStats)
+      .where(and(
+        eq(defenseVsPositionStats.sport, sport),
+        eq(defenseVsPositionStats.season, season)
+      ));
+    return result.rowCount || 0;
+  }
+
+  // Player Crosswalk methods
+  async getPlayerCrosswalk(sport: string, season: number): Promise<PlayerCrosswalk[]> {
+    return await db
+      .select()
+      .from(playerCrosswalk)
+      .where(and(
+        eq(playerCrosswalk.sport, sport),
+        eq(playerCrosswalk.season, season)
+      ));
+  }
+
+  async getCrosswalkByCanonicalKey(sport: string, season: number, canonicalKey: string): Promise<PlayerCrosswalk | undefined> {
+    const [record] = await db
+      .select()
+      .from(playerCrosswalk)
+      .where(and(
+        eq(playerCrosswalk.sport, sport),
+        eq(playerCrosswalk.season, season),
+        eq(playerCrosswalk.canonicalKey, canonicalKey)
+      ));
+    return record || undefined;
+  }
+
+  async getCrosswalkByEspnId(sport: string, season: number, espnPlayerId: number): Promise<PlayerCrosswalk | undefined> {
+    const [record] = await db
+      .select()
+      .from(playerCrosswalk)
+      .where(and(
+        eq(playerCrosswalk.sport, sport),
+        eq(playerCrosswalk.season, season),
+        eq(playerCrosswalk.espnPlayerId, espnPlayerId)
+      ));
+    return record || undefined;
+  }
+
+  async getCrosswalkByFpId(sport: string, season: number, fpPlayerId: string): Promise<PlayerCrosswalk | undefined> {
+    const [record] = await db
+      .select()
+      .from(playerCrosswalk)
+      .where(and(
+        eq(playerCrosswalk.sport, sport),
+        eq(playerCrosswalk.season, season),
+        eq(playerCrosswalk.fpPlayerId, fpPlayerId)
+      ));
+    return record || undefined;
+  }
+
+  async upsertPlayerCrosswalk(data: InsertPlayerCrosswalk): Promise<PlayerCrosswalk> {
+    const existing = await this.getCrosswalkByCanonicalKey(data.sport, data.season, data.canonicalKey);
+    
+    if (existing) {
+      // Don't overwrite manual overrides unless explicitly told to
+      if (existing.manualOverride && !data.manualOverride) {
+        return existing;
+      }
+      
+      const [updated] = await db
+        .update(playerCrosswalk)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(playerCrosswalk.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [inserted] = await db
+        .insert(playerCrosswalk)
+        .values(data)
+        .returning();
+      return inserted;
+    }
+  }
+
+  async bulkUpsertPlayerCrosswalk(dataList: InsertPlayerCrosswalk[]): Promise<{ inserted: number; updated: number }> {
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const data of dataList) {
+      const existing = await this.getCrosswalkByCanonicalKey(data.sport, data.season, data.canonicalKey);
+      
+      if (existing) {
+        // Don't overwrite manual overrides
+        if (existing.manualOverride && !data.manualOverride) {
+          continue;
+        }
+        
+        await db
+          .update(playerCrosswalk)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(playerCrosswalk.id, existing.id));
+        updated++;
+      } else {
+        await db.insert(playerCrosswalk).values(data);
+        inserted++;
+      }
+    }
+    
+    return { inserted, updated };
+  }
+
+  async deletePlayerCrosswalk(sport: string, season: number): Promise<number> {
+    const result = await db
+      .delete(playerCrosswalk)
+      .where(and(
+        eq(playerCrosswalk.sport, sport),
+        eq(playerCrosswalk.season, season)
+      ));
+    return result.rowCount || 0;
+  }
+
+  // Players Master View methods
+  async refreshPlayersMasterView(): Promise<{ success: boolean; rowCount: number; error?: string }> {
+    try {
+      console.log('Refreshing players_master materialized view...');
+      
+      // Refresh the materialized view
+      await db.execute(sql`REFRESH MATERIALIZED VIEW players_master`);
+      
+      // Get the row count
+      const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM players_master`);
+      const rowCount = parseInt((countResult.rows[0] as any)?.count || '0');
+      
+      console.log(`✓ Successfully refreshed players_master view with ${rowCount} rows`);
+      return { success: true, rowCount };
+    } catch (error: any) {
+      console.error('Error refreshing players_master view:', error);
+      return { success: false, rowCount: 0, error: error.message };
+    }
+  }
+
+  async getPlayersMaster(sport: string, season: number, filters?: { team?: string; position?: string }): Promise<any[]> {
+    let query = `SELECT * FROM players_master WHERE sport = $1 AND season = $2`;
+    const params: any[] = [sport, season];
+    
+    if (filters?.team) {
+      params.push(filters.team);
+      query += ` AND team = $${params.length}`;
+    }
+    
+    if (filters?.position) {
+      params.push(filters.position);
+      query += ` AND position = $${params.length}`;
+    }
+    
+    query += ` ORDER BY full_name`;
+    
+    const result = await db.execute(sql.raw(query));
+    return result.rows as any[];
   }
 }
 
