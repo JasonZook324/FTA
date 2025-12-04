@@ -48,6 +48,29 @@ export default function Jobs() {
   const [defRankValidating, setDefRankValidating] = useState(false);
   const [defRankResult, setDefRankResult] = useState<any>(null);
 
+  // Unified Player Data parameters
+  const [unifiedSeason, setUnifiedSeason] = useState(new Date().getFullYear().toString());
+  const [unifiedSteps, setUnifiedSteps] = useState<JobStep[]>([]);
+  const [unifiedRunning, setUnifiedRunning] = useState(false);
+  
+  // Players Master Viewer parameters
+  const [viewerSeason, setViewerSeason] = useState(new Date().getFullYear().toString());
+  const [viewerTeam, setViewerTeam] = useState<string>("");
+  const [viewerPosition, setViewerPosition] = useState<string>("");
+  const [viewerPlayers, setViewerPlayers] = useState<any[]>([]);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState<string>("");
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  
+  // Parity Validation parameters
+  const [paritySeason, setParitySeason] = useState(new Date().getFullYear().toString());
+  const [parityLoading, setParityLoading] = useState(false);
+  const [parityResult, setParityResult] = useState<any>(null);
+  const [parityError, setParityError] = useState<string>("");
+  
+  // Get scoring type from the user's league settings
+  const leagueScoringType = currentLeague?.scoringType || "PPR";
+
   // Set default week to current week when league data loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
@@ -249,6 +272,134 @@ export default function Jobs() {
 
     setDefRankValidating(false);
   }
+
+  async function runUnifiedPlayerJobs() {
+    setUnifiedRunning(true);
+    setStatus("");
+    
+    const jobs: JobStep[] = [
+      { name: "Refresh ESPN Players", status: 'pending' },
+      { name: "Refresh FP Players", status: 'pending' },
+      { name: "Refresh Defense Stats", status: 'pending' },
+      { name: "Build Crosswalk", status: 'pending' },
+      { name: "Refresh Players Master", status: 'pending' },
+    ];
+    setUnifiedSteps(jobs);
+
+    const jobConfigs = [
+      { 
+        endpoint: "/api/jobs/unified-refresh-espn-players", 
+        name: "Refresh ESPN Players",
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-fp-players", 
+        name: "Refresh FP Players",
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-defense-stats", 
+        name: "Refresh Defense Stats",
+        body: { sport: "NFL", season: parseInt(unifiedSeason), scoringType: leagueScoringType }
+      },
+      { 
+        endpoint: "/api/jobs/unified-build-crosswalk", 
+        name: "Build Crosswalk",
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-players-master", 
+        name: "Refresh Players Master",
+        body: {}
+      },
+    ];
+
+    for (let i = 0; i < jobConfigs.length; i++) {
+      const config = jobConfigs[i];
+      
+      setUnifiedSteps(prev => prev.map((step, idx) => 
+        idx === i ? { ...step, status: 'running' } : step
+      ));
+
+      const result = await runJob(config.endpoint, config.body);
+
+      setUnifiedSteps(prev => prev.map((step, idx) => 
+        idx === i ? { 
+          ...step, 
+          status: result.success ? 'completed' : 'error',
+          message: result.message
+        } : step
+      ));
+
+      if (!result.success) {
+        setStatus(`Failed at: ${config.name} - ${result.message}`);
+        setUnifiedRunning(false);
+        return;
+      }
+    }
+
+    setUnifiedRunning(false);
+    setStatus("✓ All unified player data refreshed successfully!");
+  }
+
+  async function fetchPlayersMaster() {
+    setViewerLoading(true);
+    setViewerError("");
+    setSelectedPlayer(null);
+    
+    try {
+      let url = `/api/players/unified/NFL/${viewerSeason}`;
+      const params = new URLSearchParams();
+      if (viewerTeam && viewerTeam !== 'all') params.append('team', viewerTeam);
+      if (viewerPosition && viewerPosition !== 'all') params.append('position', viewerPosition);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setViewerPlayers(data.players || []);
+      } else {
+        setViewerError(data.message || 'Failed to fetch players');
+        setViewerPlayers([]);
+      }
+    } catch (err: any) {
+      setViewerError(err.message || 'Failed to fetch players');
+      setViewerPlayers([]);
+    }
+    
+    setViewerLoading(false);
+  }
+  
+  async function runParityCheck() {
+    setParityLoading(true);
+    setParityError("");
+    setParityResult(null);
+    
+    try {
+      const res = await fetch(`/api/jobs/unified-parity-check/NFL/${paritySeason}`);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setParityResult(data);
+      } else {
+        setParityError(data.message || 'Failed to run parity check');
+      }
+    } catch (err: any) {
+      setParityError(err.message || 'Failed to run parity check');
+    }
+    
+    setParityLoading(false);
+  }
+
+  const NFL_TEAMS = [
+    'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
+    'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+    'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG',
+    'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
+  ];
+
+  const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
   const getStepProgress = (steps: JobStep[]) => {
     const completed = steps.filter(s => s.status === 'completed').length;
@@ -634,6 +785,376 @@ export default function Jobs() {
             <p className="text-sm text-muted-foreground text-center">
               Please enter a week number to validate
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Unified Player Data Refresh */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            <CardTitle>Unified Player Data</CardTitle>
+          </div>
+          <CardDescription>
+            Build the unified player database by combining ESPN and FantasyPros data into a single view.
+            Includes OPRK (opponent rank) calculations and player ID crosswalk.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="unified-season">Season</Label>
+              <Input
+                id="unified-season"
+                data-testid="input-unified-season"
+                type="number"
+                value={unifiedSeason}
+                onChange={(e) => setUnifiedSeason(e.target.value)}
+                placeholder={new Date().getFullYear().toString()}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Scoring Type</Label>
+              <div className="h-10 px-3 py-2 bg-muted/50 border border-input rounded-md flex items-center text-sm">
+                {leagueScoringType}
+                <span className="ml-2 text-xs text-muted-foreground">(from league settings)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Steps */}
+          {unifiedSteps.length > 0 && (
+            <div className="space-y-2">
+              <Progress value={getStepProgress(unifiedSteps)} className="h-2" />
+              <div className="space-y-1">
+                {unifiedSteps.map((step, idx) => (
+                  <StepIndicator key={idx} step={step} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Info Box */}
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm">
+            <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">This job will:</p>
+            <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
+              <li>Fetch player data from ESPN API → espn_player_data table</li>
+              <li>Copy existing FP players → fp_player_data table</li>
+              <li>Calculate defense vs position rankings → defense_vs_position_stats table</li>
+              <li>Match ESPN to FP players → player_crosswalk table</li>
+              <li>Refresh the unified players_master view</li>
+            </ol>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <Button
+              data-testid="button-refresh-unified-players"
+              disabled={unifiedRunning}
+              onClick={runUnifiedPlayerJobs}
+              className="flex-1"
+              size="lg"
+            >
+              {unifiedRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh All Unified Player Data
+            </Button>
+            <Button
+              data-testid="button-clear-unified-data"
+              variant="outline"
+              disabled={unifiedRunning}
+              onClick={async () => {
+                setStatus("Clearing unified player data...");
+                const result = await runJob("/api/jobs/unified-clear-data");
+                setStatus(result.success ? "✓ Unified player data cleared" : `Failed: ${result.message}`);
+                setUnifiedSteps([]);
+              }}
+              size="lg"
+            >
+              Clear Data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Players Master Viewer */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            <CardTitle>Players Master Viewer</CardTitle>
+          </div>
+          <CardDescription>
+            Test and view the merged player data from the players_master materialized view.
+            See how ESPN and FantasyPros data are combined into unified player objects.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="viewer-season">Season</Label>
+              <Input
+                id="viewer-season"
+                data-testid="input-viewer-season"
+                type="number"
+                value={viewerSeason}
+                onChange={(e) => setViewerSeason(e.target.value)}
+                placeholder={new Date().getFullYear().toString()}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viewer-team">Team (Optional)</Label>
+              <Select value={viewerTeam} onValueChange={setViewerTeam}>
+                <SelectTrigger data-testid="select-viewer-team">
+                  <SelectValue placeholder="All Teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {NFL_TEAMS.map(team => (
+                    <SelectItem key={team} value={team}>{team}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viewer-position">Position (Optional)</Label>
+              <Select value={viewerPosition} onValueChange={setViewerPosition}>
+                <SelectTrigger data-testid="select-viewer-position">
+                  <SelectValue placeholder="All Positions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Positions</SelectItem>
+                  {POSITIONS.map(pos => (
+                    <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                data-testid="button-fetch-players-master"
+                onClick={fetchPlayersMaster}
+                disabled={viewerLoading}
+                className="w-full"
+              >
+                {viewerLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Fetch Players
+              </Button>
+            </div>
+          </div>
+
+          {/* Error Display */}
+          {viewerError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-700 dark:text-red-300">
+              {viewerError}
+            </div>
+          )}
+
+          {/* Results Summary */}
+          {viewerPlayers.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              Found {viewerPlayers.length} players
+            </div>
+          )}
+
+          {/* Players Table */}
+          {viewerPlayers.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Team</th>
+                      <th className="text-left p-3 font-medium">Pos</th>
+                      <th className="text-left p-3 font-medium">ESPN ID</th>
+                      <th className="text-left p-3 font-medium">FP ID</th>
+                      <th className="text-left p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {viewerPlayers.slice(0, 100).map((player, idx) => (
+                      <tr key={idx} className="hover:bg-muted/50">
+                        <td className="p-3">{player.full_name || player.fullName}</td>
+                        <td className="p-3">{player.team}</td>
+                        <td className="p-3">{player.position}</td>
+                        <td className="p-3 font-mono text-xs">{player.espn_player_id || '-'}</td>
+                        <td className="p-3 font-mono text-xs">{player.fp_player_id || '-'}</td>
+                        <td className="p-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedPlayer(player)}
+                            data-testid={`button-view-player-${idx}`}
+                          >
+                            View JSON
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {viewerPlayers.length > 100 && (
+                <div className="p-3 bg-muted text-sm text-muted-foreground text-center">
+                  Showing first 100 of {viewerPlayers.length} players. Use filters to narrow results.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Selected Player JSON */}
+          {selectedPlayer && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Player Object JSON</Label>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedPlayer(null)}>
+                  Close
+                </Button>
+              </div>
+              <div className="p-4 bg-muted rounded-lg overflow-x-auto max-h-96">
+                <pre className="text-xs font-mono whitespace-pre-wrap">
+                  {JSON.stringify(selectedPlayer, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Data Parity Validation */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5" />
+            <CardTitle>Data Parity Validation</CardTitle>
+          </div>
+          <CardDescription>
+            Analyze ESPN vs FantasyPros data matching. Identify unmatched players and potential data quality issues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Parameters */}
+          <div className="flex items-end gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="parity-season">Season</Label>
+              <Input
+                id="parity-season"
+                data-testid="input-parity-season"
+                type="number"
+                value={paritySeason}
+                onChange={(e) => setParitySeason(e.target.value)}
+                className="w-28"
+              />
+            </div>
+            <Button
+              data-testid="button-run-parity-check"
+              onClick={runParityCheck}
+              disabled={parityLoading}
+            >
+              {parityLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Run Parity Check
+            </Button>
+          </div>
+
+          {/* Error Display */}
+          {parityError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-700 dark:text-red-300">
+              {parityError}
+            </div>
+          )}
+
+          {/* Results */}
+          {parityResult && (
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold">{parityResult.counts.espn}</div>
+                  <div className="text-sm text-muted-foreground">ESPN Players</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold">{parityResult.counts.fp}</div>
+                  <div className="text-sm text-muted-foreground">FP Players</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">{parityResult.counts.matched}</div>
+                  <div className="text-sm text-muted-foreground">Matched</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className={`text-2xl font-bold ${parityResult.counts.unmatched > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                    {parityResult.counts.unmatched}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Unmatched</div>
+                </div>
+              </div>
+
+              {/* Match Rate Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Match Rate</span>
+                  <span className={parityResult.counts.matchRate >= 95 ? 'text-green-600' : parityResult.counts.matchRate >= 85 ? 'text-amber-600' : 'text-red-600'}>
+                    {parityResult.counts.matchRate}%
+                  </span>
+                </div>
+                <Progress 
+                  value={parityResult.counts.matchRate} 
+                  className="h-2"
+                />
+              </div>
+
+              {/* Position Breakdown */}
+              <div className="space-y-3">
+                <Label>Position Breakdown (ESPN vs FP)</Label>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                  {['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map(pos => {
+                    const espnCount = parityResult.positionBreakdown.espn[pos] || 0;
+                    const fpCount = parityResult.positionBreakdown.fp[pos] || 0;
+                    const diff = espnCount - fpCount;
+                    return (
+                      <div key={pos} className="p-2 bg-muted rounded text-center text-sm">
+                        <div className="font-medium">{pos}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {espnCount} / {fpCount}
+                          {diff !== 0 && (
+                            <span className={diff > 0 ? ' text-amber-600' : ' text-green-600'}>
+                              {' '}({diff > 0 ? '+' : ''}{diff})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Unmatched Players by Position */}
+              {parityResult.counts.unmatched > 0 && (
+                <div className="space-y-3">
+                  <Label>Unmatched ESPN Players (no FP match)</Label>
+                  <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                    {Object.entries(parityResult.unmatchedByPosition).map(([position, players]: [string, any]) => (
+                      <div key={position} className="p-3">
+                        <div className="font-medium text-sm mb-2">{position} ({(players as any[]).length})</div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs">
+                          {(players as any[]).map((player, idx) => (
+                            <div key={idx} className="p-1 bg-muted/50 rounded truncate" title={player.name}>
+                              {player.team} - {player.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

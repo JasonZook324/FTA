@@ -5198,6 +5198,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // UNIFIED PLAYER DATA JOBS
+  // ============================================
+
+  app.post("/api/jobs/unified-refresh-espn-players", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024 } = req.body;
+      const { refreshEspnPlayers } = await import("./unifiedPlayerService");
+      const result = await refreshEspnPlayers(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} ESPN ${sport} players for ${season}`,
+          recordCount: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh ESPN players' });
+      }
+    } catch (error: any) {
+      console.error('ESPN player refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh ESPN players' });
+    }
+  });
+
+  app.post("/api/jobs/unified-refresh-fp-players", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024 } = req.body;
+      const { refreshFpPlayers } = await import("./unifiedPlayerService");
+      const result = await refreshFpPlayers(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} FP ${sport} players for ${season}`,
+          recordCount: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh FP players' });
+      }
+    } catch (error: any) {
+      console.error('FP player refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh FP players' });
+    }
+  });
+
+  app.post("/api/jobs/unified-refresh-defense-stats", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, scoringType = 'PPR' } = req.body;
+      const { refreshDefenseStats } = await import("./unifiedPlayerService");
+      const result = await refreshDefenseStats(sport, season, scoringType);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed ${result.recordCount} defense vs position stats for ${sport} ${season} (${scoringType})`,
+          recordCount: result.recordCount 
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh defense stats' });
+      }
+    } catch (error: any) {
+      console.error('Defense stats refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh defense stats' });
+    }
+  });
+
+  app.post("/api/jobs/unified-build-crosswalk", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024 } = req.body;
+      const { buildCrosswalk } = await import("./unifiedPlayerService");
+      const result = await buildCrosswalk(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully built crosswalk: ${result.matched} matched, ${result.unmatched} unmatched players`,
+          recordCount: result.recordCount,
+          matched: result.matched,
+          unmatched: result.unmatched
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to build crosswalk' });
+      }
+    } catch (error: any) {
+      console.error('Crosswalk build error:', error);
+      res.status(500).json({ message: error.message || 'Failed to build crosswalk' });
+    }
+  });
+
+  app.post("/api/jobs/unified-refresh-players-master", requireAuth, async (req, res) => {
+    try {
+      const { refreshPlayersMaster } = await import("./unifiedPlayerService");
+      const result = await refreshPlayersMaster();
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed players_master view with ${result.rowCount} rows`,
+          rowCount: result.rowCount
+        });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to refresh players master view' });
+      }
+    } catch (error: any) {
+      console.error('Players master refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh players master view' });
+    }
+  });
+
+  app.post("/api/jobs/unified-run-all", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2024, scoringType = 'PPR' } = req.body;
+      const { runAllUnifiedPlayerJobs } = await import("./unifiedPlayerService");
+      const result = await runAllUnifiedPlayerJobs(sport, season, scoringType);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully ran all unified player jobs for ${sport} ${season}`,
+          results: result.results
+        });
+      } else {
+        res.status(500).json({ 
+          message: result.error || 'Failed to run all unified player jobs',
+          results: result.results
+        });
+      }
+    } catch (error: any) {
+      console.error('Unified player jobs error:', error);
+      res.status(500).json({ message: error.message || 'Failed to run unified player jobs' });
+    }
+  });
+
+  // Clear unified player data tables
+  app.post("/api/jobs/unified-clear-data", requireAuth, async (req, res) => {
+    try {
+      const { clearUnifiedPlayerData } = await import("./unifiedPlayerService");
+      const result = await clearUnifiedPlayerData();
+      
+      if (result.success) {
+        res.json({ message: 'Successfully cleared unified player data tables' });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to clear unified player data' });
+      }
+    } catch (error: any) {
+      console.error('Clear unified data error:', error);
+      res.status(500).json({ message: error.message || 'Failed to clear unified player data' });
+    }
+  });
+
+  // Parity validation endpoint - analyze ESPN vs FP data matching
+  app.get("/api/jobs/unified-parity-check/:sport/:season", requireAuth, async (req, res) => {
+    try {
+      const sport = req.params.sport;
+      const season = parseInt(req.params.season);
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const suffixPattern = '\\s+(II|III|IV|V|Jr\\.?|Sr\\.?|Junior|Senior)$';
+      
+      // Get counts
+      const countsResult = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM espn_player_data WHERE sport = ${sport} AND season = ${season}) as espn_count,
+          (SELECT COUNT(*) FROM fp_player_data WHERE sport = ${sport} AND season = ${season}) as fp_count,
+          (SELECT COUNT(*) FROM player_crosswalk WHERE sport = ${sport} AND season = ${season}) as crosswalk_count,
+          (SELECT COUNT(*) FROM player_crosswalk WHERE sport = ${sport} AND season = ${season} AND fp_player_id IS NULL) as unmatched_count
+      `);
+      const counts = countsResult.rows[0] as any;
+      
+      // Get unmatched players (ESPN without FP match)
+      const unmatchedResult = await db.execute(sql`
+        SELECT c.canonical_key, c.notes, e.full_name, e.team, e.position
+        FROM player_crosswalk c
+        JOIN espn_player_data e ON c.espn_player_id = e.espn_player_id AND c.sport = e.sport AND c.season = e.season
+        WHERE c.sport = ${sport} AND c.season = ${season} AND c.fp_player_id IS NULL
+        ORDER BY e.position, e.team, e.full_name
+      `);
+      
+      // Group unmatched by position
+      const unmatchedByPosition: Record<string, any[]> = {};
+      for (const row of unmatchedResult.rows as any[]) {
+        const pos = row.position || 'Unknown';
+        if (!unmatchedByPosition[pos]) unmatchedByPosition[pos] = [];
+        unmatchedByPosition[pos].push({
+          name: row.full_name,
+          team: row.team,
+          canonicalKey: row.canonical_key
+        });
+      }
+      
+      // Get position breakdown
+      const espnPositionsResult = await db.execute(sql`
+        SELECT position, COUNT(*) as count FROM espn_player_data 
+        WHERE sport = ${sport} AND season = ${season} 
+        GROUP BY position ORDER BY count DESC
+      `);
+      const fpPositionsResult = await db.execute(sql`
+        SELECT position, COUNT(*) as count FROM fp_player_data 
+        WHERE sport = ${sport} AND season = ${season} 
+        GROUP BY position ORDER BY count DESC
+      `);
+      
+      const espnPositions: Record<string, number> = {};
+      const fpPositions: Record<string, number> = {};
+      for (const row of espnPositionsResult.rows as any[]) {
+        espnPositions[row.position || 'null'] = parseInt(row.count);
+      }
+      for (const row of fpPositionsResult.rows as any[]) {
+        fpPositions[row.position || 'null'] = parseInt(row.count);
+      }
+      
+      // Calculate match rate
+      const matchedCount = parseInt(counts.crosswalk_count) - parseInt(counts.unmatched_count);
+      const matchRate = parseInt(counts.crosswalk_count) > 0 
+        ? ((matchedCount / parseInt(counts.crosswalk_count)) * 100).toFixed(1) 
+        : '0';
+      
+      res.json({
+        sport,
+        season,
+        counts: {
+          espn: parseInt(counts.espn_count),
+          fp: parseInt(counts.fp_count),
+          crosswalk: parseInt(counts.crosswalk_count),
+          unmatched: parseInt(counts.unmatched_count),
+          matched: matchedCount,
+          matchRate: parseFloat(matchRate)
+        },
+        positionBreakdown: {
+          espn: espnPositions,
+          fp: fpPositions
+        },
+        unmatchedByPosition
+      });
+    } catch (error: any) {
+      console.error('Parity check error:', error);
+      res.status(500).json({ message: error.message || 'Failed to run parity check' });
+    }
+  });
+
+  // Get unified player data from the materialized view
+  app.get("/api/players/unified/:sport/:season", requireAuth, async (req, res) => {
+    try {
+      const sport = req.params.sport;
+      const season = parseInt(req.params.season);
+      const team = req.query.team as string | undefined;
+      const position = req.query.position as string | undefined;
+      
+      const players = await storage.getPlayersMaster(sport, season, { team, position });
+      
+      res.json({ players, count: players.length });
+    } catch (error: any) {
+      console.error('Unified players fetch error:', error);
+      res.status(500).json({ 
+        message: error.message || 'Failed to fetch unified players',
+        players: []
+      });
+    }
+  });
+
   // Cleanup endpoint to remove all Vegas odds data (use before refreshing)
   app.post("/api/jobs/nfl-cleanup-vegas-odds", requireAuth, async (req, res) => {
     try {
