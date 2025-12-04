@@ -1377,23 +1377,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPlayersMaster(sport: string, season: number, filters?: { team?: string; position?: string }): Promise<any[]> {
-    let query = `SELECT * FROM players_master WHERE sport = $1 AND season = $2`;
-    const params: any[] = [sport, season];
-    
-    if (filters?.team) {
-      params.push(filters.team);
-      query += ` AND team = $${params.length}`;
+    // Build query dynamically based on filters
+    if (filters?.team && filters?.position) {
+      const result = await db.execute(sql`
+        SELECT * FROM players_master 
+        WHERE sport = ${sport} AND season = ${season} 
+        AND team = ${filters.team} AND position = ${filters.position}
+        ORDER BY full_name
+      `);
+      return result.rows as any[];
+    } else if (filters?.team) {
+      const result = await db.execute(sql`
+        SELECT * FROM players_master 
+        WHERE sport = ${sport} AND season = ${season} 
+        AND team = ${filters.team}
+        ORDER BY full_name
+      `);
+      return result.rows as any[];
+    } else if (filters?.position) {
+      const result = await db.execute(sql`
+        SELECT * FROM players_master 
+        WHERE sport = ${sport} AND season = ${season} 
+        AND position = ${filters.position}
+        ORDER BY full_name
+      `);
+      return result.rows as any[];
+    } else {
+      const result = await db.execute(sql`
+        SELECT * FROM players_master 
+        WHERE sport = ${sport} AND season = ${season}
+        ORDER BY full_name
+      `);
+      return result.rows as any[];
     }
-    
-    if (filters?.position) {
-      params.push(filters.position);
-      query += ` AND position = $${params.length}`;
-    }
-    
-    query += ` ORDER BY full_name`;
-    
-    const result = await db.execute(sql.raw(query));
-    return result.rows as any[];
   }
 }
 
