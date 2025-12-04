@@ -96,16 +96,6 @@ export const matchups = pgTable("matchups", {
   matchupDate: text("matchup_date"),
 });
 
-export const players = pgTable("players", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  espnPlayerId: integer("espn_player_id").notNull(),
-  name: text("name").notNull(),
-  team: text("team"),
-  position: text("position"),
-  isActive: boolean("is_active").default(true),
-  stats: jsonb("stats"),
-});
-
 // New shareable league system
 export const leagueProfiles = pgTable("league_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -165,10 +155,6 @@ export const insertTeamSchema = createInsertSchema(teams).omit({
 });
 
 export const insertMatchupSchema = createInsertSchema(matchups).omit({
-  id: true,
-});
-
-export const insertPlayerSchema = createInsertSchema(players).omit({
   id: true,
 });
 
@@ -465,8 +451,6 @@ export type FantasyProsRefreshLog = typeof fantasyProsRefreshLog.$inferSelect;
 export type InsertFantasyProsRefreshLog = z.infer<typeof insertFantasyProsRefreshLogSchema>;
 export type Matchup = typeof matchups.$inferSelect;
 export type InsertMatchup = z.infer<typeof insertMatchupSchema>;
-export type Player = typeof players.$inferSelect;
-export type InsertPlayer = z.infer<typeof insertPlayerSchema>;
 export type LeagueProfile = typeof leagueProfiles.$inferSelect;
 export type InsertLeagueProfile = z.infer<typeof insertLeagueProfileSchema>;
 export type LeagueCredentials = typeof leagueCredentials.$inferSelect;
