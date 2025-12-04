@@ -49,7 +49,6 @@ export default function Jobs() {
   const [defRankResult, setDefRankResult] = useState<any>(null);
 
   // Unified Player Data parameters
-  const [unifiedSport, setUnifiedSport] = useState("NFL");
   const [unifiedSeason, setUnifiedSeason] = useState(new Date().getFullYear().toString());
   const [unifiedSteps, setUnifiedSteps] = useState<JobStep[]>([]);
   const [unifiedRunning, setUnifiedRunning] = useState(false);
@@ -276,22 +275,22 @@ export default function Jobs() {
       { 
         endpoint: "/api/jobs/unified-refresh-espn-players", 
         name: "Refresh ESPN Players",
-        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
       },
       { 
         endpoint: "/api/jobs/unified-refresh-fp-players", 
         name: "Refresh FP Players",
-        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
       },
       { 
         endpoint: "/api/jobs/unified-refresh-defense-stats", 
         name: "Refresh Defense Stats",
-        body: { sport: unifiedSport, season: parseInt(unifiedSeason), scoringType: leagueScoringType }
+        body: { sport: "NFL", season: parseInt(unifiedSeason), scoringType: leagueScoringType }
       },
       { 
         endpoint: "/api/jobs/unified-build-crosswalk", 
         name: "Build Crosswalk",
-        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+        body: { sport: "NFL", season: parseInt(unifiedSeason) }
       },
       { 
         endpoint: "/api/jobs/unified-refresh-players-master", 
@@ -730,19 +729,7 @@ export default function Jobs() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Parameters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
-            <div className="space-y-2">
-              <Label htmlFor="unified-sport">Sport</Label>
-              <Select value={unifiedSport} onValueChange={setUnifiedSport}>
-                <SelectTrigger id="unified-sport" data-testid="select-unified-sport">
-                  <SelectValue placeholder="Select sport" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NFL">NFL</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="space-y-2">
               <Label htmlFor="unified-season">Season</Label>
               <Input
@@ -751,7 +738,7 @@ export default function Jobs() {
                 type="number"
                 value={unifiedSeason}
                 onChange={(e) => setUnifiedSeason(e.target.value)}
-                placeholder="2024"
+                placeholder={new Date().getFullYear().toString()}
               />
             </div>
 
