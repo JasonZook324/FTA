@@ -3,7 +3,6 @@ import {
   type EspnCredentials, type InsertEspnCredentials,
   type Team, type InsertTeam,
   type Matchup, type InsertMatchup,
-  type Player, type InsertPlayer,
   type LeagueProfile, type InsertLeagueProfile,
   type LeagueCredentials, type InsertLeagueCredentials,
   type UserLeague, type InsertUserLeague,
@@ -12,7 +11,7 @@ import {
   type FpPlayerData, type InsertFpPlayerData,
   type DefenseVsPositionStats, type InsertDefenseVsPositionStats,
   type PlayerCrosswalk, type InsertPlayerCrosswalk,
-  users, espnCredentials, teams, matchups, players,
+  users, espnCredentials, teams, matchups,
   leagueProfiles, leagueCredentials, userLeagues,
   nflMatchups, nflVegasOdds, nflTeamStats,
   espnPlayerData, fpPlayerData, defenseVsPositionStats, playerCrosswalk
@@ -56,13 +55,6 @@ export interface IStorage {
   createMatchup(matchup: InsertMatchup): Promise<Matchup>;
   updateMatchup(id: string, matchup: Partial<Matchup>): Promise<Matchup | undefined>;
   deleteMatchup(id: string): Promise<boolean>;
-
-  // Player methods
-  getPlayers(): Promise<Player[]>;
-  getPlayer(espnPlayerId: number): Promise<Player | undefined>;
-  createPlayer(player: InsertPlayer): Promise<Player>;
-  updatePlayer(id: string, player: Partial<Player>): Promise<Player | undefined>;
-  deletePlayer(id: string): Promise<boolean>;
 
   // League Profile methods (shareable leagues)
   getAllLeagueProfiles(): Promise<LeagueProfile[]>;
@@ -137,7 +129,6 @@ export class MemStorage implements IStorage {
   private espnCredentials: Map<string, EspnCredentials>;
   private teams: Map<string, Team>;
   private matchups: Map<string, Matchup>;
-  private players: Map<string, Player>;
   private leagueProfiles: Map<string, LeagueProfile>;
   private leagueCredentials: Map<string, LeagueCredentials>;
   private userLeagues: Map<string, UserLeague>;
@@ -150,7 +141,6 @@ export class MemStorage implements IStorage {
     this.espnCredentials = new Map();
     this.teams = new Map();
     this.matchups = new Map();
-    this.players = new Map();
     this.leagueProfiles = new Map();
     this.leagueCredentials = new Map();
     this.userLeagues = new Map();
@@ -322,44 +312,6 @@ export class MemStorage implements IStorage {
 
   async deleteMatchup(id: string): Promise<boolean> {
     return this.matchups.delete(id);
-  }
-
-  // Player methods
-  async getPlayers(): Promise<Player[]> {
-    return Array.from(this.players.values());
-  }
-
-  async getPlayer(espnPlayerId: number): Promise<Player | undefined> {
-    return Array.from(this.players.values()).find(
-      (player) => player.espnPlayerId === espnPlayerId,
-    );
-  }
-
-  async createPlayer(player: InsertPlayer): Promise<Player> {
-    const id = randomUUID();
-    const newPlayer: Player = { 
-      ...player, 
-      id,
-      team: player.team ?? null,
-      position: player.position ?? null,
-      isActive: player.isActive ?? null,
-      stats: player.stats ?? null
-    };
-    this.players.set(id, newPlayer);
-    return newPlayer;
-  }
-
-  async updatePlayer(id: string, updates: Partial<Player>): Promise<Player | undefined> {
-    const existing = this.players.get(id);
-    if (!existing) return undefined;
-    
-    const updated: Player = { ...existing, ...updates };
-    this.players.set(id, updated);
-    return updated;
-  }
-
-  async deletePlayer(id: string): Promise<boolean> {
-    return this.players.delete(id);
   }
 
   // League Profile methods (not implemented in memory storage)
@@ -696,43 +648,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(matchups)
       .where(eq(matchups.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
-  }
-
-  // Player methods
-  async getPlayers(): Promise<Player[]> {
-    return await db.select().from(players);
-  }
-
-  async getPlayer(espnPlayerId: number): Promise<Player | undefined> {
-    const [player] = await db
-      .select()
-      .from(players)
-      .where(eq(players.espnPlayerId, espnPlayerId));
-    return player || undefined;
-  }
-
-  async createPlayer(player: InsertPlayer): Promise<Player> {
-    const [newPlayer] = await db
-      .insert(players)
-      .values(player)
-      .returning();
-    return newPlayer;
-  }
-
-  async updatePlayer(id: string, updates: Partial<Player>): Promise<Player | undefined> {
-    const [updated] = await db
-      .update(players)
-      .set(updates)
-      .where(eq(players.id, id))
-      .returning();
-    return updated || undefined;
-  }
-
-  async deletePlayer(id: string): Promise<boolean> {
-    const result = await db
-      .delete(players)
-      .where(eq(players.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
