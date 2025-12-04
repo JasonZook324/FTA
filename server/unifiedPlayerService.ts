@@ -171,6 +171,99 @@ const TEAM_NICKNAMES: Record<string, string> = {
   'SF': '49ers', 'TB': 'Buccaneers', 'TEN': 'Titans', 'WAS': 'Commanders'
 };
 
+// Helper function to fetch DST players from FantasyPros dedicated DST endpoint
+// Note: This function is NFL-only as DST is a football-specific position
+async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<string>): Promise<InsertFpPlayerData[]> {
+  const dstRecords: InsertFpPlayerData[] = [];
+  const teamNormalization: Record<string, string> = { 'JAC': 'JAX' };
+  
+  // DST is NFL-only
+  if (sport !== 'NFL') {
+    console.log(`DST position not applicable for sport: ${sport}`);
+    return dstRecords;
+  }
+  
+  try {
+    // Use FP's dedicated DST endpoint for real IDs and names
+    const dstEndpoint = `https://api.fantasypros.com/public/v2/nfl/players?season=${season}&position=DST`;
+    console.log(`Fetching DST players from: ${dstEndpoint}`);
+    
+    const dstData = await fetchFromFantasyPros(dstEndpoint);
+    
+    if (dstData?.players && Array.isArray(dstData.players)) {
+      console.log(`Received ${dstData.players.length} DST players from FantasyPros API`);
+      
+      for (const p of dstData.players) {
+        const playerId = String(p.player_id || p.id || p.fpid);
+        const playerName = p.player_name || p.name;
+        if (!playerId || !playerName) continue;
+        
+        // Get and normalize team abbreviation
+        let team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
+        team = teamNormalization[team] || team;
+        if (!team || !validTeams.has(team)) continue;
+        
+        // Normalize the name to ESPN format: "{Nickname} D/ST"
+        // ESPN uses names like "Cardinals D/ST" for defenses
+        const nickname = TEAM_NICKNAMES[team] || team;
+        const normalizedName = `${nickname} D/ST`;
+        
+        dstRecords.push({
+          fpPlayerId: playerId,
+          sport,
+          season,
+          firstName: nickname,
+          lastName: 'D/ST',
+          fullName: normalizedName,
+          team,
+          position: 'DEF',
+          jerseyNumber: null,
+          status: null,
+          injuryStatus: null
+        });
+        
+        // Log first few for verification
+        if (dstRecords.length <= 3) {
+          console.log(`  DST: ${normalizedName} (${team}) - FP ID: ${playerId}`);
+        }
+      }
+      
+      console.log(`Processed ${dstRecords.length} DST records from FP API`);
+    }
+  } catch (error) {
+    console.log(`Error fetching FP DST players: ${error}. Falling back to synthetic entries.`);
+  }
+  
+  // If we got less than 32 teams, add synthetic entries for missing teams
+  const foundTeams = new Set(dstRecords.map(r => r.team));
+  const missingTeams = Array.from(validTeams).filter(t => !foundTeams.has(t));
+  
+  if (missingTeams.length > 0) {
+    console.log(`Adding ${missingTeams.length} synthetic DST entries for missing teams: ${missingTeams.join(', ')}`);
+    for (const team of missingTeams) {
+      const nickname = TEAM_NICKNAMES[team];
+      if (!nickname) continue;
+      
+      dstRecords.push({
+        fpPlayerId: `DST_${team}`,
+        sport,
+        season,
+        firstName: nickname,
+        lastName: 'D/ST',
+        fullName: `${nickname} D/ST`,
+        team,
+        position: 'DEF',
+        jerseyNumber: null,
+        status: null,
+        injuryStatus: null
+      });
+    }
+  }
+  
+  return dstRecords;
+}
+
+
 export async function refreshFpPlayers(
   sport: string = 'NFL',
   season: number = 2024
@@ -243,29 +336,12 @@ export async function refreshFpPlayers(
       });
     }
 
-    // Add synthetic DST entries for all 32 teams (FP /players endpoint doesn't include team defenses)
-    // Use ESPN's naming format: "{Nickname} D/ST" and position "DST" (which we'll map to "DEF")
-    console.log('Adding synthetic DST entries for all 32 NFL teams...');
-    for (const team of Array.from(validTeams)) {
-      const nickname = TEAM_NICKNAMES[team];
-      if (!nickname) continue;
-      
-      playerRecords.push({
-        fpPlayerId: `DST_${team}`,  // Synthetic ID
-        sport,
-        season,
-        firstName: nickname,
-        lastName: 'D/ST',
-        fullName: `${nickname} D/ST`,
-        team,
-        position: 'DEF',  // Use DEF to match ESPN
-        jerseyNumber: null,
-        status: null,
-        injuryStatus: null
-      });
-    }
+    // Fetch DST players from FP's dedicated DST endpoint (with fallback to synthetic entries)
+    console.log('Fetching DST players from FantasyPros...');
+    const dstRecords = await fetchFpDstPlayers(sport, season, validTeams);
+    playerRecords.push(...dstRecords);
 
-    console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy, added 32 DST)`);
+    console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy, added ${dstRecords.length} DST)`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
     
     // After upserting, remove FP players that don't have an ESPN match
