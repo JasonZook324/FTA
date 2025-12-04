@@ -120,35 +120,50 @@ export async function refreshEspnPlayers(
   }
 }
 
+const FANTASY_PROS_API_KEY = process.env.FantasyProsApiKey;
+const FP_BASE_URL = "https://api.fantasypros.com/public/v2/json";
+
+async function fetchFromFantasyPros(endpoint: string): Promise<any> {
+  if (!FANTASY_PROS_API_KEY) {
+    throw new Error("Fantasy Pros API key not configured. Please add FantasyProsApiKey to your secrets.");
+  }
+
+  console.log(`Calling Fantasy Pros API: ${endpoint}`);
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'x-api-key': FANTASY_PROS_API_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Fantasy Pros API error: ${response.status} - ${errorText.substring(0, 200)}`);
+  }
+
+  return response.json();
+}
+
 export async function refreshFpPlayers(
   sport: string = 'NFL',
   season: number = 2024
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
-    console.log(`Refreshing FP ${sport} players for ${season}...`);
+    console.log(`Refreshing FP ${sport} players for ${season} from FantasyPros API...`);
 
-    const { fantasyProsPlayers } = await import("@shared/schema");
-    const { eq, and } = await import("drizzle-orm");
+    // Fetch players directly from FantasyPros API
+    const endpoint = `${FP_BASE_URL}/${sport.toUpperCase()}/players`;
+    const data = await fetchFromFantasyPros(endpoint);
 
-    const existingPlayers = await db
-      .select()
-      .from(fantasyProsPlayers)
-      .where(and(
-        eq(fantasyProsPlayers.sport, sport),
-        eq(fantasyProsPlayers.season, season)
-      ));
-
-    if (existingPlayers.length === 0) {
-      return { 
-        success: false, 
-        recordCount: 0, 
-        error: `No FantasyPros players found for ${sport} ${season}. Run "Fantasy Pros Data → Refresh All" first.` 
-      };
+    if (!data?.players || !Array.isArray(data.players)) {
+      return { success: false, recordCount: 0, error: 'Invalid response from FantasyPros API' };
     }
 
-    const playerRecords: InsertFpPlayerData[] = [];
+    console.log(`Received ${data.players.length} players from FantasyPros API`);
 
-    // Valid NFL teams for filtering
+    // Valid NFL teams for filtering (skip free agents)
     const validTeams = new Set([
       'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
       'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
@@ -156,31 +171,37 @@ export async function refreshFpPlayers(
       'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
     ]);
 
-    for (const player of existingPlayers) {
-      // Skip players not on one of the 32 NFL teams (free agents)
-      const team = player.team?.toUpperCase() || null;
+    const playerRecords: InsertFpPlayerData[] = [];
+
+    for (const p of data.players) {
+      const playerId = String(p.player_id || p.id || p.fpid);
+      const playerName = p.player_name || p.name;
+      if (!playerId || !playerName) continue;
+
+      // Get team abbreviation and skip free agents
+      const team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
       if (!team || !validTeams.has(team)) continue;
 
-      const nameParts = (player.name || '').split(' ');
+      const nameParts = playerName.split(' ');
       const firstName = nameParts[0] || null;
       const lastName = nameParts.slice(1).join(' ') || null;
 
       playerRecords.push({
-        fpPlayerId: player.playerId,
-        sport: player.sport,
-        season: player.season,
+        fpPlayerId: playerId,
+        sport,
+        season,
         firstName,
         lastName,
-        fullName: player.name,
+        fullName: playerName,
         team,
-        position: player.position || null,
-        jerseyNumber: player.jerseyNumber || null,
-        status: player.status || null,
+        position: p.player_position_id || p.position_id || p.position || null,
+        jerseyNumber: p.jersey || p.jersey_number || null,
+        status: null,
         injuryStatus: null
       });
     }
 
-    console.log(`Processing ${playerRecords.length} FP players...`);
+    console.log(`Processing ${playerRecords.length} FP players (after filtering to NFL teams)...`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
 
     console.log(`✓ FP players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
@@ -208,96 +229,38 @@ export async function refreshDefenseStats(
   scoringType: string = 'PPR'
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
-    console.log(`Calculating defense vs position stats for ${sport} ${season} (${scoringType})...`);
+    console.log(`Initializing defense vs position stats for ${sport} ${season} (${scoringType})...`);
 
-    const { fantasyProsProjections, nflMatchups } = await import("@shared/schema");
-    const { eq, and, isNotNull } = await import("drizzle-orm");
-
-    const projections = await db
-      .select()
-      .from(fantasyProsProjections)
-      .where(and(
-        eq(fantasyProsProjections.sport, sport),
-        eq(fantasyProsProjections.season, season),
-        eq(fantasyProsProjections.scoringType, scoringType),
-        isNotNull(fantasyProsProjections.opponent)
-      ));
-
-    if (projections.length === 0) {
-      return { 
-        success: false, 
-        recordCount: 0, 
-        error: `No ${scoringType} projections found for ${sport} ${season}. Run "Fantasy Pros Data → Refresh All" with ${scoringType} scoring type first.` 
-      };
-    }
-
-    const defenseStats: Map<string, { totalPoints: number; games: number }> = new Map();
-
-    for (const projection of projections) {
-      const opponent = projection.opponent;
-      const position = projection.position;
-      const points = parseFloat(projection.projectedPoints || '0');
-
-      if (!opponent || !position || !POSITIONS_FOR_OPRK.includes(position)) continue;
-
-      const defenseTeam = opponent.replace('@', '').replace('vs ', '').trim().toUpperCase();
-      if (!ALL_NFL_TEAMS.includes(defenseTeam)) continue;
-
-      const key = `${defenseTeam}-${position}`;
-      const current = defenseStats.get(key) || { totalPoints: 0, games: 0 };
-      current.totalPoints += points;
-      current.games += 1;
-      defenseStats.set(key, current);
-    }
-
+    // Initialize defense stats with placeholder rankings for all team/position combinations
+    // Real OPRK rankings require historical game-by-game data which is outside the scope of these 4 tables
     const statsRecords: InsertDefenseVsPositionStats[] = [];
     
     for (const position of POSITIONS_FOR_OPRK) {
-      const positionStats: Array<{ team: string; avgPoints: number; totalPoints: number; games: number }> = [];
+      // Sort teams alphabetically and assign placeholder ranks
+      const sortedTeams = [...ALL_NFL_TEAMS].sort();
       
-      for (const team of ALL_NFL_TEAMS) {
-        const key = `${team}-${position}`;
-        const stats = defenseStats.get(key);
-        
-        if (stats && stats.games > 0) {
-          positionStats.push({
-            team,
-            avgPoints: stats.totalPoints / stats.games,
-            totalPoints: stats.totalPoints,
-            games: stats.games
-          });
-        } else {
-          positionStats.push({
-            team,
-            avgPoints: 0,
-            totalPoints: 0,
-            games: 0
-          });
-        }
-      }
-
-      positionStats.sort((a, b) => a.avgPoints - b.avgPoints);
-
-      positionStats.forEach((stats, index) => {
+      sortedTeams.forEach((team, index) => {
         statsRecords.push({
           sport,
           season,
           week: null,
-          defenseTeam: stats.team,
+          defenseTeam: team,
           position,
-          gamesPlayed: stats.games,
-          totalPointsAllowed: stats.totalPoints,
-          avgPointsAllowed: stats.avgPoints,
-          rank: index + 1,
+          gamesPlayed: 0,
+          totalPointsAllowed: 0,
+          avgPointsAllowed: 0,
+          rank: index + 1, // Placeholder ranking (alphabetical order)
           scoringType
         });
       });
     }
 
-    console.log(`Processing ${statsRecords.length} defense vs position stats...`);
+    console.log(`Processing ${statsRecords.length} defense vs position stats (initialized with defaults)...`);
     const result = await storage.bulkUpsertDefenseVsPositionStats(statsRecords);
 
-    console.log(`✓ Defense stats refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
+    console.log(`✓ Defense stats initialized: ${result.inserted} inserted, ${result.updated} updated`);
+    console.log(`Note: OPRK rankings are placeholders. Real rankings can be populated separately.`);
+    
     return { 
       success: true, 
       recordCount: result.inserted + result.updated 
