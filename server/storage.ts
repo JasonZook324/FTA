@@ -99,6 +99,7 @@ export interface IStorage {
   upsertFpPlayerData(data: InsertFpPlayerData): Promise<FpPlayerData>;
   bulkUpsertFpPlayerData(dataList: InsertFpPlayerData[]): Promise<{ inserted: number; updated: number }>;
   deleteFpPlayerData(sport: string, season: number): Promise<number>;
+  deleteFpPlayersWithoutEspnMatch(): Promise<{ deleted: number }>;
 
   // Defense vs Position Stats methods
   getDefenseVsPositionStats(sport: string, season: number, scoringType?: string): Promise<DefenseVsPositionStats[]>;
@@ -421,6 +422,10 @@ export class MemStorage implements IStorage {
   }
 
   async deleteFpPlayerData(sport: string, season: number): Promise<number> {
+    throw new Error("FP player data not supported in memory storage");
+  }
+
+  async deleteFpPlayersWithoutEspnMatch(): Promise<{ deleted: number }> {
     throw new Error("FP player data not supported in memory storage");
   }
 
@@ -1113,6 +1118,27 @@ export class DatabaseStorage implements IStorage {
         eq(fpPlayerData.season, season)
       ));
     return result.rowCount || 0;
+  }
+
+  async deleteFpPlayersWithoutEspnMatch(): Promise<{ deleted: number }> {
+    // Delete FP players that don't have a matching ESPN player
+    // Match is based on canonical key: normalized name + team + position
+    const result = await db.execute(sql`
+      DELETE FROM fp_player_data fp
+      WHERE NOT EXISTS (
+        SELECT 1 FROM espn_player_data espn
+        WHERE espn.sport = fp.sport
+          AND espn.season = fp.season
+          AND UPPER(TRIM(espn.full_name)) = UPPER(TRIM(fp.full_name))
+          AND UPPER(espn.team) = UPPER(fp.team)
+          AND (
+            UPPER(espn.position) = UPPER(fp.position)
+            OR (UPPER(espn.position) = 'DEF' AND UPPER(fp.position) = 'DST')
+            OR (UPPER(espn.position) = 'DST' AND UPPER(fp.position) = 'DEF')
+          )
+      )
+    `);
+    return { deleted: result.rowCount || 0 };
   }
 
   // Defense vs Position Stats methods

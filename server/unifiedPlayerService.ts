@@ -184,6 +184,11 @@ export async function refreshFpPlayers(
       'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
     ]);
 
+    // Team abbreviation normalization (FP uses different abbreviations)
+    const teamNormalization: Record<string, string> = {
+      'JAC': 'JAX',  // Jacksonville: FP uses JAC, ESPN uses JAX
+    };
+
     // Fantasy-relevant positions only (matches ESPN's fantasy API)
     const fantasyPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DST']);
 
@@ -195,8 +200,9 @@ export async function refreshFpPlayers(
       const playerName = p.player_name || p.name;
       if (!playerId || !playerName) continue;
 
-      // Get team abbreviation and skip free agents
-      const team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
+      // Get team abbreviation, normalize it, and skip free agents
+      let team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
+      team = teamNormalization[team] || team;  // Normalize team abbreviation
       if (!team || !validTeams.has(team)) continue;
 
       // Get position and skip non-fantasy positions (IDP players)
@@ -227,6 +233,11 @@ export async function refreshFpPlayers(
 
     console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy positions)`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
+    
+    // After upserting, remove FP players that don't have an ESPN match
+    // This ensures FP data only includes players that ESPN considers fantasy-relevant
+    const deleteResult = await storage.deleteFpPlayersWithoutEspnMatch();
+    console.log(`Removed ${deleteResult.deleted} FP players without ESPN match`);
 
     console.log(`✓ FP players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
     return { 
