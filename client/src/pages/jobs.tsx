@@ -53,6 +53,15 @@ export default function Jobs() {
   const [unifiedSteps, setUnifiedSteps] = useState<JobStep[]>([]);
   const [unifiedRunning, setUnifiedRunning] = useState(false);
   
+  // Players Master Viewer parameters
+  const [viewerSeason, setViewerSeason] = useState(new Date().getFullYear().toString());
+  const [viewerTeam, setViewerTeam] = useState<string>("");
+  const [viewerPosition, setViewerPosition] = useState<string>("");
+  const [viewerPlayers, setViewerPlayers] = useState<any[]>([]);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState<string>("");
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  
   // Get scoring type from the user's league settings
   const leagueScoringType = currentLeague?.scoringType || "PPR";
 
@@ -326,6 +335,44 @@ export default function Jobs() {
     setUnifiedRunning(false);
     setStatus("✓ All unified player data refreshed successfully!");
   }
+
+  async function fetchPlayersMaster() {
+    setViewerLoading(true);
+    setViewerError("");
+    setSelectedPlayer(null);
+    
+    try {
+      let url = `/api/players/unified/NFL/${viewerSeason}`;
+      const params = new URLSearchParams();
+      if (viewerTeam && viewerTeam !== 'all') params.append('team', viewerTeam);
+      if (viewerPosition && viewerPosition !== 'all') params.append('position', viewerPosition);
+      if (params.toString()) url += `?${params.toString()}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setViewerPlayers(data.players || []);
+      } else {
+        setViewerError(data.message || 'Failed to fetch players');
+        setViewerPlayers([]);
+      }
+    } catch (err: any) {
+      setViewerError(err.message || 'Failed to fetch players');
+      setViewerPlayers([]);
+    }
+    
+    setViewerLoading(false);
+  }
+
+  const NFL_TEAMS = [
+    'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
+    'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+    'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG',
+    'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
+  ];
+
+  const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
   const getStepProgress = (steps: JobStep[]) => {
     const completed = steps.filter(s => s.status === 'completed').length;
@@ -802,6 +849,155 @@ export default function Jobs() {
               Clear Data
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Players Master Viewer */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            <CardTitle>Players Master Viewer</CardTitle>
+          </div>
+          <CardDescription>
+            Test and view the merged player data from the players_master materialized view.
+            See how ESPN and FantasyPros data are combined into unified player objects.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="viewer-season">Season</Label>
+              <Input
+                id="viewer-season"
+                data-testid="input-viewer-season"
+                type="number"
+                value={viewerSeason}
+                onChange={(e) => setViewerSeason(e.target.value)}
+                placeholder={new Date().getFullYear().toString()}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viewer-team">Team (Optional)</Label>
+              <Select value={viewerTeam} onValueChange={setViewerTeam}>
+                <SelectTrigger data-testid="select-viewer-team">
+                  <SelectValue placeholder="All Teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {NFL_TEAMS.map(team => (
+                    <SelectItem key={team} value={team}>{team}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viewer-position">Position (Optional)</Label>
+              <Select value={viewerPosition} onValueChange={setViewerPosition}>
+                <SelectTrigger data-testid="select-viewer-position">
+                  <SelectValue placeholder="All Positions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Positions</SelectItem>
+                  {POSITIONS.map(pos => (
+                    <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                data-testid="button-fetch-players-master"
+                onClick={fetchPlayersMaster}
+                disabled={viewerLoading}
+                className="w-full"
+              >
+                {viewerLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Fetch Players
+              </Button>
+            </div>
+          </div>
+
+          {/* Error Display */}
+          {viewerError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-700 dark:text-red-300">
+              {viewerError}
+            </div>
+          )}
+
+          {/* Results Summary */}
+          {viewerPlayers.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              Found {viewerPlayers.length} players
+            </div>
+          )}
+
+          {/* Players Table */}
+          {viewerPlayers.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Team</th>
+                      <th className="text-left p-3 font-medium">Pos</th>
+                      <th className="text-left p-3 font-medium">ESPN ID</th>
+                      <th className="text-left p-3 font-medium">FP ID</th>
+                      <th className="text-left p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {viewerPlayers.slice(0, 100).map((player, idx) => (
+                      <tr key={idx} className="hover:bg-muted/50">
+                        <td className="p-3">{player.full_name || player.fullName}</td>
+                        <td className="p-3">{player.team}</td>
+                        <td className="p-3">{player.position}</td>
+                        <td className="p-3 font-mono text-xs">{player.espn_player_id || '-'}</td>
+                        <td className="p-3 font-mono text-xs">{player.fp_player_id || '-'}</td>
+                        <td className="p-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedPlayer(player)}
+                            data-testid={`button-view-player-${idx}`}
+                          >
+                            View JSON
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {viewerPlayers.length > 100 && (
+                <div className="p-3 bg-muted text-sm text-muted-foreground text-center">
+                  Showing first 100 of {viewerPlayers.length} players. Use filters to narrow results.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Selected Player JSON */}
+          {selectedPlayer && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Player Object JSON</Label>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedPlayer(null)}>
+                  Close
+                </Button>
+              </div>
+              <div className="p-4 bg-muted rounded-lg overflow-x-auto max-h-96">
+                <pre className="text-xs font-mono whitespace-pre-wrap">
+                  {JSON.stringify(selectedPlayer, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
