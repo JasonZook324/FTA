@@ -464,9 +464,28 @@ export async function refreshFpPlayers(
       team = teamNormalization[team] || team;  // Normalize team abbreviation
       if (!team || !validTeams.has(team)) continue;
 
-      // Get position and skip non-fantasy positions (IDP players)
-      const position = (p.player_position_id || p.position_id || p.position || '').toUpperCase();
-      if (!position || !fantasyPositions.has(position)) {
+      // Get primary position
+      const primaryPosition = (p.player_position_id || p.position_id || p.position || '').toUpperCase();
+      
+      // Check if player has ANY fantasy-relevant position
+      // Some players like fullbacks are listed as LB but have RB in their positions array
+      const allPositions: string[] = [];
+      if (primaryPosition) allPositions.push(primaryPosition);
+      if (Array.isArray(p.positions)) {
+        for (const pos of p.positions) {
+          // positions can be comma-separated like "LB,RB"
+          const parts = String(pos).toUpperCase().split(',');
+          allPositions.push(...parts);
+        }
+      }
+      
+      // Find the best fantasy-relevant position (prefer the primary if fantasy-relevant)
+      let position = fantasyPositions.has(primaryPosition) ? primaryPosition : null;
+      if (!position) {
+        position = allPositions.find(pos => fantasyPositions.has(pos)) || null;
+      }
+      
+      if (!position) {
         skippedNonFantasy++;
         continue;
       }
