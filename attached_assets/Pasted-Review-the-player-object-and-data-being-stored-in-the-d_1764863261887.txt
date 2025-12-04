@@ -1,0 +1,68 @@
+Review the player object and data being stored in the db. I need to address the way the player object is structured and ensure that all data is being stored in the db and can be retrieved by this application.
+Here is a guideline for what I want the player object to look like: (I have seeded the example object with sample data so it will be less ambigious)
+
+Player
+{
+	id: 1,
+	name: {
+		first: 	"Patrick",
+		last:	"Mahomes"
+	},
+	espnId: 23,
+	fantasyProsId: 225,
+	otherMappingId: null,
+	team_full: "Kansas City Chiefs",
+	team_abbv: "KC",
+	jersey_number: 15,
+	position: {
+		"QB",
+	},
+	injury_status: "Injured Reserve",
+	news: {
+		espnPlayerNews: "This is some news about the player object. This can contain information about anything regarding the player",
+		fantasyProsPlayerNews: {
+			injury: "any news about a players injury status",
+			recap: "How this player has performed recently",
+			transaction: "transaction news item",
+			rumor: "rumors about player",
+			breaking: "Breaking news about the player"
+		}
+	},
+	stats: {
+		position_rank: 6,
+		average_points: 18.3,
+		pctRostered: 88,
+		pctStarting: 53
+	},
+	matchup: {
+		opponent: {
+			id: 1,
+			name: "Indiana Colts",
+			abbv: "IND",
+			rank: 4,
+		},
+		projections: {
+			points: 15.3,
+		},
+		outlook: "Professional insights",
+		gameAt: "Home/Away",
+		gameTime: "Thu, 6:15pm CST"
+	}
+}
+
+Make suggestions on additional data that could be added, removed, or modified to this structure to make it easier to replace the old player object at a later date. 
+
+What issues will we run into by making these changes to the player object? Suggest an implementation method that will let us set up the new player object and db table side-by-side with the old ones. That way the application can continue to work as usual while we build and implement the new player object. 
+
+Review the data requirements of this new player object. Am I already collecting this data point successfully somewhere else in the application? If so use that. If not, review the fantasy pros API documentation link below and attempt to find the necessary datapoint to retrieve it. If you can not find any matching data points with the fantasypros api documentation, try looking in ESPNs api documentation. If you still can't find the data, stop and discuss course of action with me. 
+
+Once I have confirmed that all data in the new players object have reliable data mapped in the database, review the code base and come up with an implementation plan for swapping the old player object with the new one. 
+Create a file called "PlayerObjectUpdate_Implementation_Plan.md" and come up with a comprehensive implementation plan for installing this new player object in place of the old one. Include a way to test the new player object by adding a section to the API playground page that will allow the user to enter a player name (First and Last) and pick one of the 32 teams from a dropdown. This should retrieve the data for and populate the new player object. Display the contents of the populated player object on the screen in a user friendly way. I should be able to traverse through a collapse/expand style tree. This should be used after implementation to test the accuracy of the player object data. 
+
+Once I have confirmed the implementation plan and there are no more questions, come up with a list of issues this implementation may cause and list them to check in the implementation plan.  
+
+Here are a list of CRITICAL IMPORTANT MANDATORY directives to be added to the implementation plan. These should be followed at all costs.
+-- CRITICAL -- Never rely on fallback data. All data should be real live data from the database. Any issues this causes must be addressed before continuing. 
+-- CRITICAL -- If you run into any unknowns while planning this functionality, stop and discuss with me. Do not make any assumptions. 
+-- CRITICAL -- Review the FantasyPros API Documentation located at: "https://api.fantasypros.com/public/v2/docs/". Do not get confused by trying to find more documentation. This was privately linked to me when they activated my API key. Only use it for reference. 
+-- CRITICAL -- DO NOT MAKE ASSUMPTIONS. If something is unclear then consult with me for more information.
