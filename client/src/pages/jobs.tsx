@@ -48,6 +48,13 @@ export default function Jobs() {
   const [defRankValidating, setDefRankValidating] = useState(false);
   const [defRankResult, setDefRankResult] = useState<any>(null);
 
+  // Unified Player Data parameters
+  const [unifiedSport, setUnifiedSport] = useState("NFL");
+  const [unifiedSeason, setUnifiedSeason] = useState("2024");
+  const [unifiedScoringType, setUnifiedScoringType] = useState("PPR");
+  const [unifiedSteps, setUnifiedSteps] = useState<JobStep[]>([]);
+  const [unifiedRunning, setUnifiedRunning] = useState(false);
+
   // Set default week to current week when league data loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
@@ -248,6 +255,75 @@ export default function Jobs() {
     }
 
     setDefRankValidating(false);
+  }
+
+  async function runUnifiedPlayerJobs() {
+    setUnifiedRunning(true);
+    setStatus("");
+    
+    const jobs: JobStep[] = [
+      { name: "Refresh ESPN Players", status: 'pending' },
+      { name: "Refresh FP Players", status: 'pending' },
+      { name: "Refresh Defense Stats", status: 'pending' },
+      { name: "Build Crosswalk", status: 'pending' },
+      { name: "Refresh Players Master", status: 'pending' },
+    ];
+    setUnifiedSteps(jobs);
+
+    const jobConfigs = [
+      { 
+        endpoint: "/api/jobs/unified-refresh-espn-players", 
+        name: "Refresh ESPN Players",
+        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-fp-players", 
+        name: "Refresh FP Players",
+        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-defense-stats", 
+        name: "Refresh Defense Stats",
+        body: { sport: unifiedSport, season: parseInt(unifiedSeason), scoringType: unifiedScoringType }
+      },
+      { 
+        endpoint: "/api/jobs/unified-build-crosswalk", 
+        name: "Build Crosswalk",
+        body: { sport: unifiedSport, season: parseInt(unifiedSeason) }
+      },
+      { 
+        endpoint: "/api/jobs/unified-refresh-players-master", 
+        name: "Refresh Players Master",
+        body: {}
+      },
+    ];
+
+    for (let i = 0; i < jobConfigs.length; i++) {
+      const config = jobConfigs[i];
+      
+      setUnifiedSteps(prev => prev.map((step, idx) => 
+        idx === i ? { ...step, status: 'running' } : step
+      ));
+
+      const result = await runJob(config.endpoint, config.body);
+
+      setUnifiedSteps(prev => prev.map((step, idx) => 
+        idx === i ? { 
+          ...step, 
+          status: result.success ? 'completed' : 'error',
+          message: result.message
+        } : step
+      ));
+
+      if (!result.success) {
+        setStatus(`Failed at: ${config.name} - ${result.message}`);
+        setUnifiedRunning(false);
+        return;
+      }
+    }
+
+    setUnifiedRunning(false);
+    setStatus("✓ All unified player data refreshed successfully!");
   }
 
   const getStepProgress = (steps: JobStep[]) => {
@@ -635,6 +711,98 @@ export default function Jobs() {
               Please enter a week number to validate
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Unified Player Data Refresh */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            <CardTitle>Unified Player Data</CardTitle>
+          </div>
+          <CardDescription>
+            Build the unified player database by combining ESPN and FantasyPros data into a single view.
+            Includes OPRK (opponent rank) calculations and player ID crosswalk.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Parameters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="unified-sport">Sport</Label>
+              <Select value={unifiedSport} onValueChange={setUnifiedSport}>
+                <SelectTrigger id="unified-sport" data-testid="select-unified-sport">
+                  <SelectValue placeholder="Select sport" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NFL">NFL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="unified-season">Season</Label>
+              <Input
+                id="unified-season"
+                data-testid="input-unified-season"
+                type="number"
+                value={unifiedSeason}
+                onChange={(e) => setUnifiedSeason(e.target.value)}
+                placeholder="2024"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unified-scoring">Scoring Type</Label>
+              <Select value={unifiedScoringType} onValueChange={setUnifiedScoringType}>
+                <SelectTrigger id="unified-scoring" data-testid="select-unified-scoring">
+                  <SelectValue placeholder="Select scoring" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PPR">PPR</SelectItem>
+                  <SelectItem value="HALF_PPR">Half PPR</SelectItem>
+                  <SelectItem value="STD">Standard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Progress Steps */}
+          {unifiedSteps.length > 0 && (
+            <div className="space-y-2">
+              <Progress value={getStepProgress(unifiedSteps)} className="h-2" />
+              <div className="space-y-1">
+                {unifiedSteps.map((step, idx) => (
+                  <StepIndicator key={idx} step={step} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Info Box */}
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md text-sm">
+            <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">This job will:</p>
+            <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-300">
+              <li>Fetch player data from ESPN API → espn_player_data table</li>
+              <li>Copy existing FP players → fp_player_data table</li>
+              <li>Calculate defense vs position rankings → defense_vs_position_stats table</li>
+              <li>Match ESPN to FP players → player_crosswalk table</li>
+              <li>Refresh the unified players_master view</li>
+            </ol>
+          </div>
+
+          {/* Refresh Button */}
+          <Button
+            data-testid="button-refresh-unified-players"
+            disabled={unifiedRunning}
+            onClick={runUnifiedPlayerJobs}
+            className="w-full"
+            size="lg"
+          >
+            {unifiedRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Refresh All Unified Player Data
+          </Button>
         </CardContent>
       </Card>
 
