@@ -277,6 +277,11 @@ export async function refreshFpPlayers(
   try {
     console.log(`Refreshing FP ${sport} players for ${season} from FantasyPros API...`);
 
+    // Clear stale FP data before fetching fresh data
+    // This ensures we only have current, filtered fantasy-relevant players
+    const deletedCount = await storage.deleteFpPlayerData(sport, season);
+    console.log(`Cleared ${deletedCount} existing FP player records for ${sport} ${season}`);
+
     // Fetch players directly from FantasyPros API
     const endpoint = `${FP_BASE_URL}/${sport.toUpperCase()}/players`;
     const data = await fetchFromFantasyPros(endpoint);
