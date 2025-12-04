@@ -30,96 +30,97 @@ export async function refreshEspnPlayers(
   try {
     console.log(`Refreshing ESPN ${sport} players for ${season}...`);
 
-    // Fetch players by team to ensure we get all rostered players
-    // The ownership-sorted endpoint caps results and prioritizes free agents
-    const allPlayerRecords: InsertEspnPlayerData[] = [];
-    const seenPlayerIds = new Set<number>();
+    // Fetch players using a high limit - ESPN API doesn't support per-team filtering
+    // We'll fetch a large batch and filter to rostered players on our side
+    const url = `${ESPN_BASE_URL}/ffl/seasons/${season}/segments/0/leaguedefaults/1?view=kona_player_info`;
     
-    // Get all valid NFL team IDs
-    const nflTeamIds = Object.keys(NFL_TEAM_NAMES).map(Number);
-    console.log(`Fetching players from ${nflTeamIds.length} NFL teams...`);
-
-    for (const teamId of nflTeamIds) {
-      const url = `${ESPN_BASE_URL}/ffl/seasons/${season}/segments/0/leaguedefaults/1?view=kona_player_info`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'X-Fantasy-Filter': JSON.stringify({
-            "players": {
-              "filterSlotIds": {"value": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]},
-              "filterProTeamIds": {"value": [teamId]},
-              "limit": 100
-            }
-          })
-        }
-      });
-
-      if (!response.ok) {
-        console.warn(`ESPN API Error for team ${teamId}: ${response.status}`);
-        continue;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'X-Fantasy-Filter': JSON.stringify({
+          "players": {
+            "filterSlotIds": {"value": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]},
+            "limit": 5000,
+            "sortPercOwned": {"sortPriority": 1, "sortAsc": false}
+          }
+        })
       }
+    });
 
-      const data = await response.json();
-      const players = data.players || [];
-
-      for (const playerEntry of players) {
-        const player = playerEntry.player || playerEntry;
-        const ownership = player.ownership || playerEntry.ownership || {};
-        
-        const espnPlayerId = player.id;
-        if (!espnPlayerId || seenPlayerIds.has(espnPlayerId)) continue;
-        seenPlayerIds.add(espnPlayerId);
-
-        const fullName = player.fullName || `${player.firstName || ''} ${player.lastName || ''}`.trim();
-        if (!fullName) continue;
-
-        const playerTeamId = player.proTeamId || player.teamId;
-        const team = playerTeamId ? getNflTeamAbbr(playerTeamId) : null;
-        const position = player.defaultPositionId ? getPositionName(player.defaultPositionId) : null;
-
-        // Skip players not on one of the 32 NFL teams (free agents)
-        if (!team) continue;
-
-        let injuryStatus: string | null = null;
-        if (player.injured) {
-          injuryStatus = player.injuryStatus || 'INJURED';
-        } else if (player.injuryStatus) {
-          injuryStatus = player.injuryStatus;
-        }
-
-        const stats = player.stats || [];
-        const currentStats = stats.find((s: any) => s.statSourceId === 0 && s.statSplitTypeId === 1) || {};
-
-        allPlayerRecords.push({
-          espnPlayerId,
-          sport,
-          season,
-          firstName: player.firstName || null,
-          lastName: player.lastName || null,
-          fullName,
-          team,
-          position,
-          jerseyNumber: player.jersey ? parseInt(player.jersey) : null,
-          injuryStatus,
-          injuryType: player.injury?.type || null,
-          percentOwned: ownership.percentOwned ?? null,
-          percentStarted: ownership.percentStarted ?? null,
-          averagePoints: currentStats.appliedAverage ?? null,
-          totalPoints: currentStats.appliedTotal ?? null
-        });
-      }
+    if (!response.ok) {
+      throw new Error(`ESPN API Error: ${response.status} ${response.statusText}`);
     }
 
-    console.log(`Total unique ESPN players collected: ${allPlayerRecords.length}`);
+    const data = await response.json();
+    const players = data.players || [];
     
-    if (allPlayerRecords.length === 0) {
+    console.log(`ESPN API returned ${players.length} total players`);
+
+    if (players.length === 0) {
       return { success: false, recordCount: 0, error: 'No players returned from ESPN API' };
     }
 
-    const result = await storage.bulkUpsertEspnPlayerData(allPlayerRecords);
+    const playerRecords: InsertEspnPlayerData[] = [];
+    let skippedFreeAgents = 0;
+
+    for (const playerEntry of players) {
+      const player = playerEntry.player || playerEntry;
+      const ownership = player.ownership || playerEntry.ownership || {};
+      
+      const espnPlayerId = player.id;
+      if (!espnPlayerId) continue;
+
+      const fullName = player.fullName || `${player.firstName || ''} ${player.lastName || ''}`.trim();
+      if (!fullName) continue;
+
+      const teamId = player.proTeamId || player.teamId;
+      const team = teamId ? getNflTeamAbbr(teamId) : null;
+      const position = player.defaultPositionId ? getPositionName(player.defaultPositionId) : null;
+
+      // Skip players not on one of the 32 NFL teams (free agents)
+      if (!team) {
+        skippedFreeAgents++;
+        continue;
+      }
+
+      let injuryStatus: string | null = null;
+      if (player.injured) {
+        injuryStatus = player.injuryStatus || 'INJURED';
+      } else if (player.injuryStatus) {
+        injuryStatus = player.injuryStatus;
+      }
+
+      const stats = player.stats || [];
+      const currentStats = stats.find((s: any) => s.statSourceId === 0 && s.statSplitTypeId === 1) || {};
+
+      playerRecords.push({
+        espnPlayerId,
+        sport,
+        season,
+        firstName: player.firstName || null,
+        lastName: player.lastName || null,
+        fullName,
+        team,
+        position,
+        jerseyNumber: player.jersey ? parseInt(player.jersey) : null,
+        injuryStatus,
+        injuryType: player.injury?.type || null,
+        percentOwned: ownership.percentOwned ?? null,
+        percentStarted: ownership.percentStarted ?? null,
+        averagePoints: currentStats.appliedAverage ?? null,
+        totalPoints: currentStats.appliedTotal ?? null
+      });
+    }
+
+    console.log(`Filtered to ${playerRecords.length} rostered players (skipped ${skippedFreeAgents} free agents)`);
+    
+    if (playerRecords.length === 0) {
+      return { success: false, recordCount: 0, error: 'No rostered players found after filtering' };
+    }
+
+    const result = await storage.bulkUpsertEspnPlayerData(playerRecords);
     
     console.log(`✓ ESPN players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
     return { 
