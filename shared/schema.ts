@@ -379,6 +379,19 @@ export const playerCrosswalk = pgTable("player_crosswalk", {
   fpIdIndex: uniqueIndex("player_crosswalk_fp").on(table.sport, table.season, table.fpPlayerId),
 }));
 
+// Player Aliases - Maps nickname/alternate names to canonical names
+export const playerAliases = pgTable("player_aliases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sport: text("sport").notNull(),
+  aliasName: text("alias_name").notNull(), // The alternate name (e.g., "Bam Knight", "Hollywood Brown")
+  canonicalName: text("canonical_name").notNull(), // The canonical name (e.g., "Zonovan Knight", "Marquise Brown")
+  aliasType: text("alias_type").notNull(), // nickname, legal_name, abbreviated
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueAlias: uniqueIndex("player_aliases_unique").on(table.sport, table.aliasName),
+}));
+
 // Insert schemas for unified player tables
 export const insertEspnPlayerDataSchema = createInsertSchema(espnPlayerData).omit({
   id: true,
@@ -403,6 +416,11 @@ export const insertPlayerCrosswalkSchema = createInsertSchema(playerCrosswalk).o
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertPlayerAliasSchema = createInsertSchema(playerAliases).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertFantasyProsPlayerSchema = createInsertSchema(fantasyProsPlayers).omit({
