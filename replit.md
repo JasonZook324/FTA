@@ -30,7 +30,7 @@ The frontend is a React 18 application with TypeScript, built with a component-b
   - **Match Confidence Levels**: `exact` (full match), `fuzzy` (team mismatch logged), `unmatched` (no FP match - legitimate data gaps)
   - DST data formatted as "{Nickname} D/ST" (e.g., "Eagles D/ST") for consistent matching
   - No synthetic/fallback data - unmatched players remain with null `fp_player_id`
-  - Achieves ~82% match rate (634 of 777 ESPN players matched to FP for NFL 2024)
+  - Achieves ~97% match rate (686 of 711 ESPN players matched to FP for NFL 2025)
 - **Data Parity Validation**: The Jobs page includes a Data Parity Validation section to analyze ESPN vs FantasyPros data matching, showing match rates, position breakdowns, and unmatched players. This helps monitor data quality between the two sources.
 
 ## External Dependencies
