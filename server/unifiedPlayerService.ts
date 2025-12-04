@@ -23,12 +23,102 @@ function getPositionName(positionId: number): string | null {
   return ESPN_POSITION_NAMES[positionId] || null;
 }
 
+// Normalize player name for matching (lowercase, remove special chars, collapse spaces)
+function normalizePlayerName(name: string): string {
+  return name.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Fetch FP roster status to identify players who are free agents or inactive
+// Returns a Set of normalized player names that should be excluded from ESPN data
+// Note: Currently NFL-only - other sports return empty set (no filtering)
+async function getFpInactivePlayers(sport: string): Promise<Set<string>> {
+  const inactiveNames = new Set<string>();
+  
+  // FP roster validation is currently NFL-only due to sport-specific team mappings
+  // For other sports, return empty set (no inactive filtering)
+  if (sport !== 'NFL') {
+    console.log(`FP roster validation not implemented for ${sport}, skipping inactive filtering`);
+    return inactiveNames;
+  }
+  
+  const apiKey = process.env.FantasyProsApiKey;
+  
+  if (!apiKey) {
+    console.log('Warning: FantasyProsApiKey not set, skipping FP roster validation');
+    return inactiveNames;
+  }
+  
+  try {
+    const url = `https://api.fantasypros.com/public/v2/json/${sport}/players`;
+    console.log('Fetching FP roster status for inactive player filtering...');
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'x-api-key': apiKey,
+      }
+    });
+    
+    if (!response.ok) {
+      console.log(`Warning: FP roster fetch failed (${response.status}), proceeding without validation`);
+      return inactiveNames;
+    }
+    
+    const data = await response.json();
+    const players = data.players || [];
+    
+    // Valid NFL teams - players not on these are considered inactive
+    const validTeams = new Set([
+      'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
+      'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+      'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG',
+      'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS',
+      'JAC' // FP uses JAC for Jacksonville
+    ]);
+    
+    // Fantasy-relevant positions only
+    const fantasyPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DST', 'DEF']);
+    
+    for (const p of players) {
+      const position = (p.position_id || '').toUpperCase();
+      if (!fantasyPositions.has(position)) continue;
+      
+      const teamId = (p.team_id || '').toUpperCase();
+      const playerName = p.player_name || '';
+      
+      // If player is FA (free agent) or not on a valid team, they're inactive
+      if (!teamId || teamId === 'FA' || !validTeams.has(teamId)) {
+        inactiveNames.add(normalizePlayerName(playerName));
+      }
+    }
+    
+    console.log(`Identified ${inactiveNames.size} inactive/FA players from FP for filtering`);
+    return inactiveNames;
+  } catch (error) {
+    console.log(`Warning: FP roster validation failed (${error}), proceeding without validation`);
+    return inactiveNames;
+  }
+}
+
 export async function refreshEspnPlayers(
   sport: string = 'NFL',
   season: number = 2024
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
     console.log(`Refreshing ESPN ${sport} players for ${season}...`);
+
+    // First, fetch FP roster status to filter out inactive players
+    // FP is the authority on current roster status
+    const fpInactivePlayers = await getFpInactivePlayers(sport);
+    
+    // Clear stale ESPN data before fetching fresh data
+    // This ensures inactive players from previous runs are removed
+    const deletedCount = await storage.deleteEspnPlayerData(sport, season);
+    console.log(`Cleared ${deletedCount} existing ESPN player records for ${sport} ${season}`);
 
     // Fetch players using a high limit - ESPN API doesn't support per-team filtering
     // We'll fetch a large batch and filter to rostered players on our side
@@ -64,6 +154,7 @@ export async function refreshEspnPlayers(
 
     const playerRecords: InsertEspnPlayerData[] = [];
     let skippedFreeAgents = 0;
+    let skippedInactive = 0;
 
     for (const playerEntry of players) {
       const player = playerEntry.player || playerEntry;
@@ -79,9 +170,17 @@ export async function refreshEspnPlayers(
       const team = teamId ? getNflTeamAbbr(teamId) : null;
       const position = player.defaultPositionId ? getPositionName(player.defaultPositionId) : null;
 
-      // Skip players not on one of the 32 NFL teams (free agents)
+      // Skip players not on one of the 32 NFL teams (free agents per ESPN)
       if (!team) {
         skippedFreeAgents++;
+        continue;
+      }
+      
+      // Skip players that FP marks as inactive/FA (ESPN has stale roster data)
+      // This ensures we only include players that are actually on active rosters
+      const normalizedName = normalizePlayerName(fullName);
+      if (fpInactivePlayers.has(normalizedName)) {
+        skippedInactive++;
         continue;
       }
 
@@ -114,7 +213,7 @@ export async function refreshEspnPlayers(
       });
     }
 
-    console.log(`Filtered to ${playerRecords.length} rostered players (skipped ${skippedFreeAgents} free agents)`);
+    console.log(`Filtered to ${playerRecords.length} active players (skipped ${skippedFreeAgents} ESPN free agents, ${skippedInactive} FP-inactive players)`);
     
     if (playerRecords.length === 0) {
       return { success: false, recordCount: 0, error: 'No rostered players found after filtering' };

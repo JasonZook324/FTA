@@ -26,11 +26,12 @@ The frontend is a React 18 application with TypeScript, built with a component-b
 - **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system includes:
   - Database tables: `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk`
   - Materialized view: `players_master` combining all player data with rankings, projections, and matchups
+  - **FP Roster Validation**: Before storing ESPN players, validates against FP's current roster status. Players marked as "FA" (free agent) in FP are excluded from ESPN data since ESPN often has stale roster information. This prevents mismatches from inactive/retired players.
   - **Two-Pass Matching Strategy**: First pass matches by exact name+team+position; second pass uses fuzzy matching (name+position only) with team as a soft signal. This handles players with outdated team info (trades, free agent signings).
   - **Match Confidence Levels**: `exact` (full match), `fuzzy` (team mismatch logged), `unmatched` (no FP match - legitimate data gaps)
   - DST data formatted as "{Nickname} D/ST" (e.g., "Eagles D/ST") for consistent matching
   - No synthetic/fallback data - unmatched players remain with null `fp_player_id`
-  - Achieves ~97% match rate (686 of 711 ESPN players matched to FP for NFL 2025)
+  - Achieves ~98% match rate (683 of 699 ESPN players matched to FP for NFL 2025)
 - **Data Parity Validation**: The Jobs page includes a Data Parity Validation section to analyze ESPN vs FantasyPros data matching, showing match rates, position breakdowns, and unmatched players. This helps monitor data quality between the two sources.
 
 ## External Dependencies
