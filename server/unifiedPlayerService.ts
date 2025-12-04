@@ -159,6 +159,18 @@ async function fetchFromFantasyPros(endpoint: string): Promise<any> {
   return response.json();
 }
 
+// Team nickname mapping for DST entries (matches ESPN's naming convention)
+const TEAM_NICKNAMES: Record<string, string> = {
+  'ARI': 'Cardinals', 'ATL': 'Falcons', 'BAL': 'Ravens', 'BUF': 'Bills',
+  'CAR': 'Panthers', 'CHI': 'Bears', 'CIN': 'Bengals', 'CLE': 'Browns',
+  'DAL': 'Cowboys', 'DEN': 'Broncos', 'DET': 'Lions', 'GB': 'Packers',
+  'HOU': 'Texans', 'IND': 'Colts', 'JAX': 'Jaguars', 'KC': 'Chiefs',
+  'LAC': 'Chargers', 'LAR': 'Rams', 'LV': 'Raiders', 'MIA': 'Dolphins',
+  'MIN': 'Vikings', 'NE': 'Patriots', 'NO': 'Saints', 'NYG': 'Giants',
+  'NYJ': 'Jets', 'PHI': 'Eagles', 'PIT': 'Steelers', 'SEA': 'Seahawks',
+  'SF': '49ers', 'TB': 'Buccaneers', 'TEN': 'Titans', 'WAS': 'Commanders'
+};
+
 export async function refreshFpPlayers(
   sport: string = 'NFL',
   season: number = 2024
@@ -231,7 +243,29 @@ export async function refreshFpPlayers(
       });
     }
 
-    console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy positions)`);
+    // Add synthetic DST entries for all 32 teams (FP /players endpoint doesn't include team defenses)
+    // Use ESPN's naming format: "{Nickname} D/ST" and position "DST" (which we'll map to "DEF")
+    console.log('Adding synthetic DST entries for all 32 NFL teams...');
+    for (const team of Array.from(validTeams)) {
+      const nickname = TEAM_NICKNAMES[team];
+      if (!nickname) continue;
+      
+      playerRecords.push({
+        fpPlayerId: `DST_${team}`,  // Synthetic ID
+        sport,
+        season,
+        firstName: nickname,
+        lastName: 'D/ST',
+        fullName: `${nickname} D/ST`,
+        team,
+        position: 'DEF',  // Use DEF to match ESPN
+        jerseyNumber: null,
+        status: null,
+        injuryStatus: null
+      });
+    }
+
+    console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy, added 32 DST)`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
     
     // After upserting, remove FP players that don't have an ESPN match

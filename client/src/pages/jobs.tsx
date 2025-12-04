@@ -62,6 +62,12 @@ export default function Jobs() {
   const [viewerError, setViewerError] = useState<string>("");
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   
+  // Parity Validation parameters
+  const [paritySeason, setParitySeason] = useState(new Date().getFullYear().toString());
+  const [parityLoading, setParityLoading] = useState(false);
+  const [parityResult, setParityResult] = useState<any>(null);
+  const [parityError, setParityError] = useState<string>("");
+  
   // Get scoring type from the user's league settings
   const leagueScoringType = currentLeague?.scoringType || "PPR";
 
@@ -363,6 +369,27 @@ export default function Jobs() {
     }
     
     setViewerLoading(false);
+  }
+  
+  async function runParityCheck() {
+    setParityLoading(true);
+    setParityError("");
+    setParityResult(null);
+    
+    try {
+      const res = await fetch(`/api/jobs/unified-parity-check/NFL/${paritySeason}`);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setParityResult(data);
+      } else {
+        setParityError(data.message || 'Failed to run parity check');
+      }
+    } catch (err: any) {
+      setParityError(err.message || 'Failed to run parity check');
+    }
+    
+    setParityLoading(false);
   }
 
   const NFL_TEAMS = [
@@ -996,6 +1023,137 @@ export default function Jobs() {
                   {JSON.stringify(selectedPlayer, null, 2)}
                 </pre>
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Data Parity Validation */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5" />
+            <CardTitle>Data Parity Validation</CardTitle>
+          </div>
+          <CardDescription>
+            Analyze ESPN vs FantasyPros data matching. Identify unmatched players and potential data quality issues.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Parameters */}
+          <div className="flex items-end gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label htmlFor="parity-season">Season</Label>
+              <Input
+                id="parity-season"
+                data-testid="input-parity-season"
+                type="number"
+                value={paritySeason}
+                onChange={(e) => setParitySeason(e.target.value)}
+                className="w-28"
+              />
+            </div>
+            <Button
+              data-testid="button-run-parity-check"
+              onClick={runParityCheck}
+              disabled={parityLoading}
+            >
+              {parityLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Run Parity Check
+            </Button>
+          </div>
+
+          {/* Error Display */}
+          {parityError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md text-sm text-red-700 dark:text-red-300">
+              {parityError}
+            </div>
+          )}
+
+          {/* Results */}
+          {parityResult && (
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold">{parityResult.counts.espn}</div>
+                  <div className="text-sm text-muted-foreground">ESPN Players</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold">{parityResult.counts.fp}</div>
+                  <div className="text-sm text-muted-foreground">FP Players</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">{parityResult.counts.matched}</div>
+                  <div className="text-sm text-muted-foreground">Matched</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <div className={`text-2xl font-bold ${parityResult.counts.unmatched > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                    {parityResult.counts.unmatched}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Unmatched</div>
+                </div>
+              </div>
+
+              {/* Match Rate Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Match Rate</span>
+                  <span className={parityResult.counts.matchRate >= 95 ? 'text-green-600' : parityResult.counts.matchRate >= 85 ? 'text-amber-600' : 'text-red-600'}>
+                    {parityResult.counts.matchRate}%
+                  </span>
+                </div>
+                <Progress 
+                  value={parityResult.counts.matchRate} 
+                  className="h-2"
+                />
+              </div>
+
+              {/* Position Breakdown */}
+              <div className="space-y-3">
+                <Label>Position Breakdown (ESPN vs FP)</Label>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                  {['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].map(pos => {
+                    const espnCount = parityResult.positionBreakdown.espn[pos] || 0;
+                    const fpCount = parityResult.positionBreakdown.fp[pos] || 0;
+                    const diff = espnCount - fpCount;
+                    return (
+                      <div key={pos} className="p-2 bg-muted rounded text-center text-sm">
+                        <div className="font-medium">{pos}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {espnCount} / {fpCount}
+                          {diff !== 0 && (
+                            <span className={diff > 0 ? ' text-amber-600' : ' text-green-600'}>
+                              {' '}({diff > 0 ? '+' : ''}{diff})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Unmatched Players by Position */}
+              {parityResult.counts.unmatched > 0 && (
+                <div className="space-y-3">
+                  <Label>Unmatched ESPN Players (no FP match)</Label>
+                  <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                    {Object.entries(parityResult.unmatchedByPosition).map(([position, players]: [string, any]) => (
+                      <div key={position} className="p-3">
+                        <div className="font-medium text-sm mb-2">{position} ({(players as any[]).length})</div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs">
+                          {(players as any[]).map((player, idx) => (
+                            <div key={idx} className="p-1 bg-muted/50 rounded truncate" title={player.name}>
+                              {player.team} - {player.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

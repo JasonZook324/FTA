@@ -5343,6 +5343,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Parity validation endpoint - analyze ESPN vs FP data matching
+  app.get("/api/jobs/unified-parity-check/:sport/:season", requireAuth, async (req, res) => {
+    try {
+      const sport = req.params.sport;
+      const season = parseInt(req.params.season);
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      const suffixPattern = '\\s+(II|III|IV|V|Jr\\.?|Sr\\.?|Junior|Senior)$';
+      
+      // Get counts
+      const countsResult = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM espn_player_data WHERE sport = ${sport} AND season = ${season}) as espn_count,
+          (SELECT COUNT(*) FROM fp_player_data WHERE sport = ${sport} AND season = ${season}) as fp_count,
+          (SELECT COUNT(*) FROM player_crosswalk WHERE sport = ${sport} AND season = ${season}) as crosswalk_count,
+          (SELECT COUNT(*) FROM player_crosswalk WHERE sport = ${sport} AND season = ${season} AND fp_player_id IS NULL) as unmatched_count
+      `);
+      const counts = countsResult.rows[0] as any;
+      
+      // Get unmatched players (ESPN without FP match)
+      const unmatchedResult = await db.execute(sql`
+        SELECT c.canonical_key, c.notes, e.full_name, e.team, e.position
+        FROM player_crosswalk c
+        JOIN espn_player_data e ON c.espn_player_id = e.espn_player_id AND c.sport = e.sport AND c.season = e.season
+        WHERE c.sport = ${sport} AND c.season = ${season} AND c.fp_player_id IS NULL
+        ORDER BY e.position, e.team, e.full_name
+      `);
+      
+      // Group unmatched by position
+      const unmatchedByPosition: Record<string, any[]> = {};
+      for (const row of unmatchedResult.rows as any[]) {
+        const pos = row.position || 'Unknown';
+        if (!unmatchedByPosition[pos]) unmatchedByPosition[pos] = [];
+        unmatchedByPosition[pos].push({
+          name: row.full_name,
+          team: row.team,
+          canonicalKey: row.canonical_key
+        });
+      }
+      
+      // Get position breakdown
+      const espnPositionsResult = await db.execute(sql`
+        SELECT position, COUNT(*) as count FROM espn_player_data 
+        WHERE sport = ${sport} AND season = ${season} 
+        GROUP BY position ORDER BY count DESC
+      `);
+      const fpPositionsResult = await db.execute(sql`
+        SELECT position, COUNT(*) as count FROM fp_player_data 
+        WHERE sport = ${sport} AND season = ${season} 
+        GROUP BY position ORDER BY count DESC
+      `);
+      
+      const espnPositions: Record<string, number> = {};
+      const fpPositions: Record<string, number> = {};
+      for (const row of espnPositionsResult.rows as any[]) {
+        espnPositions[row.position || 'null'] = parseInt(row.count);
+      }
+      for (const row of fpPositionsResult.rows as any[]) {
+        fpPositions[row.position || 'null'] = parseInt(row.count);
+      }
+      
+      // Calculate match rate
+      const matchedCount = parseInt(counts.crosswalk_count) - parseInt(counts.unmatched_count);
+      const matchRate = parseInt(counts.crosswalk_count) > 0 
+        ? ((matchedCount / parseInt(counts.crosswalk_count)) * 100).toFixed(1) 
+        : '0';
+      
+      res.json({
+        sport,
+        season,
+        counts: {
+          espn: parseInt(counts.espn_count),
+          fp: parseInt(counts.fp_count),
+          crosswalk: parseInt(counts.crosswalk_count),
+          unmatched: parseInt(counts.unmatched_count),
+          matched: matchedCount,
+          matchRate: parseFloat(matchRate)
+        },
+        positionBreakdown: {
+          espn: espnPositions,
+          fp: fpPositions
+        },
+        unmatchedByPosition
+      });
+    } catch (error: any) {
+      console.error('Parity check error:', error);
+      res.status(500).json({ message: error.message || 'Failed to run parity check' });
+    }
+  });
+
   // Get unified player data from the materialized view
   app.get("/api/players/unified/:sport/:season", requireAuth, async (req, res) => {
     try {
