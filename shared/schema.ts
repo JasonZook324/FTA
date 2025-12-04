@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, uniqueIndex, index, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -294,6 +294,131 @@ export const fantasyProsRefreshLog = pgTable("fantasy_pros_refresh_log", {
   refreshedAt: timestamp("refreshed_at").defaultNow(),
 });
 
+// ============================================
+// UNIFIED PLAYER DATA TABLES
+// See docs/unified-player-architecture.md for full documentation
+// ============================================
+
+// ESPN Player Data - Cached snapshots from ESPN API
+export const espnPlayerData = pgTable("espn_player_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  espnPlayerId: integer("espn_player_id").notNull(),
+  sport: text("sport").notNull(), // NFL, NBA, NHL, MLB
+  season: integer("season").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  fullName: text("full_name").notNull(),
+  team: text("team"), // Normalized team abbreviation
+  position: text("position"),
+  jerseyNumber: integer("jersey_number"),
+  injuryStatus: text("injury_status"), // ACTIVE, QUESTIONABLE, DOUBTFUL, OUT, IR
+  injuryType: text("injury_type"),
+  percentOwned: real("percent_owned"), // 0-100
+  percentStarted: real("percent_started"), // 0-100
+  averagePoints: real("average_points"),
+  totalPoints: real("total_points"),
+  lastFetchedAt: timestamp("last_fetched_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueEspnPlayer: uniqueIndex("espn_player_data_unique").on(table.sport, table.season, table.espnPlayerId),
+  teamIndex: index("espn_player_data_team").on(table.sport, table.season, table.team),
+  positionIndex: index("espn_player_data_position").on(table.sport, table.season, table.position),
+}));
+
+// FantasyPros Player Data - Separate from existing fantasy_pros_players to avoid confusion
+export const fpPlayerData = pgTable("fp_player_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fpPlayerId: text("fp_player_id").notNull(),
+  sport: text("sport").notNull(), // NFL, NBA, NHL, MLB
+  season: integer("season").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  fullName: text("full_name").notNull(),
+  team: text("team"), // Normalized team abbreviation
+  position: text("position"),
+  jerseyNumber: integer("jersey_number"),
+  status: text("status"), // Active, Injured, etc.
+  injuryStatus: text("injury_status"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueFpPlayer: uniqueIndex("fp_player_data_unique").on(table.sport, table.season, table.fpPlayerId),
+  teamIndex: index("fp_player_data_team").on(table.sport, table.season, table.team),
+  positionIndex: index("fp_player_data_position").on(table.sport, table.season, table.position),
+}));
+
+// Defense vs Position Stats - For calculating OPRK (Opponent Rank)
+export const defenseVsPositionStats = pgTable("defense_vs_position_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sport: text("sport").notNull(), // NFL primarily
+  season: integer("season").notNull(),
+  week: integer("week"), // null for season average
+  defenseTeam: text("defense_team").notNull(), // Team abbreviation
+  position: text("position").notNull(), // QB, RB, WR, TE
+  gamesPlayed: integer("games_played"),
+  totalPointsAllowed: real("total_points_allowed"),
+  avgPointsAllowed: real("avg_points_allowed"),
+  rank: integer("rank"), // 1-32 (1 = best defense, 32 = worst)
+  scoringType: text("scoring_type"), // PPR, HALF_PPR, STD
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueDefenseStats: uniqueIndex("defense_vs_position_unique").on(
+    table.sport, 
+    table.season, 
+    table.week, 
+    table.defenseTeam, 
+    table.position,
+    table.scoringType
+  ),
+}));
+
+// Player Crosswalk - Maps ESPN IDs to FantasyPros IDs
+export const playerCrosswalk = pgTable("player_crosswalk", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  canonicalKey: text("canonical_key").notNull(), // lowercase(first+last+team+position)
+  sport: text("sport").notNull(),
+  season: integer("season").notNull(),
+  espnPlayerId: integer("espn_player_id"), // nullable - might not have ESPN match
+  fpPlayerId: text("fp_player_id"), // nullable - might not have FP match
+  matchConfidence: text("match_confidence").notNull(), // exact, fuzzy, manual, unmatched
+  manualOverride: boolean("manual_override").default(false),
+  notes: text("notes"), // Admin notes for manual overrides
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueCrosswalk: uniqueIndex("player_crosswalk_unique").on(table.sport, table.season, table.canonicalKey),
+  espnIdIndex: uniqueIndex("player_crosswalk_espn").on(table.sport, table.season, table.espnPlayerId),
+  fpIdIndex: uniqueIndex("player_crosswalk_fp").on(table.sport, table.season, table.fpPlayerId),
+}));
+
+// Insert schemas for unified player tables
+export const insertEspnPlayerDataSchema = createInsertSchema(espnPlayerData).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastFetchedAt: true,
+});
+
+export const insertFpPlayerDataSchema = createInsertSchema(fpPlayerData).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDefenseVsPositionStatsSchema = createInsertSchema(defenseVsPositionStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPlayerCrosswalkSchema = createInsertSchema(playerCrosswalk).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertFantasyProsPlayerSchema = createInsertSchema(fantasyProsPlayers).omit({
   id: true,
   createdAt: true,
@@ -522,3 +647,13 @@ export type EmailVerification = typeof emailVerifications.$inferSelect;
 export type InsertEmailVerification = z.infer<typeof insertEmailVerificationSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+
+// Unified Player Data Types
+export type EspnPlayerData = typeof espnPlayerData.$inferSelect;
+export type InsertEspnPlayerData = z.infer<typeof insertEspnPlayerDataSchema>;
+export type FpPlayerData = typeof fpPlayerData.$inferSelect;
+export type InsertFpPlayerData = z.infer<typeof insertFpPlayerDataSchema>;
+export type DefenseVsPositionStats = typeof defenseVsPositionStats.$inferSelect;
+export type InsertDefenseVsPositionStats = z.infer<typeof insertDefenseVsPositionStatsSchema>;
+export type PlayerCrosswalk = typeof playerCrosswalk.$inferSelect;
+export type InsertPlayerCrosswalk = z.infer<typeof insertPlayerCrosswalkSchema>;

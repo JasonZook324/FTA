@@ -133,6 +133,33 @@ Direct integration with OpenAI's API allowing users to submit fantasy football p
 - **Security**: `OPENAI_API_KEY` must be stored in Replit Secrets (not .env file) for proper security
 - **API Endpoint**: POST `/api/leagues/:leagueId/submit-ai-prompt` with authentication and league access validation
 
+### Unified Player Data System (New - December 2024)
+A consolidated player data architecture that combines ESPN and FantasyPros data into a single unified player object. See `docs/unified-player-architecture.md` for full documentation.
+
+**Database Tables:**
+- `espn_player_data`: Cached snapshots of ESPN API player data (IDs, stats, ownership %, injury status)
+- `fp_player_data`: FantasyPros player data (separate from legacy `fantasy_pros_players` table)
+- `defense_vs_position_stats`: Defense rankings by position for OPRK calculation (1-32 ranking)
+- `player_crosswalk`: Maps ESPN player IDs to FantasyPros IDs using canonical key matching
+- `players_master`: Materialized view joining all sources into unified player records
+
+**OPRK (Opponent Rank) Calculation:**
+- Ranks NFL defenses 1-32 based on average fantasy points allowed per game to each position
+- Lower rank = tougher matchup (rank 1 is best defense), higher rank = easier matchup
+- Color coding: Red (1-10) tough, Black (11-21) average, Green (22-32) favorable
+
+**Player ID Matching Strategy:**
+- Canonical key: `lowercase(firstName + lastName + normalizedTeam + position)`
+- Match confidence levels: `exact`, `fuzzy`, `manual`, `unmatched`
+- Manual override support for edge cases
+
+**Jobs Page Integration:**
+- Refresh ESPN Players: Fetch ESPN API → save to `espn_player_data`
+- Refresh FP Players: Fetch FantasyPros API → save to `fp_player_data`
+- Refresh Defense Stats: Calculate OPRK data → save to `defense_vs_position_stats`
+- Build Crosswalk: Match ESPN↔FP players → update `player_crosswalk`
+- Refresh Master View: Execute `REFRESH MATERIALIZED VIEW players_master`
+
 ## External Dependencies
 
 -   **Database**: PostgreSQL via Neon Database (`@neondatabase/serverless`)
