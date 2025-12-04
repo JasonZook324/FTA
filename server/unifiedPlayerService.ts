@@ -184,7 +184,11 @@ export async function refreshFpPlayers(
       'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
     ]);
 
+    // Fantasy-relevant positions only (matches ESPN's fantasy API)
+    const fantasyPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DST']);
+
     const playerRecords: InsertFpPlayerData[] = [];
+    let skippedNonFantasy = 0;
 
     for (const p of data.players) {
       const playerId = String(p.player_id || p.id || p.fpid);
@@ -194,6 +198,13 @@ export async function refreshFpPlayers(
       // Get team abbreviation and skip free agents
       const team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
       if (!team || !validTeams.has(team)) continue;
+
+      // Get position and skip non-fantasy positions (IDP players)
+      const position = (p.player_position_id || p.position_id || p.position || '').toUpperCase();
+      if (!position || !fantasyPositions.has(position)) {
+        skippedNonFantasy++;
+        continue;
+      }
 
       const nameParts = playerName.split(' ');
       const firstName = nameParts[0] || null;
@@ -207,14 +218,14 @@ export async function refreshFpPlayers(
         lastName,
         fullName: playerName,
         team,
-        position: p.player_position_id || p.position_id || p.position || null,
+        position,
         jerseyNumber: p.jersey || p.jersey_number || null,
         status: null,
         injuryStatus: null
       });
     }
 
-    console.log(`Processing ${playerRecords.length} FP players (after filtering to NFL teams)...`);
+    console.log(`Filtered to ${playerRecords.length} fantasy-relevant players (skipped ${skippedNonFantasy} IDP/non-fantasy positions)`);
     const result = await storage.bulkUpsertFpPlayerData(playerRecords);
 
     console.log(`✓ FP players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
