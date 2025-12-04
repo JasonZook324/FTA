@@ -213,12 +213,23 @@ async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<
     };
   }
   
-  console.log(`Received ${dstData.players.length} DST players from FantasyPros API`);
+  console.log(`Received ${dstData.players.length} players from FantasyPros DST endpoint`);
+  
+  // Track how many we process vs skip for debugging
+  let skippedNonDst = 0;
   
   for (const p of dstData.players) {
     const playerId = String(p.player_id || p.id || p.fpid);
     const playerName = p.player_name || p.name;
     if (!playerId || !playerName) continue;
+    
+    // CRITICAL: Verify this is actually a DST/DEF record
+    // The FP API might return all players - we must filter
+    const position = (p.player_position_id || p.position_id || p.position || '').toUpperCase();
+    if (position !== 'DST' && position !== 'DEF') {
+      skippedNonDst++;
+      continue;
+    }
     
     // Get and normalize team abbreviation
     let team = (p.player_team_id || p.team_id || p.team_abbr || p.team || '').toUpperCase();
@@ -250,7 +261,7 @@ async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<
     }
   }
   
-  console.log(`Processed ${dstRecords.length} DST records from FP API`);
+  console.log(`Processed ${dstRecords.length} DST records from FP API (skipped ${skippedNonDst} non-DST records)`);
   
   // Check for completeness - all 32 teams must have DST data
   const foundTeams = new Set(dstRecords.map(r => r.team));
