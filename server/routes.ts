@@ -5326,6 +5326,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear unified player data tables
+  app.post("/api/jobs/unified-clear-data", requireAuth, async (req, res) => {
+    try {
+      const { clearUnifiedPlayerData } = await import("./unifiedPlayerService");
+      const result = await clearUnifiedPlayerData();
+      
+      if (result.success) {
+        res.json({ message: 'Successfully cleared unified player data tables' });
+      } else {
+        res.status(500).json({ message: result.error || 'Failed to clear unified player data' });
+      }
+    } catch (error: any) {
+      console.error('Clear unified data error:', error);
+      res.status(500).json({ message: error.message || 'Failed to clear unified player data' });
+    }
+  });
+
   // Get unified player data from the materialized view
   app.get("/api/players/unified/:sport/:season", requireAuth, async (req, res) => {
     try {

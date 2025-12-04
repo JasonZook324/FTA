@@ -74,6 +74,9 @@ export async function refreshEspnPlayers(
       const team = teamId ? getNflTeamAbbr(teamId) : null;
       const position = player.defaultPositionId ? getPositionName(player.defaultPositionId) : null;
 
+      // Skip players not on one of the 32 NFL teams (free agents)
+      if (!team) continue;
+
       let injuryStatus: string | null = null;
       if (player.injured) {
         injuryStatus = player.injuryStatus || 'INJURED';
@@ -145,7 +148,19 @@ export async function refreshFpPlayers(
 
     const playerRecords: InsertFpPlayerData[] = [];
 
+    // Valid NFL teams for filtering
+    const validTeams = new Set([
+      'ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE',
+      'DAL', 'DEN', 'DET', 'GB', 'HOU', 'IND', 'JAX', 'KC',
+      'LAC', 'LAR', 'LV', 'MIA', 'MIN', 'NE', 'NO', 'NYG',
+      'NYJ', 'PHI', 'PIT', 'SEA', 'SF', 'TB', 'TEN', 'WAS'
+    ]);
+
     for (const player of existingPlayers) {
+      // Skip players not on one of the 32 NFL teams (free agents)
+      const team = player.team?.toUpperCase() || null;
+      if (!team || !validTeams.has(team)) continue;
+
       const nameParts = (player.name || '').split(' ');
       const firstName = nameParts[0] || null;
       const lastName = nameParts.slice(1).join(' ') || null;
@@ -157,7 +172,7 @@ export async function refreshFpPlayers(
         firstName,
         lastName,
         fullName: player.name,
-        team: player.team || null,
+        team,
         position: player.position || null,
         jerseyNumber: player.jerseyNumber || null,
         status: player.status || null,
@@ -429,6 +444,30 @@ export async function refreshPlayersMaster(): Promise<{ success: boolean; rowCou
   } catch (error: any) {
     console.error('Error refreshing players master view:', error);
     return { success: false, rowCount: 0, error: error.message };
+  }
+}
+
+export async function clearUnifiedPlayerData(): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log('Clearing unified player data tables...');
+    
+    const { espnPlayerData, fpPlayerData, defenseVsPositionStats, playerCrosswalk } = await import("@shared/schema");
+    const { sql } = await import("drizzle-orm");
+    
+    // Clear tables in order (crosswalk first due to potential FK references)
+    await db.delete(playerCrosswalk);
+    await db.delete(defenseVsPositionStats);
+    await db.delete(fpPlayerData);
+    await db.delete(espnPlayerData);
+    
+    // Refresh the materialized view (will be empty)
+    await db.execute(sql`REFRESH MATERIALIZED VIEW players_master`);
+    
+    console.log('✓ Unified player data tables cleared');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error clearing unified player data:', error);
+    return { success: false, error: error.message };
   }
 }
 

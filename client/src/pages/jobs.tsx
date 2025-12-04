@@ -775,17 +775,33 @@ export default function Jobs() {
             </ol>
           </div>
 
-          {/* Refresh Button */}
-          <Button
-            data-testid="button-refresh-unified-players"
-            disabled={unifiedRunning}
-            onClick={runUnifiedPlayerJobs}
-            className="w-full"
-            size="lg"
-          >
-            {unifiedRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Refresh All Unified Player Data
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <Button
+              data-testid="button-refresh-unified-players"
+              disabled={unifiedRunning}
+              onClick={runUnifiedPlayerJobs}
+              className="flex-1"
+              size="lg"
+            >
+              {unifiedRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh All Unified Player Data
+            </Button>
+            <Button
+              data-testid="button-clear-unified-data"
+              variant="outline"
+              disabled={unifiedRunning}
+              onClick={async () => {
+                setStatus("Clearing unified player data...");
+                const result = await runJob("/api/jobs/unified-clear-data");
+                setStatus(result.success ? "✓ Unified player data cleared" : `Failed: ${result.message}`);
+                setUnifiedSteps([]);
+              }}
+              size="lg"
+            >
+              Clear Data
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
