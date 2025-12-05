@@ -282,19 +282,13 @@ export async function refreshProjections(
   scoringType: string = 'PPR'
 ): Promise<RefreshResult> {
   try {
-    console.log(`Refreshing projections for ${sport} ${season} week ${week || 'season'}...`);
+    console.log(`Refreshing projections for ${sport} ${season} week ${week || 'season'} position ${position || 'ALL'}...`);
     
-    let endpoint = `${BASE_URL}/${sport.toLowerCase()}/${season}/projections?scoring=${scoringType}`;
-    if (week) endpoint += `&week=${week}`;
-    if (position) endpoint += `&position=${position}`;
+    // If no position specified, fetch for all main positions (like rankings does)
+    const positions = position ? [position] : ['QB', 'RB', 'WR', 'TE', 'K', 'DST'];
+    let totalProjections = 0;
 
-    const data = await fetchFromFantasyPros(endpoint);
-
-    if (!data?.players || !Array.isArray(data.players)) {
-      throw new Error("Invalid response format from Fantasy Pros API");
-    }
-
-    // Delete existing projections for this criteria
+    // Delete existing projections for this criteria first
     const deleteConditions = [
       eq(fantasyProsProjections.sport, sport),
       eq(fantasyProsProjections.season, season),
@@ -306,44 +300,70 @@ export async function refreshProjections(
     if (scoringType) {
       deleteConditions.push(eq(fantasyProsProjections.scoringType, scoringType));
     }
+    if (position) {
+      deleteConditions.push(eq(fantasyProsProjections.position, position));
+    }
 
     await db.delete(fantasyProsProjections).where(and(...deleteConditions));
 
-    // Log sample player to see actual structure
-    if (data.players.length > 0) {
-      console.log(`Sample projection player from API:`, JSON.stringify(data.players[0], null, 2));
-    }
+    // Fetch projections for each position (with delay to avoid rate limiting)
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      
+      // Add 500ms delay between requests to avoid rate limiting (except first request)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      let endpoint = `${BASE_URL}/${sport.toLowerCase()}/${season}/projections?scoring=${scoringType}&position=${pos}`;
+      if (week) endpoint += `&week=${week}`;
 
-    // Insert new projections - skip players without required data
-    const projections = data.players
-      .filter((p: any) => {
+      const data = await fetchFromFantasyPros(endpoint);
+
+      if (!data?.players || !Array.isArray(data.players)) {
+        console.warn(`No projection data for position ${pos}`);
+        continue;
+      }
+
+      // Log sample player to see actual structure (only for first position)
+      if (data.players.length > 0 && pos === 'QB') {
+        console.log(`Sample ${pos} projection player from API:`, JSON.stringify(data.players[0], null, 2));
+      }
+
+      // Insert new projections - skip players without required data
+      const playersWithData = data.players.filter((p: any) => {
         const hasId = p.fpid || p.player_id || p.id || p.playerId;
         const hasName = p.name || p.player_name || p.playerName;
         const hasPoints = p.stats?.points_ppr || p.stats?.points || p.fpts || p.projected_points;
         const isValid = hasId && hasName && hasPoints;
         
-        if (!isValid) {
+        if (!isValid && data.players.indexOf(p) < 3) {
           console.log(`Filtering out projection: id=${p.fpid || p.player_id || p.id}, name=${p.name || p.player_name}, points=${p.stats?.points_ppr || p.stats?.points}`);
         }
         
         return isValid;
-      })
-      .map((p: any) => ({
+      });
+      
+      console.log(`Position ${pos}: ${data.players.length} players from API, ${playersWithData.length} passed validation`);
+      
+      const projections = playersWithData.map((p: any) => ({
         sport,
         season,
         week: week || null,
         playerId: String(p.fpid || p.player_id || p.id || p.playerId),
         playerName: p.name || p.player_name || p.playerName,
         team: p.team_id || p.team_abbr || p.team || p.teamAbbr,
-        position: p.position_id || p.position,
+        position: p.position_id || p.position || pos,
         opponent: p.opponent || p.opp || p.opponent_id || p.opponent_abbr || null,
         scoringType,
         projectedPoints: String(p.stats?.points_ppr || p.stats?.points || p.fpts || p.projected_points),
         stats: p.stats || p,
       }));
 
-    if (projections.length > 0) {
-      await db.insert(fantasyProsProjections).values(projections);
+      if (projections.length > 0) {
+        await db.insert(fantasyProsProjections).values(projections);
+        totalProjections += projections.length;
+      }
     }
 
     // Log refresh
@@ -352,12 +372,12 @@ export async function refreshProjections(
       sport,
       season,
       week: week || null,
-      recordCount: projections.length,
+      recordCount: totalProjections,
       status: 'success',
     });
 
-    console.log(`Successfully refreshed ${projections.length} projections for ${sport} ${season}`);
-    return { success: true, recordCount: projections.length };
+    console.log(`Successfully refreshed ${totalProjections} projections for ${sport} ${season}`);
+    return { success: true, recordCount: totalProjections };
   } catch (error: any) {
     console.error('Error refreshing projections:', error);
     

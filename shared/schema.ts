@@ -298,11 +298,14 @@ export const espnPlayerData = pgTable("espn_player_data", {
   position: text("position"),
   jerseyNumber: integer("jersey_number"),
   injuryStatus: text("injury_status"), // ACTIVE, QUESTIONABLE, DOUBTFUL, OUT, IR
-  injuryType: text("injury_type"),
   percentOwned: real("percent_owned"), // 0-100
   percentStarted: real("percent_started"), // 0-100
   averagePoints: real("average_points"),
   totalPoints: real("total_points"),
+  // News/Outlook data from ESPN
+  latestOutlook: text("latest_outlook"), // Weekly fantasy outlook from ESPN
+  outlookWeek: integer("outlook_week"), // Which week the outlook is for
+  newsDate: timestamp("news_date"), // lastNewsDate from ESPN API
   lastFetchedAt: timestamp("last_fetched_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -324,8 +327,10 @@ export const fpPlayerData = pgTable("fp_player_data", {
   team: text("team"), // Normalized team abbreviation
   position: text("position"),
   jerseyNumber: integer("jersey_number"),
-  status: text("status"), // Active, Injured, etc.
-  injuryStatus: text("injury_status"),
+  // News data from FantasyPros
+  latestHeadline: text("latest_headline"), // Most recent news headline
+  latestAnalysis: text("latest_analysis"), // Most recent news analysis/impact
+  newsDate: timestamp("news_date"), // When the latest news was published
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -379,6 +384,19 @@ export const playerCrosswalk = pgTable("player_crosswalk", {
   fpIdIndex: uniqueIndex("player_crosswalk_fp").on(table.sport, table.season, table.fpPlayerId),
 }));
 
+// Player Aliases - Maps nickname/alternate names to canonical names
+export const playerAliases = pgTable("player_aliases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sport: text("sport").notNull(),
+  aliasName: text("alias_name").notNull(), // The alternate name (e.g., "Bam Knight", "Hollywood Brown")
+  canonicalName: text("canonical_name").notNull(), // The canonical name (e.g., "Zonovan Knight", "Marquise Brown")
+  aliasType: text("alias_type").notNull(), // nickname, legal_name, abbreviated
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueAlias: uniqueIndex("player_aliases_unique").on(table.sport, table.aliasName),
+}));
+
 // Insert schemas for unified player tables
 export const insertEspnPlayerDataSchema = createInsertSchema(espnPlayerData).omit({
   id: true,
@@ -403,6 +421,11 @@ export const insertPlayerCrosswalkSchema = createInsertSchema(playerCrosswalk).o
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertPlayerAliasSchema = createInsertSchema(playerAliases).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertFantasyProsPlayerSchema = createInsertSchema(fantasyProsPlayers).omit({
