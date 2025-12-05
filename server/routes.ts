@@ -4959,7 +4959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fantasy Pros data refresh jobs
   app.post("/api/jobs/fp-refresh-players", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024 } = req.body;
+      const { sport = 'NFL', season = 2025 } = req.body;
       const { refreshPlayers } = await import("./fantasyProsService");
       const result = await refreshPlayers(sport, season);
       
@@ -4979,7 +4979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/fp-refresh-rankings", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024, week, position, rankType = 'weekly', scoringType = 'PPR' } = req.body;
+      const { sport = 'NFL', season = 2025, week, position, rankType = 'weekly', scoringType = 'PPR' } = req.body;
       const { refreshRankings } = await import("./fantasyProsService");
       const result = await refreshRankings(sport, season, week, position, rankType, scoringType);
       
@@ -5000,7 +5000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/fp-refresh-projections", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024, week, position, scoringType = 'PPR' } = req.body;
+      const { sport = 'NFL', season = 2025, week, position, scoringType = 'PPR' } = req.body;
       const { refreshProjections } = await import("./fantasyProsService");
       const result = await refreshProjections(sport, season, week, position, scoringType);
       
@@ -5070,7 +5070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/fp-refresh-all", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024, week } = req.body;
+      const { sport = 'NFL', season = 2025, week } = req.body;
       const { refreshAllData } = await import("./fantasyProsService");
       const results = await refreshAllData(sport, season, week);
       
@@ -5204,7 +5204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-refresh-espn-players", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024 } = req.body;
+      const { sport = 'NFL', season = 2025 } = req.body;
       const { refreshEspnPlayers } = await import("./unifiedPlayerService");
       const result = await refreshEspnPlayers(sport, season);
       
@@ -5224,7 +5224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-refresh-fp-players", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024 } = req.body;
+      const { sport = 'NFL', season = 2025 } = req.body;
       const { refreshFpPlayers } = await import("./unifiedPlayerService");
       const result = await refreshFpPlayers(sport, season);
       
@@ -5244,7 +5244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-refresh-defense-stats", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024, scoringType = 'PPR' } = req.body;
+      const { sport = 'NFL', season = 2025, scoringType = 'PPR' } = req.body;
       const { refreshDefenseStats } = await import("./unifiedPlayerService");
       const result = await refreshDefenseStats(sport, season, scoringType);
       
@@ -5264,7 +5264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-build-crosswalk", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024 } = req.body;
+      const { sport = 'NFL', season = 2025 } = req.body;
       const { buildCrosswalk } = await import("./unifiedPlayerService");
       const result = await buildCrosswalk(sport, season);
       
@@ -5305,7 +5305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-run-all", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2024, scoringType = 'PPR' } = req.body;
+      const { sport = 'NFL', season = 2025, scoringType = 'PPR' } = req.body;
       const { runAllUnifiedPlayerJobs } = await import("./unifiedPlayerService");
       const result = await runAllUnifiedPlayerJobs(sport, season, scoringType);
       
