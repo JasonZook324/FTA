@@ -1365,8 +1365,106 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Refreshing players_master materialized view...');
       
-      // Refresh the materialized view
-      await db.execute(sql`REFRESH MATERIALIZED VIEW players_master`);
+      // First, ensure deprecated columns are dropped from source tables
+      try {
+        await db.execute(sql`ALTER TABLE espn_player_data DROP COLUMN IF EXISTS injury_type`);
+        await db.execute(sql`ALTER TABLE fp_player_data DROP COLUMN IF EXISTS status`);
+        await db.execute(sql`ALTER TABLE fp_player_data DROP COLUMN IF EXISTS injury_status`);
+        console.log('Ensured deprecated injury columns are removed');
+      } catch (e) {
+        // Columns may already be gone, that's fine
+      }
+      
+      // Check if view needs to be recreated (e.g., if it has old columns)
+      const checkResult = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'players_master' AND column_name IN ('injury_type', 'fp_status', 'fp_injury_status')
+      `);
+      
+      if (checkResult.rows.length > 0) {
+        console.log('Recreating players_master view to remove deprecated columns...');
+        await db.execute(sql`DROP MATERIALIZED VIEW IF EXISTS players_master`);
+        
+        // Recreate the view with updated schema
+        await db.execute(sql`
+          CREATE MATERIALIZED VIEW players_master AS
+          WITH latest_rankings AS (
+            SELECT DISTINCT ON (player_id, sport, season)
+              player_id, sport, season, rank, tier, rank_type, scoring_type, week
+            FROM fantasy_pros_rankings
+            WHERE rank_type = 'weekly'
+            ORDER BY player_id, sport, season, week DESC NULLS LAST
+          ),
+          latest_projections AS (
+            SELECT DISTINCT ON (player_id, sport, season)
+              player_id, sport, season, projected_points, opponent, stats, week, scoring_type
+            FROM fantasy_pros_projections
+            ORDER BY player_id, sport, season, week DESC NULLS LAST
+          ),
+          latest_matchups AS (
+            SELECT DISTINCT ON (team_abbr, season)
+              team_abbr, season, opponent_abbr, game_time_utc, is_home, venue, game_day, week
+            FROM nfl_matchups
+            ORDER BY team_abbr, season, week DESC NULLS LAST
+          ),
+          latest_defense_stats AS (
+            SELECT DISTINCT ON (sport, season, defense_team, position)
+              sport, season, defense_team, position, rank, avg_points_allowed, scoring_type, week
+            FROM defense_vs_position_stats
+            ORDER BY sport, season, defense_team, position, 
+              CASE scoring_type WHEN 'PPR' THEN 0 WHEN 'HALF' THEN 1 ELSE 2 END,
+              week DESC NULLS LAST
+          )
+          SELECT 
+            xw.id as crosswalk_id, xw.canonical_key, xw.sport, xw.season,
+            xw.match_confidence, xw.manual_override,
+            e.espn_player_id, fp.fp_player_id,
+            COALESCE(e.first_name, fp.first_name) as first_name,
+            COALESCE(e.last_name, fp.last_name) as last_name,
+            COALESCE(e.full_name, fp.full_name) as full_name,
+            COALESCE(e.team, fp.team) as team,
+            COALESCE(e.position, fp.position) as position,
+            COALESCE(e.jersey_number, fp.jersey_number) as jersey_number,
+            e.injury_status,
+            e.percent_owned, e.percent_started, e.average_points, e.total_points,
+            e.last_fetched_at as espn_last_fetched,
+            e.latest_outlook as espn_outlook, e.outlook_week as espn_outlook_week,
+            e.news_date as espn_news_date,
+            fp.latest_headline as fp_headline, fp.latest_analysis as fp_analysis,
+            fp.news_date as fp_news_date,
+            r.rank as fp_rank, r.tier as fp_tier, r.rank_type,
+            r.scoring_type as ranking_scoring_type, r.week as ranking_week,
+            p.projected_points, p.opponent as projection_opponent,
+            p.stats as projection_stats, p.week as projection_week,
+            p.scoring_type as projection_scoring_type,
+            m.opponent_abbr, m.game_time_utc, m.is_home, m.venue, m.game_day,
+            m.week as matchup_week,
+            dvp.rank as opponent_rank, dvp.avg_points_allowed as opponent_avg_allowed,
+            dvp.scoring_type as oprk_scoring_type
+          FROM player_crosswalk xw
+          LEFT JOIN espn_player_data e ON xw.espn_player_id = e.espn_player_id AND xw.sport = e.sport AND xw.season = e.season
+          LEFT JOIN fp_player_data fp ON xw.fp_player_id = fp.fp_player_id AND xw.sport = fp.sport AND xw.season = fp.season
+          LEFT JOIN latest_rankings r ON xw.fp_player_id = r.player_id AND xw.sport = r.sport AND xw.season = r.season
+          LEFT JOIN latest_projections p ON xw.fp_player_id = p.player_id AND xw.sport = p.sport AND xw.season = p.season
+          LEFT JOIN latest_matchups m ON COALESCE(e.team, fp.team) = m.team_abbr AND xw.season = m.season
+          LEFT JOIN latest_defense_stats dvp ON m.opponent_abbr = dvp.defense_team 
+            AND COALESCE(e.position, fp.position) = dvp.position 
+            AND xw.sport = dvp.sport AND xw.season = dvp.season
+        `);
+        
+        // Recreate indexes
+        await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS players_master_crosswalk_id ON players_master(crosswalk_id)`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS players_master_espn_id ON players_master(espn_player_id)`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS players_master_fp_id ON players_master(fp_player_id)`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS players_master_team ON players_master(team)`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS players_master_position ON players_master(position)`);
+        await db.execute(sql`CREATE INDEX IF NOT EXISTS players_master_sport_season ON players_master(sport, season)`);
+        
+        console.log('Recreated players_master view with updated schema');
+      } else {
+        // Just refresh the existing view
+        await db.execute(sql`REFRESH MATERIALIZED VIEW players_master`);
+      }
       
       // Get the row count
       const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM players_master`);
