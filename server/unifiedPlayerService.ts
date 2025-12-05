@@ -256,7 +256,6 @@ export async function refreshEspnPlayers(
         position,
         jerseyNumber: player.jersey ? parseInt(player.jersey) : null,
         injuryStatus,
-        injuryType: player.injury?.type || null,
         percentOwned: ownership.percentOwned ?? null,
         percentStarted: ownership.percentStarted ?? null,
         averagePoints: currentStats.appliedAverage ?? null,
@@ -403,9 +402,7 @@ async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<
       fullName: normalizedName,
       team,
       position: 'DEF',
-      jerseyNumber: null,
-      status: null,
-      injuryStatus: null
+      jerseyNumber: null
     });
     
     // Log first few for verification
@@ -557,9 +554,7 @@ export async function refreshFpPlayers(
         fullName: playerName,
         team,
         position,
-        jerseyNumber: p.jersey || p.jersey_number || null,
-        status: null,
-        injuryStatus: null
+        jerseyNumber: p.jersey || p.jersey_number || null
       });
     }
 

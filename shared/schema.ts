@@ -298,7 +298,6 @@ export const espnPlayerData = pgTable("espn_player_data", {
   position: text("position"),
   jerseyNumber: integer("jersey_number"),
   injuryStatus: text("injury_status"), // ACTIVE, QUESTIONABLE, DOUBTFUL, OUT, IR
-  injuryType: text("injury_type"),
   percentOwned: real("percent_owned"), // 0-100
   percentStarted: real("percent_started"), // 0-100
   averagePoints: real("average_points"),
@@ -328,8 +327,6 @@ export const fpPlayerData = pgTable("fp_player_data", {
   team: text("team"), // Normalized team abbreviation
   position: text("position"),
   jerseyNumber: integer("jersey_number"),
-  status: text("status"), // Active, Injured, etc.
-  injuryStatus: text("injury_status"),
   // News data from FantasyPros
   latestHeadline: text("latest_headline"), // Most recent news headline
   latestAnalysis: text("latest_analysis"), // Most recent news analysis/impact

@@ -93,17 +93,12 @@ SELECT
   COALESCE(e.jersey_number, fp.jersey_number) as jersey_number,
   
   -- ESPN-specific data
-  e.injury_status as espn_injury_status,
-  e.injury_type,
+  e.injury_status,
   e.percent_owned,
   e.percent_started,
   e.average_points,
   e.total_points,
   e.last_fetched_at as espn_last_fetched,
-  
-  -- FP-specific data
-  fp.status as fp_status,
-  fp.injury_status as fp_injury_status,
   
   -- Rankings (latest weekly ranking per player)
   r.rank as fp_rank,

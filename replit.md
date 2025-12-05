@@ -37,6 +37,7 @@ The frontend is a React 18 application with TypeScript, built with a component-b
   - DST data formatted as "{Nickname} D/ST" (e.g., "Eagles D/ST") for consistent matching
   - No synthetic/fallback data - unmatched players remain with null `fp_player_id`
   - Achieves 100% match rate (699 of 699 ESPN players matched to FP for NFL 2025)
+  - **Simplified Injury Data**: Only `injury_status` from ESPN is included (injury_type, fp_status, fp_injury_status removed - that data is available in news/headlines)
   - **News Data Integration**: Player objects include news from both sources:
     - ESPN weekly outlooks (432+ players with Week 14 fantasy analysis)
     - FP latest headlines and analysis (286+ players with injury/news updates)
