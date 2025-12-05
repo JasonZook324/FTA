@@ -138,7 +138,7 @@ async function getFpInactivePlayers(sport: string): Promise<Set<string>> {
 
 export async function refreshEspnPlayers(
   sport: string = 'NFL',
-  season: number = 2024
+  season: number = 2025
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
     console.log(`Refreshing ESPN ${sport} players for ${season}...`);
@@ -226,6 +226,25 @@ export async function refreshEspnPlayers(
       const stats = player.stats || [];
       const currentStats = stats.find((s: any) => s.statSourceId === 0 && s.statSplitTypeId === 1) || {};
 
+      // Extract latest weekly outlook from ESPN
+      let latestOutlook: string | null = null;
+      let outlookWeek: number | null = null;
+      const outlooks = player.outlooks?.outlooksByWeek;
+      if (outlooks && typeof outlooks === 'object') {
+        // Get the highest week number with an outlook (most recent)
+        const weeks = Object.keys(outlooks).map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a);
+        if (weeks.length > 0) {
+          outlookWeek = weeks[0];
+          latestOutlook = outlooks[String(outlookWeek)] || null;
+        }
+      }
+      
+      // Parse newsDate from ESPN's lastNewsDate (milliseconds since epoch)
+      let newsDate: Date | null = null;
+      if (player.lastNewsDate && typeof player.lastNewsDate === 'number') {
+        newsDate = new Date(player.lastNewsDate);
+      }
+
       playerRecords.push({
         espnPlayerId,
         sport,
@@ -241,7 +260,10 @@ export async function refreshEspnPlayers(
         percentOwned: ownership.percentOwned ?? null,
         percentStarted: ownership.percentStarted ?? null,
         averagePoints: currentStats.appliedAverage ?? null,
-        totalPoints: currentStats.appliedTotal ?? null
+        totalPoints: currentStats.appliedTotal ?? null,
+        latestOutlook,
+        outlookWeek,
+        newsDate
       });
     }
 
@@ -411,10 +433,42 @@ async function fetchFpDstPlayers(sport: string, season: number, validTeams: Set<
   return { success: true, records: dstRecords };
 }
 
+// Enrich FP players with their latest news from fantasy_pros_news table
+async function enrichFpPlayersWithNews(sport: string, season: number): Promise<number> {
+  const { sql } = await import("drizzle-orm");
+  
+  // Get latest news per player (by player_id) and update fp_player_data
+  // We match on fp_player_id = player_id from the news table
+  // Season filter ensures we only update the specific season's data
+  const result = await db.execute(sql`
+    WITH latest_news AS (
+      SELECT DISTINCT ON (player_id)
+        player_id,
+        headline,
+        analysis,
+        news_date
+      FROM fantasy_pros_news
+      WHERE sport = ${sport}
+        AND player_id IS NOT NULL
+      ORDER BY player_id, news_date DESC NULLS LAST, created_at DESC
+    )
+    UPDATE fp_player_data fpd
+    SET 
+      latest_headline = ln.headline,
+      latest_analysis = ln.analysis,
+      news_date = ln.news_date
+    FROM latest_news ln
+    WHERE fpd.fp_player_id = ln.player_id
+      AND fpd.sport = ${sport}
+      AND fpd.season = ${season}
+  `);
+  
+  return result.rowCount || 0;
+}
 
 export async function refreshFpPlayers(
   sport: string = 'NFL',
-  season: number = 2024
+  season: number = 2025
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
     console.log(`Refreshing FP ${sport} players for ${season} from FantasyPros API...`);
@@ -532,6 +586,11 @@ export async function refreshFpPlayers(
     // This was causing valid FP players with outdated team info to be deleted
     // before they could be matched by name+position in the crosswalk.
     // The crosswalk now handles matching more flexibly.
+    
+    // Enrich FP players with latest news from fantasy_pros_news table
+    console.log('Enriching FP players with latest news...');
+    const newsEnriched = await enrichFpPlayersWithNews(sport, season);
+    console.log(`Enriched ${newsEnriched} players with news data`);
 
     console.log(`✓ FP players refresh complete: ${result.inserted} inserted, ${result.updated} updated`);
     return { 
@@ -554,7 +613,7 @@ const ALL_NFL_TEAMS = [
 
 export async function refreshDefenseStats(
   sport: string = 'NFL',
-  season: number = 2024,
+  season: number = 2025,
   scoringType: string = 'PPR'
 ): Promise<{ success: boolean; recordCount: number; error?: string }> {
   try {
@@ -665,7 +724,7 @@ function createNameTeamKey(firstName: string | null, lastName: string | null, te
 
 export async function buildCrosswalk(
   sport: string = 'NFL',
-  season: number = 2024
+  season: number = 2025
 ): Promise<{ success: boolean; recordCount: number; matched: number; unmatched: number; teamMismatches: number; aliasMatched: number; crossPosMatched: number; error?: string }> {
   try {
     console.log(`Building player crosswalk for ${sport} ${season}...`);
@@ -946,7 +1005,7 @@ export async function clearUnifiedPlayerData(): Promise<{ success: boolean; erro
 
 export async function runAllUnifiedPlayerJobs(
   sport: string = 'NFL',
-  season: number = 2024,
+  season: number = 2025,
   scoringType: string = 'PPR'
 ): Promise<{ success: boolean; results: Record<string, any>; error?: string }> {
   const results: Record<string, any> = {};

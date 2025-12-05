@@ -5,7 +5,7 @@
 DROP MATERIALIZED VIEW IF EXISTS players_master;
 
 CREATE MATERIALIZED VIEW players_master AS
-SELECT 
+SELECT DISTINCT ON (xw.id)
   xw.id as crosswalk_id,
   xw.canonical_key,
   xw.sport,
@@ -38,16 +38,27 @@ SELECT
   fp.status as fp_status,
   fp.injury_status as fp_injury_status,
   
+  -- News data (from ESPN and FP)
+  e.latest_outlook as espn_outlook,
+  e.outlook_week as espn_outlook_week,
+  e.news_date as espn_news_date,
+  fp.latest_headline as fp_headline,
+  fp.latest_analysis as fp_analysis,
+  fp.news_date as fp_news_date,
+  
   -- Rankings (from existing fp_rankings table - latest weekly ranking)
   r.rank as fp_rank,
   r.tier as fp_tier,
   r.rank_type,
   r.scoring_type as ranking_scoring_type,
+  r.week as ranking_week,
   
   -- Projections (from existing fp_projections table)
   p.projected_points,
   p.opponent as projection_opponent,
   p.stats as projection_stats,
+  p.week as projection_week,
+  p.scoring_type as projection_scoring_type,
   
   -- Matchup data (from nfl_matchups table)
   m.opponent_abbr,
@@ -55,6 +66,7 @@ SELECT
   m.is_home,
   m.venue,
   m.game_day,
+  m.week as matchup_week,
   
   -- OPRK (from defense_vs_position_stats)
   dvp.rank as opponent_rank,
@@ -70,22 +82,38 @@ LEFT JOIN fp_player_data fp
   ON xw.fp_player_id = fp.fp_player_id 
   AND xw.sport = fp.sport 
   AND xw.season = fp.season
-LEFT JOIN fantasy_pros_rankings r 
-  ON xw.fp_player_id = r.player_id 
-  AND xw.sport = r.sport 
-  AND xw.season = r.season
-  AND r.rank_type = 'weekly'
-LEFT JOIN fantasy_pros_projections p 
-  ON xw.fp_player_id = p.player_id 
-  AND xw.sport = p.sport 
-  AND xw.season = p.season
-LEFT JOIN nfl_matchups m 
-  ON COALESCE(e.team, fp.team) = m.team_abbr 
-  AND xw.season = m.season
+LEFT JOIN LATERAL (
+  SELECT rank, tier, rank_type, scoring_type, week
+  FROM fantasy_pros_rankings
+  WHERE player_id = xw.fp_player_id 
+    AND sport = xw.sport 
+    AND season = xw.season
+    AND rank_type = 'weekly'
+  ORDER BY week DESC NULLS LAST
+  LIMIT 1
+) r ON true
+LEFT JOIN LATERAL (
+  SELECT projected_points, opponent, stats, week, scoring_type
+  FROM fantasy_pros_projections
+  WHERE player_id = xw.fp_player_id 
+    AND sport = xw.sport 
+    AND season = xw.season
+  ORDER BY week DESC NULLS LAST
+  LIMIT 1
+) p ON true
+LEFT JOIN LATERAL (
+  SELECT opponent_abbr, game_time_utc, is_home, venue, game_day, week
+  FROM nfl_matchups
+  WHERE team_abbr = COALESCE(e.team, fp.team) 
+    AND season = xw.season
+  ORDER BY week DESC NULLS LAST
+  LIMIT 1
+) m ON true
 LEFT JOIN defense_vs_position_stats dvp 
   ON m.opponent_abbr = dvp.defense_team 
   AND COALESCE(e.position, fp.position) = dvp.position 
-  AND xw.season = dvp.season;
+  AND xw.season = dvp.season
+ORDER BY xw.id;
 
 -- Create indexes on the materialized view for fast lookups
 CREATE UNIQUE INDEX IF NOT EXISTS players_master_crosswalk_id ON players_master(crosswalk_id);
