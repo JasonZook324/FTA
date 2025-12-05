@@ -1001,7 +1001,8 @@ export async function clearUnifiedPlayerData(): Promise<{ success: boolean; erro
 export async function runAllUnifiedPlayerJobs(
   sport: string = 'NFL',
   season: number = 2025,
-  scoringType: string = 'PPR'
+  scoringType: string = 'PPR',
+  week?: number
 ): Promise<{ success: boolean; results: Record<string, any>; error?: string }> {
   const results: Record<string, any> = {};
   
@@ -1010,31 +1011,74 @@ export async function runAllUnifiedPlayerJobs(
     console.log(`Running all unified player data jobs for ${sport} ${season}`);
     console.log(`${'='.repeat(50)}\n`);
 
-    console.log('\n[1/5] Refreshing ESPN Players...');
+    // Determine current week if not provided
+    let targetWeek = week;
+    if (!targetWeek && sport === 'NFL') {
+      try {
+        const { sql } = await import('drizzle-orm');
+        const weekResult = await db.execute(
+          sql`SELECT MAX(week) as current_week FROM nfl_matchups WHERE season = ${season}`
+        );
+        targetWeek = weekResult.rows[0]?.current_week as number || undefined;
+        console.log(`Detected current week: ${targetWeek || 'unknown'}`);
+      } catch (e) {
+        console.log('Could not detect current week, will fetch season data');
+      }
+    }
+
+    console.log('\n[1/7] Refreshing ESPN Players...');
     results.espnPlayers = await refreshEspnPlayers(sport, season);
     if (!results.espnPlayers.success) {
       throw new Error(`ESPN Players refresh failed: ${results.espnPlayers.error}`);
     }
 
-    console.log('\n[2/5] Refreshing FP Players...');
+    console.log('\n[2/7] Refreshing FP Players...');
     results.fpPlayers = await refreshFpPlayers(sport, season);
     if (!results.fpPlayers.success) {
       console.warn('FP Players refresh warning:', results.fpPlayers.error);
     }
 
-    console.log('\n[3/5] Refreshing Defense Stats...');
+    console.log('\n[3/7] Refreshing FP Rankings...');
+    try {
+      const { refreshRankings } = await import('./fantasyProsService');
+      results.fpRankings = await refreshRankings(sport, season, targetWeek, undefined, 'weekly', scoringType);
+      if (!results.fpRankings.success) {
+        console.warn('FP Rankings refresh warning:', results.fpRankings.error);
+      } else {
+        console.log(`✓ Fetched ${results.fpRankings.recordCount} rankings`);
+      }
+    } catch (e: any) {
+      console.warn('FP Rankings refresh warning:', e.message);
+      results.fpRankings = { success: false, recordCount: 0, error: e.message };
+    }
+
+    console.log('\n[4/7] Refreshing FP Projections...');
+    try {
+      const { refreshProjections } = await import('./fantasyProsService');
+      results.fpProjections = await refreshProjections(sport, season, targetWeek, undefined, scoringType);
+      if (!results.fpProjections.success) {
+        console.warn('FP Projections refresh warning:', results.fpProjections.error);
+      } else {
+        console.log(`✓ Fetched ${results.fpProjections.recordCount} projections`);
+      }
+    } catch (e: any) {
+      console.warn('FP Projections refresh warning:', e.message);
+      results.fpProjections = { success: false, recordCount: 0, error: e.message };
+    }
+
+    console.log('\n[5/7] Refreshing Defense Stats...');
     results.defenseStats = await refreshDefenseStats(sport, season, scoringType);
     if (!results.defenseStats.success) {
       console.warn('Defense stats refresh warning:', results.defenseStats.error);
     }
 
-    console.log('\n[4/5] Building Crosswalk...');
+    console.log('\n[6/7] Building Crosswalk...');
     results.crosswalk = await buildCrosswalk(sport, season);
     if (!results.crosswalk.success) {
       console.warn('Crosswalk build warning:', results.crosswalk.error);
     }
 
-    console.log('\n[5/5] Refreshing Players Master View...');
+    console.log('\n[7/7] Refreshing Players Master View...');
     results.playersMaster = await refreshPlayersMaster();
     if (!results.playersMaster.success) {
       console.warn('Players master refresh warning:', results.playersMaster.error);

@@ -5305,9 +5305,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/jobs/unified-run-all", requireAuth, async (req, res) => {
     try {
-      const { sport = 'NFL', season = 2025, scoringType = 'PPR' } = req.body;
+      const { sport = 'NFL', season = 2025, scoringType = 'PPR', week } = req.body;
       const { runAllUnifiedPlayerJobs } = await import("./unifiedPlayerService");
-      const result = await runAllUnifiedPlayerJobs(sport, season, scoringType);
+      const result = await runAllUnifiedPlayerJobs(sport, season, scoringType, week);
       
       if (result.success) {
         res.json({ 
