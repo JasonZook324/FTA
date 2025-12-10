@@ -998,6 +998,41 @@ export async function clearUnifiedPlayerData(): Promise<{ success: boolean; erro
   }
 }
 
+// Clean up old week data from weekly tables to prevent stale data accumulation
+async function cleanupOldWeekData(season: number, currentWeek: number): Promise<{ deleted: Record<string, number> }> {
+  const { sql } = await import('drizzle-orm');
+  const deleted: Record<string, number> = {};
+  
+  console.log(`Cleaning up data older than week ${currentWeek} for season ${season}...`);
+  
+  // Clean fantasy_pros_rankings - keep only current week
+  const rankingsResult = await db.execute(
+    sql`DELETE FROM fantasy_pros_rankings WHERE season = ${season} AND week < ${currentWeek} RETURNING id`
+  );
+  deleted.rankings = rankingsResult.rows.length;
+  
+  // Clean fantasy_pros_projections - keep only current week
+  const projectionsResult = await db.execute(
+    sql`DELETE FROM fantasy_pros_projections WHERE season = ${season} AND week < ${currentWeek} RETURNING id`
+  );
+  deleted.projections = projectionsResult.rows.length;
+  
+  // Clean nfl_matchups - keep only current week
+  const matchupsResult = await db.execute(
+    sql`DELETE FROM nfl_matchups WHERE season = ${season} AND week < ${currentWeek} RETURNING id`
+  );
+  deleted.matchups = matchupsResult.rows.length;
+  
+  const totalDeleted = Object.values(deleted).reduce((a, b) => a + b, 0);
+  if (totalDeleted > 0) {
+    console.log(`✓ Cleaned up ${totalDeleted} old records: rankings=${deleted.rankings}, projections=${deleted.projections}, matchups=${deleted.matchups}`);
+  } else {
+    console.log('✓ No old data to clean up');
+  }
+  
+  return { deleted };
+}
+
 export async function runAllUnifiedPlayerJobs(
   sport: string = 'NFL',
   season: number = 2025,
@@ -1023,6 +1058,17 @@ export async function runAllUnifiedPlayerJobs(
         console.log(`Detected current week: ${targetWeek || 'unknown'}`);
       } catch (e) {
         console.log('Could not detect current week, will fetch season data');
+      }
+    }
+
+    // Clean up old week data before refreshing (only if we have a target week)
+    if (targetWeek) {
+      console.log('\n[0/7] Cleaning up old week data...');
+      try {
+        results.cleanup = await cleanupOldWeekData(season, targetWeek);
+      } catch (e: any) {
+        console.warn('Cleanup warning:', e.message);
+        results.cleanup = { error: e.message };
       }
     }
 

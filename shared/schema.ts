@@ -556,7 +556,6 @@ export const nflMatchups = pgTable("nfl_matchups", {
   gameTimeUtc: timestamp("game_time_utc").notNull(),
   isHome: boolean("is_home").notNull(),
   gameDay: text("game_day"),
-  venue: text("venue"),
   bookmakerSource: text("bookmaker_source"),
   oddsSnapshotTs: timestamp("odds_snapshot_ts").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
