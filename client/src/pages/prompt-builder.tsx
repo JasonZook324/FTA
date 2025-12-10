@@ -373,7 +373,7 @@ export default function PromptBuilder() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Don't include</SelectItem>
-                        <SelectItem value="top50">Top 50 available</SelectItem>
+                        <SelectItem value="top20">Top 20 available</SelectItem>
                         <SelectItem value="position">By position</SelectItem>
                         <SelectItem value="team">By NFL team</SelectItem>
                       </SelectContent>

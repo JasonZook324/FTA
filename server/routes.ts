@@ -4865,7 +4865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Sort by ownership percentage (most owned first) and limit results
-        const limit = options.includeWaiverWire === 'top50' ? 50 : 100;
+        const limit = options.includeWaiverWire === 'top20' ? 20 : 100;
         availablePlayers = availablePlayers
           .sort((aData: any, bData: any) => {
             const a = aData.player || aData;
