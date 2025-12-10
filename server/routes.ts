@@ -4446,10 +4446,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Fetch comprehensive player data from players_master view if requested
+      const playersMasterMap = new Map<string, any>();
+      if (options.includePlayerLevelData) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          // Query all enrichment columns from players_master view
+          const playersResult = await db.execute(sql`
+            SELECT 
+              full_name, first_name, last_name, team, position,
+              fp_rank, 
+              injury_status,
+              projected_points, projection_opponent, projection_stats,
+              espn_outlook,
+              fp_headline, fp_analysis,
+              opponent_abbr, is_home, game_day,
+              opponent_rank, opponent_avg_allowed
+            FROM players_master 
+            WHERE sport = 'NFL' AND season = 2025
+          `);
+          
+          // Create lookup map by player name (case-insensitive and with normalized names)
+          playersResult.rows.forEach((player: any) => {
+            if (player.full_name) {
+              // Store with exact name
+              playersMasterMap.set(player.full_name, player);
+              // Also store with lowercase for case-insensitive lookup
+              playersMasterMap.set(player.full_name.toLowerCase(), player);
+            }
+          });
+          
+          console.log(`Loaded ${playersResult.rows.length} players from players_master into map`);
+          // Log sample entries for debugging
+          const sampleNames = Array.from(playersMasterMap.keys()).slice(0, 10);
+          console.log('Sample players_master names:', sampleNames);
+        } catch (error: any) {
+          console.error('Error fetching players_master data for custom prompt:', error);
+        }
+      }
+
       // Helper function to enrich player display with FantasyPros data
       const enrichPlayerData = (playerName: string): string => {
         let enrichment = '';
         
+        // If comprehensive player-level data is enabled, use players_master view
+        if (playersMasterMap.size > 0) {
+          // Try exact match first, then lowercase
+          let player = playersMasterMap.get(playerName) || playersMasterMap.get(playerName.toLowerCase());
+          if (player) {
+            // Rank
+            if (player.fp_rank) {
+              enrichment += `\n  🏆 Rank: #${player.fp_rank}`;
+            }
+            // Injury Status
+            if (player.injury_status && player.injury_status !== 'ACTIVE') {
+              enrichment += `\n  🏥 Injury: ${player.injury_status}`;
+            }
+            // Projected Points
+            if (player.projected_points) {
+              enrichment += `\n  📊 Projected: ${player.projected_points} pts`;
+              if (player.projection_stats) {
+                const stats = player.projection_stats;
+                if (stats.pass_yds) enrichment += ` (${stats.pass_yds} pass yds, ${stats.pass_tds || 0} TDs)`;
+                else if (stats.rush_yds) enrichment += ` (${stats.rush_yds} rush yds, ${stats.rush_tds || 0} TDs)`;
+                else if (stats.rec) enrichment += ` (${stats.rec} rec, ${stats.rec_yds || 0} yds, ${stats.rec_tds || 0} TDs)`;
+              }
+            }
+            // Opponent with OPRK data
+            if (player.opponent_abbr) {
+              const homeAway = player.is_home ? 'vs' : '@';
+              enrichment += `\n  🏈 Opponent: ${homeAway} ${player.opponent_abbr}`;
+              if (player.opponent_rank) {
+                enrichment += ` (OPRK: #${player.opponent_rank}, ${player.opponent_avg_allowed?.toFixed(1) || '?'} avg pts allowed)`;
+              }
+              if (player.game_day) {
+                enrichment += ` - ${player.game_day}`;
+              }
+            } else if (player.projection_opponent) {
+              // Fallback to projection opponent if no matchup data
+              enrichment += `\n  🏈 Opponent: ${player.projection_opponent}`;
+            }
+            // ESPN Outlook
+            if (player.espn_outlook) {
+              enrichment += `\n  📝 ESPN Outlook: ${player.espn_outlook}`;
+            }
+            // FP Headline and Analysis
+            if (player.fp_headline) {
+              enrichment += `\n  📰 FP News: ${player.fp_headline}`;
+              if (player.fp_analysis) {
+                enrichment += ` - ${player.fp_analysis}`;
+              }
+            }
+            return enrichment;
+          }
+        }
+        
+        // Fallback to individual data sources if players_master not enabled
         // Add news if available
         if (newsMap.size > 0) {
           const news = newsMap.get(playerName);

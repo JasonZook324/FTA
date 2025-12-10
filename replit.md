@@ -22,6 +22,13 @@ The frontend is a React 18 application with TypeScript, built with a component-b
 - **Kicker Streaming**: A waiver wire analysis tool ranking NFL kickers based on matchup quality using a scoring algorithm that considers dome advantage, Vegas matchup data, red zone efficiency, and opponent defense.
 - **Jobs Page**: Provides automated, sequential data refresh workflows with visual progress tracking for tasks like refreshing NFL Kicker Streaming data and Fantasy Pros data.
 - **AI Prompt Builder**: Generates customizable prompts for AI assistants, including league settings, team rosters, waiver wire players, matchups, and standings. It automatically enriches player listings with injury status, news headlines, and optional rankings/projections.
+  - **Player-Level Data Option**: When enabled, enriches every player in the prompt with comprehensive data from the `players_master` view including:
+    - 🏆 Rank (FantasyPros weekly position rank)
+    - 🏥 Injury status (if not ACTIVE)
+    - 📊 Projected points with stat breakdown (pass/rush/rec yards and TDs)
+    - 🏈 Opponent matchup with OPRK data (e.g., "vs PHI (OPRK: #12, 18.5 avg pts allowed) - Sunday")
+    - 📝 ESPN weekly outlook
+    - 📰 FantasyPros news headline and analysis
 - **OpenAI Integration**: Allows direct submission of generated prompts to OpenAI's API for in-app AI analysis, with model selection (GPT-4 Turbo, GPT-4, GPT-3.5 Turbo), request tracking, and robust error handling.
 - **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system is fully self-contained - running the unified player data job fetches all necessary data including rankings and projections. This includes:
   - Database tables: `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk`, `player_aliases`, `fantasy_pros_rankings`, `fantasy_pros_projections`
