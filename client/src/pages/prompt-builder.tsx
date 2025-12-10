@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -58,6 +58,15 @@ export default function PromptBuilder() {
   const [excludeIRPlayers, setExcludeIRPlayers] = useState(false);
   const [excludeOutPlayers, setExcludeOutPlayers] = useState(false);
   const [excludeDoubtfulPlayers, setExcludeDoubtfulPlayers] = useState(false);
+  // Ensure all 4 exclude options default to checked when Top 20 is selected
+  useEffect(() => {
+    if (includeWaiverWire === "top20") {
+      setExcludeIRPlayers(true);
+      setExcludeOutPlayers(true);
+      setExcludeDoubtfulPlayers(true);
+      setExcludeQuestionablePlayers(true);
+    }
+  }, [includeWaiverWire]);
   const [excludeQuestionablePlayers, setExcludeQuestionablePlayers] = useState(false);
   const [includeLeagueSettings, setIncludeLeagueSettings] = useState(true);
 
@@ -501,7 +510,7 @@ export default function PromptBuilder() {
                     </label>
                   </div>
                   <p className="text-xs text-muted-foreground ml-6">
-                    Enables: FantasyPros rankings, Vegas betting lines, injury reports, weather data, latest news updates, and matchup analysis
+                    Ensures your prompt includes directives to include external research sources.
                   </p>
                 </CardContent>
               </Card>
