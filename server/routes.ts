@@ -4508,9 +4508,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               enrichment += `\n  📊 Projected: ${player.projected_points} pts`;
               if (player.projection_stats) {
                 const stats = player.projection_stats;
-                if (stats.pass_yds) enrichment += ` (${stats.pass_yds} pass yds, ${stats.pass_tds || 0} TDs)`;
-                else if (stats.rush_yds) enrichment += ` (${stats.rush_yds} rush yds, ${stats.rush_tds || 0} TDs)`;
-                else if (stats.rec) enrichment += ` (${stats.rec} rec, ${stats.rec_yds || 0} yds, ${stats.rec_tds || 0} TDs)`;
+                const statParts: string[] = [];
+                
+                // Passing stats
+                if (stats.pass_yds && stats.pass_yds > 0) statParts.push(`${stats.pass_yds} pass yds`);
+                if (stats.pass_tds && stats.pass_tds > 0) statParts.push(`${stats.pass_tds} pass TDs`);
+                if (stats.pass_int && stats.pass_int > 0) statParts.push(`${stats.pass_int} INT`);
+                
+                // Rushing stats
+                if (stats.rush_att && stats.rush_att > 0) statParts.push(`${stats.rush_att} rush att`);
+                if (stats.rush_yds && stats.rush_yds > 0) statParts.push(`${stats.rush_yds} rush yds`);
+                if (stats.rush_tds && stats.rush_tds > 0) statParts.push(`${stats.rush_tds} rush TDs`);
+                
+                // Receiving stats
+                if (stats.rec_rec && stats.rec_rec > 0) statParts.push(`${stats.rec_rec} rec`);
+                if (stats.rec_yds && stats.rec_yds > 0) statParts.push(`${stats.rec_yds} rec yds`);
+                if (stats.rec_tds && stats.rec_tds > 0) statParts.push(`${stats.rec_tds} rec TDs`);
+                
+                // Other stats
+                if (stats.ret_tds && stats.ret_tds > 0) statParts.push(`${stats.ret_tds} ret TDs`);
+                if (stats['2pt_tds'] && stats['2pt_tds'] > 0) statParts.push(`${stats['2pt_tds']} 2pt`);
+                if (stats.fumbles && stats.fumbles > 0) statParts.push(`${stats.fumbles} fum`);
+                
+                if (statParts.length > 0) {
+                  enrichment += ` (${statParts.join(', ')})`;
+                }
               }
             }
             // Opponent with OPRK data
