@@ -4452,28 +4452,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const { db } = await import('./db');
           const { sql } = await import('drizzle-orm');
+          // Query all enrichment columns from players_master view
           const playersResult = await db.execute(sql`
             SELECT 
               full_name, first_name, last_name, team, position,
-              fp_rank, fp_tier, ranking_scoring_type, ranking_week,
+              fp_rank, 
               injury_status,
-              projected_points, projection_opponent, projection_stats, projection_week, projection_scoring_type,
-              espn_outlook, espn_outlook_week,
-              fp_headline, fp_analysis, fp_news_date,
-              opponent_abbr, game_time_utc, is_home, venue, game_day, matchup_week,
-              opponent_rank, opponent_avg_allowed, oprk_scoring_type
+              projected_points, projection_opponent, projection_stats,
+              espn_outlook,
+              fp_headline, fp_analysis,
+              opponent_abbr, is_home, game_day,
+              opponent_rank, opponent_avg_allowed
             FROM players_master 
             WHERE sport = 'NFL' AND season = 2025
           `);
           
-          // Create lookup map by player name
+          // Create lookup map by player name (case-insensitive and with normalized names)
           playersResult.rows.forEach((player: any) => {
             if (player.full_name) {
+              // Store with exact name
               playersMasterMap.set(player.full_name, player);
+              // Also store with lowercase for case-insensitive lookup
+              playersMasterMap.set(player.full_name.toLowerCase(), player);
             }
           });
           
           console.log(`Loaded ${playersResult.rows.length} players from players_master into map`);
+          // Log sample entries for debugging
+          const sampleNames = Array.from(playersMasterMap.keys()).slice(0, 10);
+          console.log('Sample players_master names:', sampleNames);
         } catch (error: any) {
           console.error('Error fetching players_master data for custom prompt:', error);
         }
@@ -4485,7 +4492,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // If comprehensive player-level data is enabled, use players_master view
         if (playersMasterMap.size > 0) {
-          const player = playersMasterMap.get(playerName);
+          // Try exact match first, then lowercase
+          let player = playersMasterMap.get(playerName) || playersMasterMap.get(playerName.toLowerCase());
           if (player) {
             // Rank
             if (player.fp_rank) {
@@ -4505,6 +4513,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 else if (stats.rec) enrichment += ` (${stats.rec} rec, ${stats.rec_yds || 0} yds, ${stats.rec_tds || 0} TDs)`;
               }
             }
+            // Opponent with OPRK data
+            if (player.opponent_abbr) {
+              const homeAway = player.is_home ? 'vs' : '@';
+              enrichment += `\n  🏈 Opponent: ${homeAway} ${player.opponent_abbr}`;
+              if (player.opponent_rank) {
+                enrichment += ` (OPRK: #${player.opponent_rank}, ${player.opponent_avg_allowed?.toFixed(1) || '?'} avg pts allowed)`;
+              }
+              if (player.game_day) {
+                enrichment += ` - ${player.game_day}`;
+              }
+            } else if (player.projection_opponent) {
+              // Fallback to projection opponent if no matchup data
+              enrichment += `\n  🏈 Opponent: ${player.projection_opponent}`;
+            }
             // ESPN Outlook
             if (player.espn_outlook) {
               enrichment += `\n  📝 ESPN Outlook: ${player.espn_outlook}`;
@@ -4514,17 +4536,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               enrichment += `\n  📰 FP News: ${player.fp_headline}`;
               if (player.fp_analysis) {
                 enrichment += ` - ${player.fp_analysis}`;
-              }
-            }
-            // Opponent Data
-            if (player.opponent_abbr) {
-              const homeAway = player.is_home ? 'vs' : '@';
-              enrichment += `\n  🏈 Opponent: ${homeAway} ${player.opponent_abbr}`;
-              if (player.opponent_rank) {
-                enrichment += ` (OPRK: #${player.opponent_rank}, ${player.opponent_avg_allowed?.toFixed(1) || '?'} avg pts allowed)`;
-              }
-              if (player.game_day && player.game_time_utc) {
-                enrichment += ` - ${player.game_day}`;
               }
             }
             return enrichment;
