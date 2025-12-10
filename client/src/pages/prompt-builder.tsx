@@ -68,6 +68,7 @@ export default function PromptBuilder() {
   const [includePlayerNews, setIncludePlayerNews] = useState(false);
   const [includePlayerProjections, setIncludePlayerProjections] = useState(false);
   const [includePlayerRankings, setIncludePlayerRankings] = useState(false);
+  const [includePlayerLevelData, setIncludePlayerLevelData] = useState(false);
 
   // Query teams for the selected team's league (needed for selecting other teams)
   const { data: teamsData } = useQuery<{ teams?: any[]; members?: any[] }>({
@@ -115,7 +116,8 @@ export default function PromptBuilder() {
             // Player-level data options
             includePlayerNews,
             includePlayerProjections,
-            includePlayerRankings
+            includePlayerRankings,
+            includePlayerLevelData
           }
         })
       });
@@ -496,6 +498,23 @@ export default function PromptBuilder() {
                     </p>
                     
                     <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="include-player-level-data" 
+                          data-testid="checkbox-player-level-data"
+                          checked={includePlayerLevelData}
+                          onCheckedChange={(checked) => setIncludePlayerLevelData(checked as boolean)}
+                        />
+                        <label htmlFor="include-player-level-data" className="text-sm font-medium">
+                          Include Comprehensive Player Data
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted-foreground ml-6">
+                        Adds rank, injury status, projected points, ESPN outlook, FP headlines/analysis, and opponent data for every player
+                      </p>
+                      
+                      <Separator className="my-2" />
+                      
                       <div className="flex items-center space-x-2">
                         <Checkbox 
                           id="include-player-news" 

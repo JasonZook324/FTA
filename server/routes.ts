@@ -4446,10 +4446,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Fetch comprehensive player data from players_master view if requested
+      const playersMasterMap = new Map<string, any>();
+      if (options.includePlayerLevelData) {
+        try {
+          const { db } = await import('./db');
+          const { sql } = await import('drizzle-orm');
+          const playersResult = await db.execute(sql`
+            SELECT 
+              full_name, first_name, last_name, team, position,
+              fp_rank, fp_tier, ranking_scoring_type, ranking_week,
+              injury_status,
+              projected_points, projection_opponent, projection_stats, projection_week, projection_scoring_type,
+              espn_outlook, espn_outlook_week,
+              fp_headline, fp_analysis, fp_news_date,
+              opponent_abbr, game_time_utc, is_home, venue, game_day, matchup_week,
+              opponent_rank, opponent_avg_allowed, oprk_scoring_type
+            FROM players_master 
+            WHERE sport = 'NFL' AND season = 2025
+          `);
+          
+          // Create lookup map by player name
+          playersResult.rows.forEach((player: any) => {
+            if (player.full_name) {
+              playersMasterMap.set(player.full_name, player);
+            }
+          });
+          
+          console.log(`Loaded ${playersResult.rows.length} players from players_master into map`);
+        } catch (error: any) {
+          console.error('Error fetching players_master data for custom prompt:', error);
+        }
+      }
+
       // Helper function to enrich player display with FantasyPros data
       const enrichPlayerData = (playerName: string): string => {
         let enrichment = '';
         
+        // If comprehensive player-level data is enabled, use players_master view
+        if (playersMasterMap.size > 0) {
+          const player = playersMasterMap.get(playerName);
+          if (player) {
+            // Rank
+            if (player.fp_rank) {
+              enrichment += `\n  🏆 Rank: #${player.fp_rank}`;
+            }
+            // Injury Status
+            if (player.injury_status && player.injury_status !== 'ACTIVE') {
+              enrichment += `\n  🏥 Injury: ${player.injury_status}`;
+            }
+            // Projected Points
+            if (player.projected_points) {
+              enrichment += `\n  📊 Projected: ${player.projected_points} pts`;
+              if (player.projection_stats) {
+                const stats = player.projection_stats;
+                if (stats.pass_yds) enrichment += ` (${stats.pass_yds} pass yds, ${stats.pass_tds || 0} TDs)`;
+                else if (stats.rush_yds) enrichment += ` (${stats.rush_yds} rush yds, ${stats.rush_tds || 0} TDs)`;
+                else if (stats.rec) enrichment += ` (${stats.rec} rec, ${stats.rec_yds || 0} yds, ${stats.rec_tds || 0} TDs)`;
+              }
+            }
+            // ESPN Outlook
+            if (player.espn_outlook) {
+              enrichment += `\n  📝 ESPN Outlook: ${player.espn_outlook}`;
+            }
+            // FP Headline and Analysis
+            if (player.fp_headline) {
+              enrichment += `\n  📰 FP News: ${player.fp_headline}`;
+              if (player.fp_analysis) {
+                enrichment += ` - ${player.fp_analysis}`;
+              }
+            }
+            // Opponent Data
+            if (player.opponent_abbr) {
+              const homeAway = player.is_home ? 'vs' : '@';
+              enrichment += `\n  🏈 Opponent: ${homeAway} ${player.opponent_abbr}`;
+              if (player.opponent_rank) {
+                enrichment += ` (OPRK: #${player.opponent_rank}, ${player.opponent_avg_allowed?.toFixed(1) || '?'} avg pts allowed)`;
+              }
+              if (player.game_day && player.game_time_utc) {
+                enrichment += ` - ${player.game_day}`;
+              }
+            }
+            return enrichment;
+          }
+        }
+        
+        // Fallback to individual data sources if players_master not enabled
         // Add news if available
         if (newsMap.size > 0) {
           const news = newsMap.get(playerName);
