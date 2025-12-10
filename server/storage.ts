@@ -1403,7 +1403,7 @@ export class DatabaseStorage implements IStorage {
           ),
           latest_matchups AS (
             SELECT DISTINCT ON (team_abbr, season)
-              team_abbr, season, opponent_abbr, game_time_utc, is_home, venue, game_day, week
+              team_abbr, season, opponent_abbr, game_time_utc, is_home, game_day, week
             FROM nfl_matchups
             ORDER BY team_abbr, season, week DESC NULLS LAST
           ),
@@ -1437,7 +1437,7 @@ export class DatabaseStorage implements IStorage {
             p.projected_points, p.opponent as projection_opponent,
             p.stats as projection_stats, p.week as projection_week,
             p.scoring_type as projection_scoring_type,
-            m.opponent_abbr, m.game_time_utc, m.is_home, m.venue, m.game_day,
+            m.opponent_abbr, m.game_time_utc, m.is_home, m.game_day,
             m.week as matchup_week,
             dvp.rank as opponent_rank, dvp.avg_points_allowed as opponent_avg_allowed,
             dvp.scoring_type as oprk_scoring_type
