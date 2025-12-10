@@ -62,13 +62,10 @@ export default function PromptBuilder() {
   const [includeLeagueSettings, setIncludeLeagueSettings] = useState(true);
 
   // External research data - single toggle for all external data sources
-  const [includeExternalResearch, setIncludeExternalResearch] = useState(false);
+  const [includeExternalResearch, setIncludeExternalResearch] = useState(true);
 
-  // Player-level data options
-  const [includePlayerNews, setIncludePlayerNews] = useState(false);
-  const [includePlayerProjections, setIncludePlayerProjections] = useState(false);
-  const [includePlayerRankings, setIncludePlayerRankings] = useState(false);
-  const [includePlayerLevelData, setIncludePlayerLevelData] = useState(false);
+  // Player-level data option (condensed)
+  const [includePlayerLevelData, setIncludePlayerLevelData] = useState(true);
 
   // Query teams for the selected team's league (needed for selecting other teams)
   const { data: teamsData } = useQuery<{ teams?: any[]; members?: any[] }>({
@@ -113,10 +110,7 @@ export default function PromptBuilder() {
             includeWeatherData: includeExternalResearch,
             includeNewsUpdates: includeExternalResearch,
             includeMatchupAnalysis: includeExternalResearch,
-            // Player-level data options
-            includePlayerNews,
-            includePlayerProjections,
-            includePlayerRankings,
+            // Player-level data option
             includePlayerLevelData
           }
         })
@@ -126,7 +120,7 @@ export default function PromptBuilder() {
       
       const result = await response.json();
       setGeneratedPrompt(result.prompt);
-  setShowPrompt(false); // hide by default to save space
+      setShowPrompt(false); // hide by default to save space
       
       toast({
         title: "Prompt Generated",
@@ -288,6 +282,9 @@ export default function PromptBuilder() {
                       My Team Roster
                     </label>
                   </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Adds your full roster with positions, statuses, and opponent.
+                  </p>
 
                   <Separator />
 
@@ -465,10 +462,32 @@ export default function PromptBuilder() {
                       League Settings & Scoring
                     </label>
                   </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Adds scoring rules, roster limits, and key league configuration.
+                  </p>
 
                   <Separator />
 
-                  {/* External Research Data - Single Checkbox */}
+                  {/* Player-Level Data */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="include-player-level-data" 
+                      data-testid="checkbox-player-level-data"
+                      checked={includePlayerLevelData}
+                      onCheckedChange={(checked) => setIncludePlayerLevelData(checked as boolean)}
+                    />
+                    <label htmlFor="include-player-level-data" className="flex items-center gap-2 text-sm font-medium">
+                      <Users className="h-4 w-4" />
+                      Player-Level Data
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Adds ranks, injury status, projected points, outlook, and opponent info.
+                  </p>
+
+                  <Separator />
+
+                  {/* Include External Research Directives */}
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="include-external-research" 
@@ -478,80 +497,12 @@ export default function PromptBuilder() {
                     />
                     <label htmlFor="include-external-research" className="flex items-center gap-2 text-sm font-medium">
                       <Globe className="h-4 w-4" />
-                      Include All External Research Data
+                      Include External Research Directives
                     </label>
                   </div>
                   <p className="text-xs text-muted-foreground ml-6">
                     Enables: FantasyPros rankings, Vegas betting lines, injury reports, weather data, latest news updates, and matchup analysis
                   </p>
-
-                  <Separator />
-
-                  {/* Player-Level Data Options */}
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <Users className="h-4 w-4" />
-                      Player-Level Data
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      Include detailed player data from FantasyPros database for players in your prompt
-                    </p>
-                    
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="include-player-level-data" 
-                          data-testid="checkbox-player-level-data"
-                          checked={includePlayerLevelData}
-                          onCheckedChange={(checked) => setIncludePlayerLevelData(checked as boolean)}
-                        />
-                        <label htmlFor="include-player-level-data" className="text-sm font-medium">
-                          Include Comprehensive Player Data
-                        </label>
-                      </div>
-                      <p className="text-xs text-muted-foreground ml-6">
-                        Adds rank, injury status, projected points, ESPN outlook, FP headlines/analysis, and opponent data for every player
-                      </p>
-                      
-                      <Separator className="my-2" />
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="include-player-news" 
-                          data-testid="checkbox-player-news"
-                          checked={includePlayerNews}
-                          onCheckedChange={(checked) => setIncludePlayerNews(checked as boolean)}
-                        />
-                        <label htmlFor="include-player-news" className="text-sm">
-                          Player News & Updates
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="include-player-projections" 
-                          data-testid="checkbox-player-projections"
-                          checked={includePlayerProjections}
-                          onCheckedChange={(checked) => setIncludePlayerProjections(checked as boolean)}
-                        />
-                        <label htmlFor="include-player-projections" className="text-sm">
-                          Player Projections
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="include-player-rankings" 
-                          data-testid="checkbox-player-rankings"
-                          checked={includePlayerRankings}
-                          onCheckedChange={(checked) => setIncludePlayerRankings(checked as boolean)}
-                        />
-                        <label htmlFor="include-player-rankings" className="text-sm">
-                          Expert Consensus Rankings
-                        </label>
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
 
