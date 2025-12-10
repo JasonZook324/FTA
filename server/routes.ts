@@ -4518,7 +4518,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const homeAway = player.is_home ? 'vs' : '@';
               enrichment += `\n  🏈 Opponent: ${homeAway} ${player.opponent_abbr}`;
               if (player.opponent_rank) {
-                enrichment += ` (OPRK: #${player.opponent_rank}, ${player.opponent_avg_allowed?.toFixed(1) || '?'} avg pts allowed)`;
+                enrichment += ` (OPRK: #${player.opponent_rank}`;
+                if (player.opponent_avg_allowed && player.opponent_avg_allowed > 0) {
+                  enrichment += `, ${player.opponent_avg_allowed.toFixed(1)} avg pts allowed`;
+                }
+                enrichment += `)`;
               }
               if (player.game_day) {
                 enrichment += ` - ${player.game_day}`;
