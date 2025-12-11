@@ -233,14 +233,14 @@ export default function AiAnswers() {
   return (
     <>
       {/* Header Bar */}
-      <header className="bg-card border-b border-border px-6 py-4">
+      <header className="bg-card border-b border-border px-6 py-2">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <FileText className="h-6 w-6" />
               AI Answers
             </h2>
-            <p className="text-muted-foreground">Build custom AI prompts with your fantasy data</p>
+            <p className="text-muted-foreground leading-tight">Build custom AI prompts with your fantasy data</p>
           </div>
         </div>
       </header>
@@ -279,23 +279,25 @@ export default function AiAnswers() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* My Team */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="include-my-team" 
-                      data-testid="checkbox-my-team"
-                      checked={includeMyTeam}
-                      onCheckedChange={(checked) => setIncludeMyTeam(checked as boolean)}
-                    />
-                    <label htmlFor="include-my-team" className="flex items-center gap-2 text-sm font-medium">
-                      <User className="h-4 w-4" />
-                      My Team Roster
-                    </label>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-my-team" 
+                        data-testid="checkbox-my-team"
+                        checked={includeMyTeam}
+                        onCheckedChange={(checked) => setIncludeMyTeam(checked as boolean)}
+                      />
+                      <label htmlFor="include-my-team" className="flex items-center gap-2 text-sm font-medium">
+                        <User className="h-4 w-4" />
+                        My Team Roster
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      Adds your full roster with positions, statuses, and opponent.
+                    </p>
+                    <Separator />
                   </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Adds your full roster with positions, statuses, and opponent.
-                  </p>
 
-                  <Separator />
 
                   {/* Other Teams */}
                   <div className="space-y-3">
@@ -460,58 +462,64 @@ export default function AiAnswers() {
                   <Separator />
 
                   {/* League Settings */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="include-league-settings" 
-                      checked={includeLeagueSettings}
-                      onCheckedChange={(checked) => setIncludeLeagueSettings(checked as boolean)}
-                    />
-                    <label htmlFor="include-league-settings" className="flex items-center gap-2 text-sm font-medium">
-                      <Crown className="h-4 w-4" />
-                      League Settings & Scoring
-                    </label>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-league-settings" 
+                        checked={includeLeagueSettings}
+                        onCheckedChange={(checked) => setIncludeLeagueSettings(checked as boolean)}
+                      />
+                      <label htmlFor="include-league-settings" className="flex items-center gap-2 text-sm font-medium">
+                        <Crown className="h-4 w-4" />
+                        League Settings & Scoring
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      Adds scoring rules, roster limits, and key league configuration.
+                    </p>
+                    <Separator />
                   </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Adds scoring rules, roster limits, and key league configuration.
-                  </p>
 
-                  <Separator />
 
                   {/* Player-Level Data */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="include-player-level-data" 
-                      data-testid="checkbox-player-level-data"
-                      checked={includePlayerLevelData}
-                      onCheckedChange={(checked) => setIncludePlayerLevelData(checked as boolean)}
-                    />
-                    <label htmlFor="include-player-level-data" className="flex items-center gap-2 text-sm font-medium">
-                      <Users className="h-4 w-4" />
-                      Player-Level Data
-                    </label>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-player-level-data" 
+                        data-testid="checkbox-player-level-data"
+                        checked={includePlayerLevelData}
+                        onCheckedChange={(checked) => setIncludePlayerLevelData(checked as boolean)}
+                      />
+                      <label htmlFor="include-player-level-data" className="flex items-center gap-2 text-sm font-medium">
+                        <Users className="h-4 w-4" />
+                        Player-Level Data
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      Adds ranks, injury status, projected points, outlook, and opponent info.
+                    </p>
+                    <Separator />
                   </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Adds ranks, injury status, projected points, outlook, and opponent info.
-                  </p>
 
-                  <Separator />
 
                   {/* Include External Research Directives */}
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="include-external-research" 
-                      data-testid="checkbox-external-research"
-                      checked={includeExternalResearch}
-                      onCheckedChange={(checked) => setIncludeExternalResearch(checked as boolean)}
-                    />
-                    <label htmlFor="include-external-research" className="flex items-center gap-2 text-sm font-medium">
-                      <Globe className="h-4 w-4" />
-                      Include External Research Directives
-                    </label>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="include-external-research" 
+                        data-testid="checkbox-external-research"
+                        checked={includeExternalResearch}
+                        onCheckedChange={(checked) => setIncludeExternalResearch(checked as boolean)}
+                      />
+                      <label htmlFor="include-external-research" className="flex items-center gap-2 text-sm font-medium">
+                        <Globe className="h-4 w-4" />
+                        Include External Research Directives
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">
+                      Ensures your prompt includes directives to include external research sources.
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Ensures your prompt includes directives to include external research sources.
-                  </p>
                 </CardContent>
               </Card>
 
