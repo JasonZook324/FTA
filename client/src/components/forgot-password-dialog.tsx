@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail } from "lucide-react";
+import { formatApiError } from "@/lib/error";
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -68,7 +69,7 @@ export function ForgotPasswordDialog({ trigger }: ForgotPasswordDialogProps) {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "We couldn't send the reset email. Please try again." }),
         variant: "destructive",
       });
     },

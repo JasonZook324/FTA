@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { formatApiError } from "@/lib/error";
 
 export default function AccountSettings() {
   const { user } = useAuth();
@@ -66,26 +67,9 @@ export default function AccountSettings() {
         toast({ title: "Username updated", description: "Your username has been saved." });
       }
     } catch (e: any) {
-      const friendly = (() => {
-        const raw = e?.message ? String(e.message) : String(e);
-        const idx = raw.indexOf(":");
-        const after = idx >= 0 ? raw.slice(idx + 1).trim() : raw;
-        if (/failed to fetch|network error|networkrequestfailed/i.test(after)) {
-          return "We couldn't reach the server. Please check your connection and try again.";
-        }
-        try {
-          const parsed = JSON.parse(after);
-          if (parsed && typeof parsed === "object" && "message" in parsed) {
-            return String(parsed.message);
-          }
-        } catch {}
-        const match = after.match(/"message"\s*:\s*"([^"]+)"/);
-        if (match) return match[1];
-        if (/email/i.test(after) && /invalid|format/.test(after)) return "Please enter a valid email address.";
-        if (/email/i.test(after) && /exist|used|taken/.test(after)) return "That email is already in use.";
-        if (/username/i.test(after) && /exist|used|taken/.test(after)) return "That username is already taken.";
-        return "Unable to update account. Please try again.";
-      })();
+      const friendly = formatApiError(e, {
+        defaultMessage: "Unable to update account. Please try again.",
+      });
       toast({ title: "Update failed", description: friendly, variant: "destructive" });
     }
   }
@@ -116,25 +100,9 @@ export default function AccountSettings() {
       setConfirmPassword("");
       toast({ title: "Password changed", description: "Your password has been updated." });
     } catch (e: any) {
-      const friendly = (() => {
-        const raw = e?.message ? String(e.message) : String(e);
-        const idx = raw.indexOf(":");
-        const after = idx >= 0 ? raw.slice(idx + 1).trim() : raw;
-        if (/failed to fetch|network error|networkrequestfailed/i.test(after)) {
-          return "We couldn't reach the server. Please check your connection and try again.";
-        }
-        try {
-          const parsed = JSON.parse(after);
-          if (parsed && typeof parsed === "object" && "message" in parsed) {
-            return String(parsed.message);
-          }
-        } catch {}
-        const match = after.match(/"message"\s*:\s*"([^"]+)"/);
-        if (match) return match[1];
-        if (/incorrect/i.test(after)) return "Current password is incorrect";
-        if (/required/i.test(after)) return "Current password is required";
-        return "Unable to change password. Please try again.";
-      })();
+      const friendly = formatApiError(e, {
+        defaultMessage: "Unable to change password. Please try again.",
+      });
       toast({ title: "Update failed", description: friendly, variant: "destructive" });
     }
   }
