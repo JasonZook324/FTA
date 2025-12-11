@@ -12,7 +12,7 @@ import Players from "@/pages/players";
 import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
 import TradeAnalyzer from "@/pages/trade-analyzer";
-import PromptBuilder from "@/pages/prompt-builder";
+import AiAnswers from "@/pages/ai-answers";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
@@ -179,13 +179,26 @@ function App() {
                 </div>
               )} />
               
+              <ProtectedRoute path="/ai-answers" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <AiAnswers />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              {/* Legacy alias for old URL */}
               <ProtectedRoute path="/prompt-builder" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
-                      <PromptBuilder />
+                      <AiAnswers />
                     </main>
                   </div>
                 </div>

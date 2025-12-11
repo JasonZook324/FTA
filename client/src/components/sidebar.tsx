@@ -58,7 +58,7 @@ const navigation = [
   { name: "Player Details", href: "/players", icon: UsersRound },
   { name: "AI Recommendations", href: "/ai-recommendations", icon: Brain },
   { name: "Trade Analyzer", href: "/trade-analyzer", icon: TrendingUp },
-  { name: "Prompt Builder", href: "/prompt-builder", icon: FileText },
+  { name: "AI Answers", href: "/ai-answers", icon: FileText },
   { name: "API Playground", href: "/api-playground", icon: FlaskConical },
   { name: "Jobs", href: "/jobs", icon: Volleyball },
   { name: "Streaming", href: "/streaming", icon: PlayCircle },
