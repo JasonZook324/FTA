@@ -7,6 +7,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { formatApiError } from "@/lib/error";
+import * as React from "react";
+import * as Avatar from "@radix-ui/react-avatar";
 
 export default function AccountSettings() {
   const { user } = useAuth();
@@ -22,10 +24,36 @@ export default function AccountSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Avatar state
+  // Derive avatar directly from auth user to avoid double updates
+  const avatarUrl = (user as any)?.avatarUrl ?? null;
+  const avatarVersion = (user as any)?.avatarUpdatedAt ?? 0;
+  const [displayedSrc, setDisplayedSrc] = React.useState<string | undefined>(
+    avatarUrl ? `${avatarUrl}?v=${avatarVersion}` : undefined
+  );
+  React.useEffect(() => {
+    const next = avatarUrl ? `${avatarUrl}?v=${avatarVersion}` : undefined;
+    if (!next) { setDisplayedSrc(undefined); return; }
+    const img = new Image();
+    img.onload = () => setDisplayedSrc(next);
+    img.src = next;
+  }, [avatarUrl, avatarVersion]);
+  const [uploading, setUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const uploadsEnabled = (import.meta.env.VITE_ENABLE_AVATAR_UPLOAD === 'true');
+  const presets = React.useMemo(() => [
+    { id: "robot", label: "Robot" },
+    { id: "helmet", label: "Helmet" },
+    { id: "star", label: "Star" },
+    { id: "shield", label: "Shield" },
+  ], []);
+
   useEffect(() => {
     setUsername(user?.username || "");
     setEmail((user as any)?.email || "");
   }, [user]);
+
+  // No local avatar state; preview updates when auth user changes
 
   useEffect(() => {
     let ignore = false;
@@ -139,6 +167,115 @@ export default function AccountSettings() {
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Avatar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Avatar.Root className="inline-flex h-16 w-16 select-none items-center justify-center overflow-hidden rounded-full align-middle border">
+              <Avatar.Image
+                src={displayedSrc}
+                alt={user?.username ?? "avatar"}
+                className="h-full w-full object-cover"
+              />
+              <Avatar.Fallback delayMs={250} className="flex h-full w-full items-center justify-center bg-muted text-lg">
+                {(user?.username || "U").slice(0, 1).toUpperCase()}
+              </Avatar.Fallback>
+            </Avatar.Root>
+            <div className="text-sm text-muted-foreground">
+              Choose a preset or upload a custom image (PNG/JPG/WebP, max ~1MB).
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Presets</label>
+            <div className="flex flex-wrap gap-3">
+              {presets.map((p) => (
+                <Button key={p.id} variant="secondary" size="sm" onClick={async () => {
+                  try {
+                    const res = await apiRequest("PATCH", "/api/account/avatar", { presetId: p.id });
+                    const updated = await res.json();
+                    queryClient.setQueryData(["/api/user"], updated);
+                    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                    // Explicit refetch to ensure global auth state updates immediately
+                    try {
+                      const userRes = await fetch("/api/user", { credentials: "include" });
+                      if (userRes.ok) {
+                        const fresh = await userRes.json();
+                        queryClient.setQueryData(["/api/user"], fresh);
+                      }
+                    } catch {}
+                    toast({ title: "Avatar updated", description: `Preset set to ${p.label}.` });
+                  } catch (e: any) {
+                    const friendly = formatApiError(e, { defaultMessage: "Unable to update avatar." });
+                    toast({ title: "Update failed", description: friendly, variant: "destructive" });
+                  }
+                }}>
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {uploadsEnabled && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Upload custom</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setFile(f);
+                  }}
+                />
+                <div>
+                  <Button disabled={!file || uploading} onClick={async () => {
+                    if (!file) return;
+                    if (file.size > 1_000_000) { // ~1MB limit
+                      toast({ title: "File too large", description: "Please choose an image under 1MB.", variant: "destructive" });
+                      return;
+                    }
+                    const ct = file.type;
+                    const ext = ct === "image/png" ? "png" : ct === "image/webp" ? "webp" : "jpg";
+                    setUploading(true);
+                    try {
+                      const presignRes = await apiRequest("POST", "/api/account/avatar/presign", { contentType: ct, ext });
+                      const { putUrl, publicUrl } = await presignRes.json();
+                      const put = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": ct }, body: file });
+                      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+                      const finalizeRes = await apiRequest("PATCH", "/api/account/avatar", { publicUrl });
+                      const updated = await finalizeRes.json();
+                      queryClient.setQueryData(["/api/user"], updated);
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      try {
+                        const userRes = await fetch("/api/user", { credentials: "include" });
+                        if (userRes.ok) {
+                          const fresh = await userRes.json();
+                          queryClient.setQueryData(["/api/user"], fresh);
+                        }
+                      } catch {}
+                      toast({ title: "Avatar uploaded", description: "Your avatar has been updated." });
+                    } catch (e: any) {
+                      const friendly = formatApiError(e, { defaultMessage: "Unable to upload avatar." });
+                      toast({ title: "Upload failed", description: friendly, variant: "destructive" });
+                    } finally {
+                      setUploading(false);
+                    }
+                  }}>
+                    {uploading ? "Uploading..." : "Upload & Save"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

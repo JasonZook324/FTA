@@ -9,6 +9,7 @@ import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw, Users } from "lucid
 import { useTeam } from "@/contexts/TeamContext";
 import { formatApiError } from "@/lib/error";
 import { useAuth } from "@/hooks/use-auth";
+// Removed avatar chip from main header per user request
 
 export default function LeagueHeader() {
   const { toast } = useToast();
@@ -230,7 +231,7 @@ export default function LeagueHeader() {
         </div>
         
         <div className="flex items-center gap-2 w-full lg:w-auto">
-          <Button
+              <Button
             variant="outline"
             onClick={() => reloadLeagueMutation.mutate()}
             disabled={reloadLeagueMutation.isPending}
