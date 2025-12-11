@@ -223,16 +223,7 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* API Status */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center space-x-2 text-sm">
-          <div className="w-2 h-2 bg-chart-2 rounded-full"></div>
-          <span className="text-muted-foreground">API Connected</span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1" data-testid="connection-status">
-          Ready for ESPN API calls
-        </p>
-      </div>
+      {/* Footer spacer removed; no status here */}
       </div>
     </>
   );
