@@ -27,6 +27,8 @@ import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { AdminRoute } from "@/lib/admin-route";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
 // Leagues page removed
 
 function App() {
@@ -45,6 +47,32 @@ function App() {
               
               {/* Public password reset route */}
               <Route path="/reset-password" component={ResetPasswordPage} />
+
+              {/* Public About route with standard layout */}
+              <Route path="/about" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <About />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              {/* Public Contact route with standard layout */}
+              <Route path="/contact" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <Contact />
+                    </main>
+                  </div>
+                </div>
+              )} />
               
               {/* Protected routes with sidebar and header */}
               <ProtectedRoute path="/" component={() => (

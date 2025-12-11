@@ -15,20 +15,30 @@ export default function Footer() {
           <div>© {new Date().getFullYear()} Fantasy Toolbox AI</div>
           <div>Your playbook just got smarter</div>
         </div>
-        {links.length > 0 && (
-          <nav className="flex items-center gap-3 flex-wrap">
-            {links.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="hover:underline"
-                aria-label={item.name}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-        )}
+        <nav className="flex items-center gap-3 flex-wrap">
+          {/* Always show About and Contact in footer */}
+          <Link href="/about" className="hover:underline" aria-label="About">
+            About
+          </Link>
+          <Link href="/contact" className="hover:underline" aria-label="Contact">
+            Contact
+          </Link>
+          {/* Conditionally show user navigation links when logged in */}
+          {links.length > 0 && (
+            <>
+              {links.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="hover:underline"
+                  aria-label={item.name}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </>
+          )}
+        </nav>
       </div>
     </footer>
   );
