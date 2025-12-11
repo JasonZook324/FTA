@@ -56,7 +56,7 @@ export default function TradeAnalyzer() {
   const selectedLeague = leagues?.find((l: any) => l.id === selectedLeagueId);
 
   // Fetch roster data to show available players for trade analysis
-  const { data: rostersData, isLoading: rostersLoading } = useQuery({
+  const { data: rostersData, isLoading: rostersLoading } = useQuery<{ teams: any[] }>({
     queryKey: ["/api/leagues", selectedLeagueId, "rosters"],
     enabled: !!selectedLeagueId,
     staleTime: 5 * 60 * 1000 // 5 minutes
