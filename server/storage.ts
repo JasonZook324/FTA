@@ -174,6 +174,11 @@ export class MemStorage implements IStorage {
       id, 
       selectedLeagueId: null,
       selectedTeamId: null,
+      // Ensure nullable fields are explicitly null, not undefined
+      avatarUrl: (insertUser as any).avatarUrl ?? null,
+      avatarProvider: (insertUser as any).avatarProvider ?? null,
+      avatarKey: (insertUser as any).avatarKey ?? null,
+      avatarUpdatedAt: (insertUser as any).avatarUpdatedAt ?? null,
       createdAt: new Date(),
       email: (insertUser as any).email ?? null
     };
