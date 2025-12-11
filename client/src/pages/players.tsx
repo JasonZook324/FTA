@@ -518,7 +518,7 @@ export default function Players() {
                 ))}
               </div>
             ) : filteredPlayers.length > 0 ? (
-              <div className="rounded-md border">
+              <div className="rounded-md border max-h-[70vh] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
