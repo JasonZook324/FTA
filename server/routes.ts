@@ -764,6 +764,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Account settings: avatar presign URL (S3/R2) for client direct upload
   app.post("/api/account/avatar/presign", requireAuth, async (req: any, res) => {
     try {
+      if (process.env.ENABLE_AVATAR_UPLOAD !== 'true') {
+        return res.status(403).json({ message: "User-uploaded avatars are disabled" });
+      }
       const bodySchema = z.object({
         contentType: z.enum(["image/png", "image/jpeg", "image/webp"]),
         ext: z.enum(["png", "jpg", "jpeg", "webp"]),
@@ -780,7 +783,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const key = `avatars/${userId}/${Date.now()}.${ext}`;
 
       // Lazily import AWS SDK v3 to keep startup fast
+      // @ts-ignore: Optional dependency when uploads are disabled
       const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+      // @ts-ignore: Optional dependency when uploads are disabled
       const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
 
       const s3 = new S3Client({
@@ -832,6 +837,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avatarProvider = "preset";
         avatarKey = null;
       } else if (publicUrl) {
+        if (process.env.ENABLE_AVATAR_UPLOAD !== 'true') {
+          return res.status(403).json({ message: "User-uploaded avatars are disabled" });
+        }
         // Restrict to our configured base URL to avoid arbitrary external URLs
         const allowedBase = process.env.AVATAR_BASE_URL;
         if (!allowedBase || !publicUrl.startsWith(allowedBase)) {

@@ -40,6 +40,7 @@ export default function AccountSettings() {
   }, [avatarUrl, avatarVersion]);
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const uploadsEnabled = (import.meta.env.VITE_ENABLE_AVATAR_UPLOAD === 'true');
   const presets = React.useMemo(() => [
     { id: "robot", label: "Robot" },
     { id: "helmet", label: "Helmet" },
@@ -222,56 +223,59 @@ export default function AccountSettings() {
             </div>
           </div>
 
-          <Separator />
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Upload custom</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setFile(f);
-              }}
-            />
-            <div>
-              <Button disabled={!file || uploading} onClick={async () => {
-                if (!file) return;
-                if (file.size > 1_000_000) { // ~1MB limit
-                  toast({ title: "File too large", description: "Please choose an image under 1MB.", variant: "destructive" });
-                  return;
-                }
-                const ct = file.type;
-                const ext = ct === "image/png" ? "png" : ct === "image/webp" ? "webp" : "jpg";
-                setUploading(true);
-                try {
-                  const presignRes = await apiRequest("POST", "/api/account/avatar/presign", { contentType: ct, ext });
-                  const { putUrl, publicUrl } = await presignRes.json();
-                  const put = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": ct }, body: file });
-                  if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-                  const finalizeRes = await apiRequest("PATCH", "/api/account/avatar", { publicUrl });
-                  const updated = await finalizeRes.json();
-                  queryClient.setQueryData(["/api/user"], updated);
-                  queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                  try {
-                    const userRes = await fetch("/api/user", { credentials: "include" });
-                    if (userRes.ok) {
-                      const fresh = await userRes.json();
-                      queryClient.setQueryData(["/api/user"], fresh);
+          {uploadsEnabled && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Upload custom</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    setFile(f);
+                  }}
+                />
+                <div>
+                  <Button disabled={!file || uploading} onClick={async () => {
+                    if (!file) return;
+                    if (file.size > 1_000_000) { // ~1MB limit
+                      toast({ title: "File too large", description: "Please choose an image under 1MB.", variant: "destructive" });
+                      return;
                     }
-                  } catch {}
-                  toast({ title: "Avatar uploaded", description: "Your avatar has been updated." });
-                } catch (e: any) {
-                  const friendly = formatApiError(e, { defaultMessage: "Unable to upload avatar." });
-                  toast({ title: "Upload failed", description: friendly, variant: "destructive" });
-                } finally {
-                  setUploading(false);
-                }
-              }}>
-                {uploading ? "Uploading..." : "Upload & Save"}
-              </Button>
-            </div>
-          </div>
+                    const ct = file.type;
+                    const ext = ct === "image/png" ? "png" : ct === "image/webp" ? "webp" : "jpg";
+                    setUploading(true);
+                    try {
+                      const presignRes = await apiRequest("POST", "/api/account/avatar/presign", { contentType: ct, ext });
+                      const { putUrl, publicUrl } = await presignRes.json();
+                      const put = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": ct }, body: file });
+                      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+                      const finalizeRes = await apiRequest("PATCH", "/api/account/avatar", { publicUrl });
+                      const updated = await finalizeRes.json();
+                      queryClient.setQueryData(["/api/user"], updated);
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      try {
+                        const userRes = await fetch("/api/user", { credentials: "include" });
+                        if (userRes.ok) {
+                          const fresh = await userRes.json();
+                          queryClient.setQueryData(["/api/user"], fresh);
+                        }
+                      } catch {}
+                      toast({ title: "Avatar uploaded", description: "Your avatar has been updated." });
+                    } catch (e: any) {
+                      const friendly = formatApiError(e, { defaultMessage: "Unable to upload avatar." });
+                      toast({ title: "Upload failed", description: friendly, variant: "destructive" });
+                    } finally {
+                      setUploading(false);
+                    }
+                  }}>
+                    {uploading ? "Uploading..." : "Upload & Save"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
