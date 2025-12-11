@@ -761,10 +761,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Account settings: avatar presign URL (S3/R2) for client direct upload
+  // Account settings: avatar presign URL (Supabase Storage signed upload)
   app.post("/api/account/avatar/presign", requireAuth, async (req: any, res) => {
     try {
-      if (process.env.ENABLE_AVATAR_UPLOAD !== 'true') {
+      // Enable uploads by default; only block if explicitly set to 'false'
+      if (process.env.ENABLE_AVATAR_UPLOAD === 'false') {
         return res.status(403).json({ message: "User-uploaded avatars are disabled" });
       }
       const bodySchema = z.object({
@@ -772,41 +773,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ext: z.enum(["png", "jpg", "jpeg", "webp"]),
       });
       const { contentType, ext } = bodySchema.parse(req.body);
+      const userId = req.user.id as string;
 
+      // Choose storage mode: Supabase (SDK) or S3 protocol based on envs
+      const forcedMode = (process.env.AVATAR_STORAGE_MODE || "").toLowerCase();
+      const useSupabaseEnv = !!process.env.SUPABASE_URL && !!(process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE);
+      const useSupabase = forcedMode === "supabase" ? true : forcedMode === "s3" ? false : useSupabaseEnv;
+      if (useSupabase) {
+        const { createSignedUpload, getPublicBaseUrl } = await import("./supabaseStorage");
+        const { path, signedUrl } = await createSignedUpload(userId, ext);
+        return res.json({ putUrl: signedUrl, key: path, publicUrl: `${getPublicBaseUrl()}/${path}` });
+      }
+
+      // Fallback: S3-compatible presign using AWS SDK v3
       const bucket = process.env.AVATAR_BUCKET;
       const baseUrl = process.env.AVATAR_BASE_URL;
       if (!bucket || !baseUrl) {
-        return res.status(500).json({ message: "Avatar storage is not configured" });
+        return res.status(500).json({ message: "Avatar storage is not configured (S3 mode)" });
       }
-
-      const userId = req.user.id as string;
       const key = `avatars/${userId}/${Date.now()}.${ext}`;
-
-      // Lazily import AWS SDK v3 to keep startup fast
-      // @ts-ignore: Optional dependency when uploads are disabled
+      // @ts-ignore
       const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
-      // @ts-ignore: Optional dependency when uploads are disabled
+      // @ts-ignore
       const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
-
       const s3 = new S3Client({
-        region: process.env.AWS_REGION || "auto",
-        endpoint: process.env.S3_ENDPOINT || undefined, // for R2, set endpoint via env
+        region: process.env.AWS_REGION || "us-west-2",
+        endpoint: process.env.S3_ENDPOINT || undefined,
         credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)
           ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID!, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! }
           : undefined,
       });
-
-      const command = new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        ContentType: contentType,
-      });
-      const putUrl = await getSignedUrl(s3, command, { expiresIn: 60 * 5 }); // 5 minutes
-
+      const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
+      const putUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
       return res.json({ putUrl, key, publicUrl: `${baseUrl}/${key}` });
     } catch (error: any) {
-      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
-      return res.status(400).json({ message });
+      const zodMsg = error?.issues?.[0]?.message;
+      if (zodMsg) {
+        return res.status(400).json({ message: zodMsg });
+      }
+      const msg = error?.message || "Unknown error";
+      const isConfig = msg.includes("Supabase storage not configured") || msg.includes("Supabase bucket error");
+      return res.status(isConfig ? 500 : 400).json({ message: msg });
     }
   });
 
@@ -837,18 +844,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avatarProvider = "preset";
         avatarKey = null;
       } else if (publicUrl) {
-        if (process.env.ENABLE_AVATAR_UPLOAD !== 'true') {
+        // Enable uploads by default; only block if explicitly set to 'false'
+        if (process.env.ENABLE_AVATAR_UPLOAD === 'false') {
           return res.status(403).json({ message: "User-uploaded avatars are disabled" });
         }
-        // Restrict to our configured base URL to avoid arbitrary external URLs
-        const allowedBase = process.env.AVATAR_BASE_URL;
-        if (!allowedBase || !publicUrl.startsWith(allowedBase)) {
-          return res.status(400).json({ message: "Avatar URL must be from configured storage" });
+        // Accept either Supabase pseudo base or S3 base depending on configured mode
+        const useSupabase = !!process.env.SUPABASE_URL && !!(process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE);
+        if (useSupabase) {
+          const forcedMode = (process.env.AVATAR_STORAGE_MODE || "").toLowerCase();
+          const useSupabaseEnv = !!process.env.SUPABASE_URL && !!(process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE);
+          const useSupabase = forcedMode === "supabase" ? true : forcedMode === "s3" ? false : useSupabaseEnv;
+          const { getPublicBaseUrl } = await import("./supabaseStorage");
+          const allowedBase = getPublicBaseUrl();
+          if (!publicUrl.startsWith(allowedBase)) {
+            return res.status(400).json({ message: "Avatar URL must be from Supabase storage" });
+          }
+          avatarProvider = "supabase";
+          const prefix = `${allowedBase}/`;
+          avatarKey = publicUrl.startsWith(prefix) ? publicUrl.slice(prefix.length) : null;
+        } else {
+          const allowedBase = process.env.AVATAR_BASE_URL;
+          if (!allowedBase || !publicUrl.startsWith(allowedBase)) {
+            return res.status(400).json({ message: "Avatar URL must be from configured storage" });
+          }
+          avatarProvider = process.env.S3_ENDPOINT ? "r2" : "s3";
+          const prefix = `${allowedBase}/`;
+          avatarKey = publicUrl.startsWith(prefix) ? publicUrl.slice(prefix.length) : null;
         }
-        avatarProvider = process.env.S3_ENDPOINT ? "r2" : "s3";
-        // Derive key from base + url if possible
-        const prefix = `${allowedBase}/`;
-        avatarKey = publicUrl.startsWith(prefix) ? publicUrl.slice(prefix.length) : null;
       }
 
       const [updated] = await db
@@ -870,6 +892,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(updated);
     } catch (error: any) {
       const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
+  // Account settings: get signed access URL for current user's private avatar (Supabase)
+  app.get("/api/account/avatar/url", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (!user.avatarKey) {
+        return res.status(400).json({ message: "No private avatar configured" });
+      }
+      if (user.avatarProvider === "supabase") {
+        const { getSignedUrl } = await import("./supabaseStorage");
+        const signedUrl = await getSignedUrl(user.avatarKey as string, 60 * 60);
+        return res.json({ signedUrl });
+      }
+      // S3-compatible signed URL for GET
+      const bucket = process.env.AVATAR_BUCKET;
+      if (!bucket) return res.status(500).json({ message: "Avatar storage not configured (S3 mode)" });
+      // @ts-ignore
+      const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
+      // @ts-ignore
+      const { getSignedUrl: s3GetSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+      const s3 = new S3Client({
+        region: process.env.AWS_REGION || "us-west-2",
+        endpoint: process.env.S3_ENDPOINT || undefined,
+        credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)
+          ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID!, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! }
+          : undefined,
+      });
+      const cmd = new GetObjectCommand({ Bucket: bucket, Key: user.avatarKey as string });
+      const signedUrl = await s3GetSignedUrl(s3, cmd, { expiresIn: 3600 });
+      return res.json({ signedUrl });
+    } catch (error: any) {
+      const message = error?.message || "Failed to generate signed URL";
       return res.status(400).json({ message });
     }
   });
