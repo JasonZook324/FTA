@@ -11,13 +11,13 @@ export default async function () {
 
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
     try {
-      const cartographerModule = await import("@replit/vite-plugin-cartographer");
-      const cartographer = cartographerModule.default || cartographerModule;
+      const cartographerModule: any = await import("@replit/vite-plugin-cartographer");
+      const cartographer: any = cartographerModule?.default ?? cartographerModule;
       if (typeof cartographer === 'function') {
         plugins.push(cartographer());
       }
-    } catch (e) {
-      console.warn('Cartographer plugin not available:', e.message);
+    } catch (e: any) {
+      console.warn('Cartographer plugin not available:', e?.message ?? e);
     }
   }
 

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube, LifeBuoy, Settings } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube, LifeBuoy, Settings, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -55,10 +55,7 @@ export const navigation = [
   { name: "League Setup", href: "/authentication", icon: Key },
   { name: "Standings", href: "/standings", icon: BarChart3 },
   { name: "Team Rosters", href: "/rosters", icon: Users },
-  { name: "Matchups", href: "/matchups", icon: Calendar },
   { name: "Player Details", href: "/players", icon: UsersRound },
-  { name: "AI Recommendations", href: "/ai-recommendations", icon: Brain },
-  { name: "Trade Analyzer", href: "/trade-analyzer", icon: TrendingUp },
   { name: "AI Answers", href: "/ai-answers", icon: FileText },
   { name: "API Playground", href: "/api-playground", icon: FlaskConical },
   { name: "Jobs", href: "/jobs", icon: Volleyball },
@@ -210,6 +207,20 @@ export default function Sidebar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Link
+                      href="/help"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent hover:text-accent-foreground"
+                      aria-label="Help"
+                      onClick={() => setIsOpen(false)}
+                      data-testid="button-help"
+                    >
+                      <CircleHelp className="w-4 h-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Help</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
                       href="/account-settings"
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent hover:text-accent-foreground"
                       aria-label="Account Settings"
@@ -245,7 +256,8 @@ export default function Sidebar() {
       <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
           {filterNavigationForUser(user)
-            .map((item) => {
+            .filter((item) => item.name !== "Help" && item.name !== "Account Settings")
+            .map((item, idx) => {
               const Icon = item.icon;
               const isActive = location === item.href;
               
@@ -259,7 +271,7 @@ export default function Sidebar() {
                         ? "bg-primary text-primary-foreground" 
                         : "text-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
-                    data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`nav-item-${idx + 1}`}
                     onClick={() => setIsOpen(false)}
                   >
                     <Icon className="w-5 h-5" />

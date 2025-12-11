@@ -5,12 +5,16 @@ import { filterNavigationForUser } from "@/components/sidebar";
 
 export default function Footer() {
   const { user } = useAuth();
-  const links = user ? filterNavigationForUser(user) : [];
+  // When logged in, show only Standard User links; when logged out, show none
+  const links = user ? filterNavigationForUser({ role: 0 }) : [];
 
   return (
     <footer className="w-full border-t bg-background text-foreground/80">
       <div className="mx-auto max-w-7xl px-4 py-3 text-xs sm:text-sm flex items-center justify-between gap-4">
-        <span className="opacity-80">© {new Date().getFullYear()} Fantasy Tracker Assistant</span>
+        <div className="opacity-80">
+          <div>© {new Date().getFullYear()} Fantasy Toolbox AI</div>
+          <div>Your playbook just got smarter</div>
+        </div>
         {links.length > 0 && (
           <nav className="flex items-center gap-3 flex-wrap">
             {links.map((item) => (

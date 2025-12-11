@@ -3,11 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import TeamRoster from "@/components/team-roster";
 import { useAuth } from "@/hooks/use-auth";
 
+interface League {
+  id: string;
+  name: string;
+  season: number;
+}
+
 export default function Rosters() {
   const { user } = useAuth();
 
   // Query user leagues
-  const { data: leagues } = useQuery({
+  const { data: leagues } = useQuery<League[]>({
     queryKey: ["/api/leagues"],
     enabled: !!user,
   });

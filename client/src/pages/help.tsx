@@ -61,9 +61,6 @@ export default function Help() {
                 <p className="text-muted-foreground mt-4">Admin/Developer features:</p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>
-                    <Link href="/trade-analyzer" className="text-primary hover:underline">Trade Analyzer</Link> — analyze multi-player trades.
-                  </li>
-                  <li>
                     <Link href="/streaming" className="text-primary hover:underline">Streaming</Link> — weekly add/drop and matchup targets.
                   </li>
                 </ul>
@@ -123,13 +120,7 @@ export default function Help() {
 
             {isAdminOrDev && (
               <>
-                <div>
-                  <div className="font-medium flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Analyze a trade</div>
-                  <ol className="list-decimal pl-5 mt-1 space-y-1 text-muted-foreground">
-                    <li>Open <Link href="/trade-analyzer" className="text-primary hover:underline">Trade Analyzer</Link>.</li>
-                    <li>Add players to each side, then run analysis.</li>
-                  </ol>
-                </div>
+                
                 <div>
                   <div className="font-medium flex items-center gap-2"><PlayCircle className="w-4 h-4" /> Find a player to stream</div>
                   <ol className="list-decimal pl-5 mt-1 space-y-1 text-muted-foreground">
