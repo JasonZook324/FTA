@@ -669,6 +669,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Account settings: update profile (username/email) for current user
+  app.patch("/api/account/profile", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const updateSchema = z.object({
+        username: z.string().min(3).max(50).optional(),
+        email: z.string().email().transform(v => v.trim().toLowerCase()).optional(),
+      });
+      const updates = updateSchema.parse(req.body);
+
+      // Validate username uniqueness if changing
+      if (updates.username) {
+        const existing = await db
+          .select()
+          .from(schema.users)
+          .where(sql`LOWER(${schema.users.username}) = LOWER(${updates.username}) AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        if (existing.length > 0) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      }
+
+      // Validate email uniqueness if changing
+      let sendVerification = false;
+      if (updates.email) {
+        const existingEmail = await db
+          .select()
+          .from(schema.users)
+          .where(sql`${schema.users.email} = ${updates.email} AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        if (existingEmail.length > 0) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        sendVerification = true;
+      }
+
+      const [updated] = await db
+        .update(schema.users)
+        .set(updates as any)
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      // If email changed, (re)send verification email
+      if (sendVerification && updated?.email) {
+        await createAndSendVerificationToken(userId, updated.email, updated.username || req.user.username);
+      }
+
+      // Return updated user
+      return res.json(updated);
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
+  // Account settings: update password for current user
+  app.patch("/api/account/password", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const bodySchema = z.object({
+        currentPassword: z.string().min(6).optional(),
+        newPassword: z.string().min(6),
+      });
+      const { currentPassword, newPassword } = bodySchema.parse(req.body);
+
+      // Fetch current user to verify password
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // If user has a password, require currentPassword match
+      if (user.password) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required" });
+        }
+        const ok = await bcrypt.compare(currentPassword, user.password);
+        if (!ok) return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const hashed = await bcrypt.hash(newPassword, 10);
+      const [updated] = await db
+        .update(schema.users)
+        .set({ password: hashed })
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
   // Get all users with email verification data
   app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {

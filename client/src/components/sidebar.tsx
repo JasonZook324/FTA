@@ -64,6 +64,7 @@ export const navigation = [
   { name: "Streaming", href: "/streaming", icon: PlayCircle },
   { name: "OPRK Sandbox", href: "/oprk-sandbox", icon: TestTube, adminOnly: true },
   { name: "Manage Members", href: "/manage-members", icon: UserCog },
+  { name: "Account Settings", href: "/account-settings", icon: UserCog },
   { name: "Help", href: "/help", icon: LifeBuoy },
 ];
 
