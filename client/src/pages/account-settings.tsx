@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { formatApiError } from "@/lib/error";
 import * as React from "react";
+import { resolveAvatarUrl } from "@/lib/avatar";
 import * as Avatar from "@radix-ui/react-avatar";
 
 export default function AccountSettings() {
@@ -28,19 +29,25 @@ export default function AccountSettings() {
   // Derive avatar directly from auth user to avoid double updates
   const avatarUrl = (user as any)?.avatarUrl ?? null;
   const avatarVersion = (user as any)?.avatarUpdatedAt ?? 0;
-  const [displayedSrc, setDisplayedSrc] = React.useState<string | undefined>(
-    avatarUrl ? `${avatarUrl}?v=${avatarVersion}` : undefined
-  );
+  const avatarProvider = (user as any)?.avatarProvider ?? null;
+  const [displayedSrc, setDisplayedSrc] = React.useState<string | undefined>(undefined);
   React.useEffect(() => {
-    const next = avatarUrl ? `${avatarUrl}?v=${avatarVersion}` : undefined;
-    if (!next) { setDisplayedSrc(undefined); return; }
-    const img = new Image();
-    img.onload = () => setDisplayedSrc(next);
-    img.src = next;
-  }, [avatarUrl, avatarVersion]);
+    let cancelled = false;
+    async function resolveAvatar() {
+      if (!avatarUrl) { setDisplayedSrc(undefined); return; }
+      const next = await resolveAvatarUrl({ avatarUrl, avatarProvider, avatarVersion });
+      if (!next) { setDisplayedSrc(undefined); return; }
+      const img = new Image();
+      img.onload = () => { if (!cancelled) setDisplayedSrc(next); };
+      img.src = next;
+    }
+    resolveAvatar();
+    return () => { cancelled = true; };
+  }, [avatarUrl, avatarVersion, avatarProvider]);
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const uploadsEnabled = (import.meta.env.VITE_ENABLE_AVATAR_UPLOAD === 'true');
+  // Re-enable uploads by default: only disable when explicitly set to 'false'
+  const uploadsEnabled = (import.meta.env.VITE_ENABLE_AVATAR_UPLOAD !== 'false');
   const presets = React.useMemo(() => [
     { id: "robot", label: "Robot" },
     { id: "helmet", label: "Helmet" },
@@ -249,8 +256,12 @@ export default function AccountSettings() {
                     try {
                       const presignRes = await apiRequest("POST", "/api/account/avatar/presign", { contentType: ct, ext });
                       const { putUrl, publicUrl } = await presignRes.json();
+                      // Use PUT for S3-presigned uploads (and most providers)
                       const put = await fetch(putUrl, { method: "PUT", headers: { "Content-Type": ct }, body: file });
-                      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+                      if (!put.ok) {
+                        const text = await put.text().catch(() => "");
+                        throw new Error(`Upload failed (${put.status}) ${text}`);
+                      }
                       const finalizeRes = await apiRequest("PATCH", "/api/account/avatar", { publicUrl });
                       const updated = await finalizeRes.json();
                       queryClient.setQueryData(["/api/user"], updated);

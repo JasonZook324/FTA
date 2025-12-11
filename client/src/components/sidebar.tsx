@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { resolveAvatarUrl } from "@/lib/avatar";
 import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube, LifeBuoy, Settings, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -186,14 +187,20 @@ export default function Sidebar() {
                   {(() => {
                     const url = (user as any)?.avatarUrl as string | undefined;
                     const version = (user as any)?.avatarUpdatedAt ?? 0;
-                    const srcWithVersion = url ? `${url}?v=${version}` : undefined;
-                    const [displayedSrc, setDisplayedSrc] = useState<string | undefined>(srcWithVersion);
+                    const provider = (user as any)?.avatarProvider ?? null;
+                    const [displayedSrc, setDisplayedSrc] = useState<string | undefined>(undefined);
                     useEffect(() => {
-                      if (!srcWithVersion) { setDisplayedSrc(undefined); return; }
-                      const img = new Image();
-                      img.onload = () => setDisplayedSrc(srcWithVersion);
-                      img.src = srcWithVersion;
-                    }, [srcWithVersion]);
+                      let cancelled = false;
+                      async function load() {
+                        const next = await resolveAvatarUrl({ avatarUrl: url, avatarProvider: provider, avatarVersion: version });
+                        if (!next) { setDisplayedSrc(undefined); return; }
+                        const img = new Image();
+                        img.onload = () => { if (!cancelled) setDisplayedSrc(next); };
+                        img.src = next;
+                      }
+                      load();
+                      return () => { cancelled = true; };
+                    }, [url, version, provider]);
                     return (
                       <Avatar className="h-7 w-7">
                         <AvatarImage src={displayedSrc} alt={user.username || 'User'} />
