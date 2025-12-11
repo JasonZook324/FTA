@@ -191,18 +191,7 @@ function App() {
                 </div>
               )} />
 
-              {/* Legacy alias for old URL */}
-              <ProtectedRoute path="/prompt-builder" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <AiAnswers />
-                    </main>
-                  </div>
-                </div>
-              )} />
+              
               
               <AdminRoute path="/api-playground" component={() => (
                 <div className="flex min-h-screen">

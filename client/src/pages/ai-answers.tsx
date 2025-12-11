@@ -255,13 +255,13 @@ export default function AiAnswers() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
-                    Your Custom Prompt
+                    Your Question
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Textarea
                     data-testid="input-prompt"
-                    placeholder="Enter your custom prompt or question here. The fantasy data you select below will be automatically included..."
+                    placeholder="Enter your question here. The fantasy data you select below will be automatically included..."
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     className="min-h-[120px]"
@@ -687,7 +687,7 @@ export default function AiAnswers() {
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
                   <div className="flex items-start gap-3">
                     <Badge variant="outline" className="mt-0.5">1</Badge>
-                    <p>Write your custom prompt or question in the text area</p>
+                    <p>Write your question in the text area</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <Badge variant="outline" className="mt-0.5">2</Badge>
