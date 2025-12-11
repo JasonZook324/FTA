@@ -16,7 +16,6 @@ import { formatGameTime } from "@/lib/timezone-utils";
 export default function Players() {
   const { user } = useAuth();
   const SPORT = "ffl" as const; // Always Football (NFL)
-  const [selectedSeason, setSelectedSeason] = useState<string>("2025");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"all" | "waiver">("all");
@@ -30,13 +29,16 @@ export default function Players() {
 
   // Get current week from the first league
   const currentWeek = leagues?.[0]?.currentWeek || 1;
+  // Derive current league and season from loaded leagues
+  const currentLeague = (Array.isArray(leagues) && (leagues.find((l: any) => l.id === selectedLeagueId) || leagues[0])) || undefined;
+  const season = currentLeague?.season ? String(currentLeague.season) : undefined;
   
   // Query NFL matchups for current week
-  const { data: matchupsData } = useNFLMatchups(parseInt(selectedSeason), currentWeek);
+  const { data: matchupsData } = useNFLMatchups(parseInt(season || `${new Date().getFullYear()}`), currentWeek);
   const nflMatchups = matchupsData?.matchups || [];
   
   // Query defensive rankings for current week
-  const { data: rankingsData } = useDefensiveRankings(parseInt(selectedSeason), currentWeek);
+  const { data: rankingsData } = useDefensiveRankings(parseInt(season || `${new Date().getFullYear()}`), currentWeek);
   const defensiveRankings = rankingsData?.rankings || {};
 
   // Auto-select the first league when leagues load
@@ -48,17 +50,17 @@ export default function Players() {
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
-    queryKey: ["/api/players", SPORT, selectedSeason, selectedLeagueId],
+    queryKey: ["/api/players", SPORT, season, selectedLeagueId],
     queryFn: async () => {
       const leagueParam = selectedLeagueId ? `&leagueId=${selectedLeagueId}` : '';
-      const response = await fetch(`/api/players/${SPORT}/${selectedSeason}?${leagueParam}`);
+      const response = await fetch(`/api/players/${SPORT}/${season}?${leagueParam}`);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch players: ${response.status} ${errorText}`);
       }
       return response.json();
     },
-    enabled: !!user && !!selectedSeason && viewMode === "all",
+    enabled: !!user && !!season && viewMode === "all",
   });
 
   // Query waiver wire data
@@ -413,17 +415,7 @@ export default function Players() {
               </>
             )}
             <div className="text-sm text-muted-foreground">Football (NFL)</div>
-            
-            <Select value={selectedSeason} onValueChange={setSelectedSeason}>
-              <SelectTrigger className="w-24" data-testid="select-season">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
-              </SelectContent>
-            </Select>
+            {season && <div className="text-sm text-muted-foreground">Season: {season}</div>}
             
             {viewMode === "waiver" && selectedLeagueId && (
               <Button
@@ -464,7 +456,7 @@ export default function Players() {
                   });
                 } else {
                   queryClient.invalidateQueries({ 
-                    queryKey: ["/api/players", SPORT, selectedSeason] 
+                    queryKey: ["/api/players", SPORT, season ?? "unknown"] 
                   });
                 }
               }}
