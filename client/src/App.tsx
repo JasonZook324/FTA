@@ -21,6 +21,7 @@ import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import ManageMembers from "@/pages/manage-members";
 import OPRKSandbox from "@/pages/oprk-sandbox";
+import AccountSettings from "@/pages/account-settings";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
@@ -190,6 +191,18 @@ function App() {
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
                       <Help />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              <ProtectedRoute path="/account-settings" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <AccountSettings />
                     </main>
                   </div>
                 </div>

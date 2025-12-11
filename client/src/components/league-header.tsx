@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trophy, LogOut, Settings, AlertTriangle, RefreshCw, Users } from "lucide-react";
 import { useTeam } from "@/contexts/TeamContext";
+import { formatApiError } from "@/lib/error";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function LeagueHeader() {
@@ -65,7 +66,7 @@ export default function LeagueHeader() {
     onError: (error: Error) => {
       toast({
         title: "Refresh Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "Unable to refresh league data. Please try again." }),
         variant: "destructive",
       });
     },
@@ -91,7 +92,7 @@ export default function LeagueHeader() {
     onError: (error: Error) => {
       toast({
         title: "Leave Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "Unable to leave the league. Please try again." }),
         variant: "destructive",
       });
     },

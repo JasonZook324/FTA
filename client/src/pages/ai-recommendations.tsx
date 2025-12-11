@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTeam } from "@/contexts/TeamContext";
+import { formatApiError } from "@/lib/error";
 
 interface FantasyRecommendation {
   type: 'waiver_wire' | 'trade' | 'lineup' | 'general';
@@ -62,7 +63,7 @@ export default function AIRecommendations() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "We couldn't generate the analysis prompt. Please try again." }),
         variant: "destructive",
       });
     }

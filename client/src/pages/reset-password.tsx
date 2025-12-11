@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Activity, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { formatApiError } from "@/lib/error";
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -99,7 +100,7 @@ export default function ResetPasswordPage() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "We couldn't reset your password. Please try again." }),
         variant: "destructive",
       });
     },
