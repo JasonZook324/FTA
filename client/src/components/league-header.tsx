@@ -166,7 +166,16 @@ export default function LeagueHeader() {
   // League loaded - show league info with team selector and disconnect option
   return (
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-b border-green-200 dark:border-green-800 px-4 sm:px-6 py-3">
-      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:justify-between">
+      <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:justify-between">
+        {/* Centered API status overlay on wide screens */}
+        <div className="pointer-events-none absolute inset-0 hidden lg:flex items-center justify-center">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-chart-2 rounded-full" />
+            <span className="text-green-700 dark:text-green-300" data-testid="connection-status">
+              API Connected — Ready for ESPN API calls
+            </span>
+          </div>
+        </div>
         <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
           <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
           <div className="min-w-0 flex-1">

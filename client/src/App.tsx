@@ -12,7 +12,7 @@ import Players from "@/pages/players";
 import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
 import TradeAnalyzer from "@/pages/trade-analyzer";
-import PromptBuilder from "@/pages/prompt-builder";
+import AiAnswers from "@/pages/ai-answers";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
@@ -23,6 +23,7 @@ import OPRKSandbox from "@/pages/oprk-sandbox";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
+import Footer from "@/components/footer";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -179,17 +180,19 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/prompt-builder" component={() => (
+              <ProtectedRoute path="/ai-answers" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
-                      <PromptBuilder />
+                      <AiAnswers />
                     </main>
                   </div>
                 </div>
               )} />
+
+              
               
               <AdminRoute path="/api-playground" component={() => (
                 <div className="flex min-h-screen">
@@ -227,6 +230,7 @@ function App() {
               
               <Route component={NotFound} />
             </Switch>
+            <Footer />
             <DebugPanel />
           </TooltipProvider>
         </TeamProvider>

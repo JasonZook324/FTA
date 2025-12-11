@@ -50,7 +50,7 @@ const useThemeSafe = () => {
   return { theme, toggleTheme };
 };
 
-const navigation = [
+export const navigation = [
   { name: "League Setup", href: "/authentication", icon: Key },
   { name: "Standings", href: "/standings", icon: BarChart3 },
   { name: "Team Rosters", href: "/rosters", icon: Users },
@@ -58,13 +58,40 @@ const navigation = [
   { name: "Player Details", href: "/players", icon: UsersRound },
   { name: "AI Recommendations", href: "/ai-recommendations", icon: Brain },
   { name: "Trade Analyzer", href: "/trade-analyzer", icon: TrendingUp },
-  { name: "Prompt Builder", href: "/prompt-builder", icon: FileText },
+  { name: "AI Answers", href: "/ai-answers", icon: FileText },
   { name: "API Playground", href: "/api-playground", icon: FlaskConical },
   { name: "Jobs", href: "/jobs", icon: Volleyball },
   { name: "Streaming", href: "/streaming", icon: PlayCircle },
   { name: "OPRK Sandbox", href: "/oprk-sandbox", icon: TestTube, adminOnly: true },
   { name: "Manage Members", href: "/manage-members", icon: UserCog },
 ];
+
+export function filterNavigationForUser(user?: { role?: number } | null) {
+  return navigation.filter((item) => {
+    const adminOnlyPages = [
+      "API Playground",
+      "Jobs",
+      "Matchups",
+      "AI Recommendations",
+      "Trade Analyzer",
+      "Streaming",
+    ];
+
+    if (adminOnlyPages.includes(item.name)) {
+      return user?.role === 9 || user?.role === 2;
+    }
+
+    if ((item as any).adminOnly) {
+      return user?.role === 9 || user?.role === 2;
+    }
+
+    if (item.name === "Manage Members") {
+      return user?.role === 9;
+    }
+
+    return true;
+  });
+}
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -110,18 +137,65 @@ export default function Sidebar() {
         "fixed lg:static inset-y-0 left-0 z-40 w-94 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )} data-testid="sidebar">
-      {/* Logo and Header */}
+      {/* Logo, User, and Quick Actions in Header */}
       <div className="p-6 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <img 
-            src={theme === 'light' ? '/logo_light.png' : '/logo_dark.png'}
-            alt="Fantasy Toolbox AI Logo" 
-            className="w-16 h-16 rounded-lg object-cover transition-opacity duration-150"
-            key={theme}
-          />
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Fantasy Toolbox AI</h1>
-            <p className="text-xs text-muted-foreground">Your Playbook Just Got Smarter</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <img 
+              src={theme === 'light' ? '/logo_light.png' : '/logo_dark.png'}
+              alt="Fantasy Toolbox AI Logo" 
+              className="w-16 h-16 rounded-lg object-cover transition-opacity duration-150"
+              key={theme}
+            />
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Fantasy Toolbox AI</h1>
+              <p className="text-xs text-muted-foreground">Your Playbook Just Got Smarter</p>
+              {user && (
+                <div className="mt-2 flex items-center flex-wrap gap-2">
+                  <span className="text-xs text-muted-foreground">Logged in as</span>
+                  <span className="text-sm font-medium text-foreground max-w-[10rem] truncate">{user.username}</span>
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap",
+                    user.role === 9 ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" :
+                    user.role === 2 ? "bg-blue-500/20 text-blue-700 dark:text-blue-300" :
+                    user.role === 1 ? "bg-green-500/20 text-green-700 dark:text-green-300" :
+                    "bg-gray-500/20 text-gray-700 dark:text-gray-300"
+                  )}>
+                    {user.role === 9 ? "Admin" :
+                     user.role === 2 ? "Dev" :
+                     user.role === 1 ? "Paid" :
+                     "User"}
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    disabled={logoutMutation.isPending}
+                    className="ml-1 inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    title={logoutMutation.isPending ? 'Logging out…' : 'Logout'}
+                    aria-label="Logout"
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Quick actions: theme only */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card p-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              aria-label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              data-testid="theme-toggle"
+            >
+              {theme === 'light' ? (
+                <Moon className="w-5 h-5" />
+              ) : (
+                <Sun className="w-5 h-5" />
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -129,27 +203,7 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
-          {navigation
-            .filter((item) => {
-              // Hide admin-only pages for non-admin/developer users
-              const adminOnlyPages = ['API Playground', 'Jobs', 'Matchups', 'AI Recommendations', 'Trade Analyzer', 'Streaming'];
-              if (adminOnlyPages.includes(item.name)) {
-                // Allow access for Admin (role 9) or Developer (role 2)
-                return user?.role === 9 || user?.role === 2;
-              }
-              
-              // Hide OPRK Sandbox for non-admin/developer users
-              if (item.adminOnly) {
-                return user?.role === 9 || user?.role === 2;
-              }
-              
-              // Hide Manage Members for non-admin users (admin only - role 9)
-              if (item.name === 'Manage Members') {
-                return user?.role === 9;
-              }
-              
-              return true;
-            })
+          {filterNavigationForUser(user)
             .map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
@@ -176,72 +230,7 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* API Status and Actions */}
-      <div className="p-4 border-t border-border">
-        {/* User Info */}
-        {user && (
-          <div className="mb-4 p-3 bg-accent rounded-md">
-            <p className="text-xs text-muted-foreground mb-1">Logged in as</p>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-foreground truncate">{user.username}</p>
-              {/* Role Badge */}
-              <span className={cn(
-                "text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ml-2",
-                user.role === 9 ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" :
-                user.role === 2 ? "bg-blue-500/20 text-blue-700 dark:text-blue-300" :
-                user.role === 1 ? "bg-green-500/20 text-green-700 dark:text-green-300" :
-                "bg-gray-500/20 text-gray-700 dark:text-gray-300"
-              )}>
-                {user.role === 9 ? "Admin" :
-                 user.role === 2 ? "Dev" :
-                 user.role === 1 ? "Paid" :
-                 "User"}
-              </span>
-            </div>
-          </div>
-        )}
-        
-        {/* Theme Toggle */}
-        <div className="mb-2">
-          <button
-            onClick={toggleTheme}
-            className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-foreground hover:bg-accent hover:text-accent-foreground"
-            data-testid="theme-toggle"
-          >
-            {theme === 'light' ? (
-              <Moon className="w-5 h-5" />
-            ) : (
-              <Sun className="w-5 h-5" />
-            )}
-            <span className="text-sm">
-              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            </span>
-          </button>
-        </div>
-        
-        {/* Logout Button */}
-        <div className="mb-4">
-          <button
-            onClick={handleLogout}
-            disabled={logoutMutation.isPending}
-            className="flex items-center space-x-3 px-3 py-3 rounded-md transition-colors touch-target w-full text-destructive hover:bg-destructive/10 disabled:opacity-50"
-            data-testid="button-logout"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="text-sm">
-              {logoutMutation.isPending ? 'Logging out...' : 'Logout'}
-            </span>
-          </button>
-        </div>
-        
-        <div className="flex items-center space-x-2 text-sm">
-          <div className="w-2 h-2 bg-chart-2 rounded-full"></div>
-          <span className="text-muted-foreground">API Connected</span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1" data-testid="connection-status">
-          Ready for ESPN API calls
-        </p>
-      </div>
+      {/* Footer spacer removed; no status here */}
       </div>
     </>
   );
