@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, UsersRound, Search, Download, Plus, Eye } from "lucide-react";
+import { UsersRound, Search, Download, Plus, Eye } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { queryClient } from "@/lib/queryClient";
+// Removed local refresh; global header handles data refresh
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
@@ -447,24 +447,7 @@ export default function Players() {
               </Button>
             )}
             
-            <Button
-              variant="secondary"
-              onClick={() => {
-                if (viewMode === "waiver" && selectedLeagueId) {
-                  queryClient.invalidateQueries({ 
-                    queryKey: ["/api/leagues", selectedLeagueId, "waiver-wire"] 
-                  });
-                } else {
-                  queryClient.invalidateQueries({ 
-                    queryKey: ["/api/players", SPORT, season ?? "unknown"] 
-                  });
-                }
-              }}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
+            {/* Local refresh removed; use header refresh instead */}
           </div>
         </div>
       </header>

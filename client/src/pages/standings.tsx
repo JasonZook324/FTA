@@ -1,8 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, BarChart3 } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { BarChart3 } from "lucide-react";
 import StandingsTable from "@/components/standings-table";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -33,18 +31,7 @@ export default function Standings() {
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">League Standings</h2>
             <p className="text-sm text-muted-foreground">View team rankings and records</p>
           </div>
-          <div className="flex items-center space-x-3 w-full sm:w-auto">
-            <Button
-              variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", currentLeague?.id, "standings"] })}
-              disabled={!currentLeague}
-              className="w-full sm:w-auto min-h-[44px]"
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          {/* Local refresh removed; use header refresh instead */}
         </div>
       </header>
 
