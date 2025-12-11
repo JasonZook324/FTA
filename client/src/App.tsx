@@ -7,11 +7,8 @@ import NotFound from "@/pages/not-found";
 import Authentication from "@/pages/authentication";
 import Standings from "@/pages/standings";
 import Rosters from "@/pages/rosters";
-import Matchups from "@/pages/matchups";
 import Players from "@/pages/players";
-import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
-import TradeAnalyzer from "@/pages/trade-analyzer";
 import AiAnswers from "@/pages/ai-answers";
 import Help from "@/pages/help";
 import Jobs from "@/pages/jobs";
@@ -100,17 +97,7 @@ function App() {
                 </div>
               )} />
               
-              <AdminRoute path="/matchups" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <Matchups />
-                    </main>
-                  </div>
-                </div>
-              )} />
+              
               
               <ProtectedRoute path="/players" component={() => (
                 <div className="flex min-h-screen">
@@ -148,29 +135,7 @@ function App() {
                     </div>
                   )} />
               
-              <AdminRoute path="/ai-recommendations" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <AIRecommendations />
-                    </main>
-                  </div>
-                </div>
-              )} />
               
-              <AdminRoute path="/trade-analyzer" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <TradeAnalyzer />
-                    </main>
-                  </div>
-                </div>
-              )} />
               
               <ProtectedRoute path="/ai-answers" component={() => (
                 <div className="flex min-h-screen">
