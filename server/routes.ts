@@ -761,6 +761,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Account settings: avatar presign URL (S3/R2) for client direct upload
+  app.post("/api/account/avatar/presign", requireAuth, async (req: any, res) => {
+    try {
+      const bodySchema = z.object({
+        contentType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+        ext: z.enum(["png", "jpg", "jpeg", "webp"]),
+      });
+      const { contentType, ext } = bodySchema.parse(req.body);
+
+      const bucket = process.env.AVATAR_BUCKET;
+      const baseUrl = process.env.AVATAR_BASE_URL;
+      if (!bucket || !baseUrl) {
+        return res.status(500).json({ message: "Avatar storage is not configured" });
+      }
+
+      const userId = req.user.id as string;
+      const key = `avatars/${userId}/${Date.now()}.${ext}`;
+
+      // Lazily import AWS SDK v3 to keep startup fast
+      const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+      const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+
+      const s3 = new S3Client({
+        region: process.env.AWS_REGION || "auto",
+        endpoint: process.env.S3_ENDPOINT || undefined, // for R2, set endpoint via env
+        credentials: (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)
+          ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID!, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! }
+          : undefined,
+      });
+
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: contentType,
+      });
+      const putUrl = await getSignedUrl(s3, command, { expiresIn: 60 * 5 }); // 5 minutes
+
+      return res.json({ putUrl, key, publicUrl: `${baseUrl}/${key}` });
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
+  // Account settings: finalize avatar (preset selection or uploaded URL)
+  app.patch("/api/account/avatar", requireAuth, async (req: any, res) => {
+    try {
+      const bodySchema = z.object({
+        // Choose one: presetId (from curated list) OR publicUrl (from presign response)
+        presetId: z.string().min(1).optional(),
+        publicUrl: z.string().url().optional(),
+      }).refine((v) => !!(v.presetId || v.publicUrl), {
+        message: "Provide either presetId or publicUrl",
+        path: ["presetId"],
+      });
+      const { presetId, publicUrl } = bodySchema.parse(req.body);
+
+      const userId = req.user.id as string;
+
+      // If preset selected, map to known safe URL base
+      let finalUrl = publicUrl || null;
+      let avatarProvider: string | null = null;
+      let avatarKey: string | null = null;
+
+      if (presetId) {
+        const base = process.env.AVATAR_PRESET_BASE || "/avatars"; // served from client/public or CDN
+        // Presets provided as SVG assets in client/public/avatars
+        finalUrl = `${base}/${presetId}.svg`;
+        avatarProvider = "preset";
+        avatarKey = null;
+      } else if (publicUrl) {
+        // Restrict to our configured base URL to avoid arbitrary external URLs
+        const allowedBase = process.env.AVATAR_BASE_URL;
+        if (!allowedBase || !publicUrl.startsWith(allowedBase)) {
+          return res.status(400).json({ message: "Avatar URL must be from configured storage" });
+        }
+        avatarProvider = process.env.S3_ENDPOINT ? "r2" : "s3";
+        // Derive key from base + url if possible
+        const prefix = `${allowedBase}/`;
+        avatarKey = publicUrl.startsWith(prefix) ? publicUrl.slice(prefix.length) : null;
+      }
+
+      const [updated] = await db
+        .update(schema.users)
+        .set({
+          avatarUrl: finalUrl as any,
+          avatarProvider: avatarProvider as any,
+          avatarKey: avatarKey as any,
+          avatarUpdatedAt: sql`now()`,
+        })
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      // Ensure session reflects latest user data so /api/user returns updated avatar
+      if (updated) {
+        // Merge to preserve any fields passport may rely on
+        req.user = { ...(req.user || {}), ...updated };
+      }
+      return res.json(updated);
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
   // Get all users with email verification data
   app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {

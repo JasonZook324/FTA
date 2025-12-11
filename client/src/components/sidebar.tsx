@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube, LifeBuoy, Settings, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -182,9 +183,26 @@ export default function Sidebar() {
           <div className="mt-3">
             <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-                  {(user.username?.[0] || 'U').toUpperCase()}
-                </div>
+                  {(() => {
+                    const url = (user as any)?.avatarUrl as string | undefined;
+                    const version = (user as any)?.avatarUpdatedAt ?? 0;
+                    const srcWithVersion = url ? `${url}?v=${version}` : undefined;
+                    const [displayedSrc, setDisplayedSrc] = useState<string | undefined>(srcWithVersion);
+                    useEffect(() => {
+                      if (!srcWithVersion) { setDisplayedSrc(undefined); return; }
+                      const img = new Image();
+                      img.onload = () => setDisplayedSrc(srcWithVersion);
+                      img.src = srcWithVersion;
+                    }, [srcWithVersion]);
+                    return (
+                      <Avatar className="h-7 w-7">
+                        <AvatarImage src={displayedSrc} alt={user.username || 'User'} />
+                        <AvatarFallback delayMs={250} className="bg-primary/10 text-primary font-semibold">
+                          {(user.username?.[0] || 'U').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    );
+                  })()}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-foreground truncate max-w-[9rem]">{user.username}</span>

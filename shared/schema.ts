@@ -14,6 +14,11 @@ export const users = pgTable("users", {
   role: integer("role").notNull().default(0), // 0=Standard User, 1=Paid User, 2=Developer, 9=Administrator
   selectedLeagueId: varchar("selected_league_id"), // Store user's preferred league
   selectedTeamId: integer("selected_team_id"), // Store user's selected team ID
+  // Avatar metadata: store URL and provider info; do NOT store binary in DB
+  avatarUrl: text("avatar_url"), // Public HTTPS URL for the avatar image
+  avatarProvider: text("avatar_provider"), // e.g., s3, r2, supabase, local
+  avatarKey: text("avatar_key"), // Storage object key/path (optional)
+  avatarUpdatedAt: timestamp("avatar_updated_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Basic unique constraint (case-sensitive). We also add a case-insensitive unique index via migration.
