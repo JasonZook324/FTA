@@ -1,16 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
 import TeamRoster from "@/components/team-roster";
 import { useAuth } from "@/hooks/use-auth";
+
+interface League {
+  id: string;
+  name: string;
+  season: number;
+}
 
 export default function Rosters() {
   const { user } = useAuth();
 
   // Query user leagues
-  const { data: leagues } = useQuery({
+  const { data: leagues } = useQuery<League[]>({
     queryKey: ["/api/leagues"],
     enabled: !!user,
   });
@@ -35,17 +38,7 @@ export default function Rosters() {
               {leagues?.[0] ? `${leagues[0].name} (${leagues[0].season}) - View team lineups and player details` : "View team lineups and player details"}
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/leagues", selectedLeagueId, "rosters"] })}
-              disabled={!selectedLeagueId}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          {/* Local refresh removed; use header refresh instead */}
         </div>
       </header>
 

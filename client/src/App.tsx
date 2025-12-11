@@ -7,12 +7,10 @@ import NotFound from "@/pages/not-found";
 import Authentication from "@/pages/authentication";
 import Standings from "@/pages/standings";
 import Rosters from "@/pages/rosters";
-import Matchups from "@/pages/matchups";
 import Players from "@/pages/players";
-import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
-import TradeAnalyzer from "@/pages/trade-analyzer";
-import PromptBuilder from "@/pages/prompt-builder";
+import AiAnswers from "@/pages/ai-answers";
+import Help from "@/pages/help";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
@@ -20,14 +18,16 @@ import VerifyEmailPage from "@/pages/verify-email";
 import ResetPasswordPage from "@/pages/reset-password";
 import ManageMembers from "@/pages/manage-members";
 import OPRKSandbox from "@/pages/oprk-sandbox";
+import AccountSettings from "@/pages/account-settings";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
+import Footer from "@/components/footer";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { AdminRoute } from "@/lib/admin-route";
-import Leagues from "@/pages/leagues";
+// Leagues page removed
 
 function App() {
   return (
@@ -71,17 +71,7 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/leagues" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <Leagues />
-                    </main>
-                  </div>
-                </div>
-              )} />
+              {/* /leagues route removed */}
               
               <ProtectedRoute path="/standings" component={() => (
                 <div className="flex min-h-screen">
@@ -107,17 +97,7 @@ function App() {
                 </div>
               )} />
               
-              <AdminRoute path="/matchups" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <Matchups />
-                    </main>
-                  </div>
-                </div>
-              )} />
+              
               
               <ProtectedRoute path="/players" component={() => (
                 <div className="flex min-h-screen">
@@ -155,41 +135,45 @@ function App() {
                     </div>
                   )} />
               
-              <AdminRoute path="/ai-recommendations" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <AIRecommendations />
-                    </main>
-                  </div>
-                </div>
-              )} />
               
-              <AdminRoute path="/trade-analyzer" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <TradeAnalyzer />
-                    </main>
-                  </div>
-                </div>
-              )} />
               
-              <ProtectedRoute path="/prompt-builder" component={() => (
+              <ProtectedRoute path="/ai-answers" component={() => (
                 <div className="flex min-h-screen">
                   <Sidebar />
                   <div className="flex-1 flex flex-col lg:ml-0">
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
-                      <PromptBuilder />
+                      <AiAnswers />
                     </main>
                   </div>
                 </div>
               )} />
+
+              <ProtectedRoute path="/help" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <Help />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              <ProtectedRoute path="/account-settings" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <AccountSettings />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              
               
               <AdminRoute path="/api-playground" component={() => (
                 <div className="flex min-h-screen">
@@ -227,6 +211,7 @@ function App() {
               
               <Route component={NotFound} />
             </Switch>
+            <Footer />
             <DebugPanel />
           </TooltipProvider>
         </TeamProvider>

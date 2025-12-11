@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { formatApiError } from "@/lib/error";
 
 const leagueFormSchema = z.object({
   espnLeagueId: z.string().min(1, "League ID is required"),
@@ -57,7 +58,7 @@ export default function LeagueSelector({ disabled }: LeagueSelectorProps) {
       console.error('League load error:', error);
       toast({
         title: "Load Failed", 
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "Unable to load league data. Please check your inputs and try again." }),
         variant: "destructive",
       });
     },

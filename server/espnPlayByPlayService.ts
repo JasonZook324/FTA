@@ -407,7 +407,7 @@ export async function refreshRedZoneStats(season: number, week: number): Promise
     // Update database with red zone stats
     let updatedCount = 0;
     
-    for (const [teamId, stats] of weekStats) {
+    for (const [teamId, stats] of Array.from(weekStats.entries())) {
       try {
         // Check if record exists
         const existing = await db.query.nflTeamStats.findFirst({

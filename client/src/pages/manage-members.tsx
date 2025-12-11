@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { RefreshCw, Pencil, Trash2, CheckCircle, XCircle, UserCog } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { formatApiError } from "@/lib/error";
 
 type UserWithVerification = {
   id: string;
@@ -63,7 +64,7 @@ export default function ManageMembers() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update user",
+        description: formatApiError(error, { defaultMessage: "Failed to update user" }),
         variant: "destructive",
       });
     },
@@ -85,7 +86,7 @@ export default function ManageMembers() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete user",
+        description: formatApiError(error, { defaultMessage: "Failed to delete user" }),
         variant: "destructive",
       });
     },

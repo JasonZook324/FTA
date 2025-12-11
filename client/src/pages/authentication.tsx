@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeam } from "@/contexts/TeamContext";
+import { formatApiError } from "@/lib/error";
 import { useAuth } from "@/hooks/use-auth";
 
 // Schema for connecting to a new shareable league
@@ -89,7 +90,7 @@ export default function Authentication() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "We couldn't join the league. Please try again." }),
         variant: "destructive",
       });
     },
@@ -115,7 +116,7 @@ export default function Authentication() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: formatApiError(error, { defaultMessage: "We couldn't connect the league. Please check your cookies and details." }),
         variant: "destructive",
       });
     },

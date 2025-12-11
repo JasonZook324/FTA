@@ -669,6 +669,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Account settings: update profile (username/email) for current user
+  app.patch("/api/account/profile", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const updateSchema = z.object({
+        username: z.string().min(3).max(50).optional(),
+        email: z.string().email().transform(v => v.trim().toLowerCase()).optional(),
+      });
+      const updates = updateSchema.parse(req.body);
+
+      // Validate username uniqueness if changing
+      if (updates.username) {
+        const existing = await db
+          .select()
+          .from(schema.users)
+          .where(sql`LOWER(${schema.users.username}) = LOWER(${updates.username}) AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        if (existing.length > 0) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      }
+
+      // Validate email uniqueness if changing
+      let sendVerification = false;
+      if (updates.email) {
+        const existingEmail = await db
+          .select()
+          .from(schema.users)
+          .where(sql`${schema.users.email} = ${updates.email} AND ${schema.users.id} != ${userId}`)
+          .limit(1);
+        if (existingEmail.length > 0) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        sendVerification = true;
+      }
+
+      const [updated] = await db
+        .update(schema.users)
+        .set(updates as any)
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      // If email changed, (re)send verification email
+      if (sendVerification && updated?.email) {
+        await createAndSendVerificationToken(userId, updated.email, updated.username || req.user.username);
+      }
+
+      // Return updated user
+      return res.json(updated);
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
+  // Account settings: update password for current user
+  app.patch("/api/account/password", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const bodySchema = z.object({
+        currentPassword: z.string().min(6).optional(),
+        newPassword: z.string().min(6),
+      });
+      const { currentPassword, newPassword } = bodySchema.parse(req.body);
+
+      // Fetch current user to verify password
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // If user has a password, require currentPassword match
+      if (user.password) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required" });
+        }
+        const ok = await bcrypt.compare(currentPassword, user.password);
+        if (!ok) return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const hashed = await bcrypt.hash(newPassword, 10);
+      const [updated] = await db
+        .update(schema.users)
+        .set({ password: hashed })
+        .where(sql`${schema.users.id} = ${userId}`)
+        .returning();
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Invalid input";
+      return res.status(400).json({ message });
+    }
+  });
+
   // Get all users with email verification data
   app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {
@@ -1743,504 +1835,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Matchups route
-  app.get("/api/leagues/:leagueId/matchups", requireAuth, requireRole(2, 9), async (req: any, res) => {
-    try {
-      const { week } = req.query;
-      const league = await storage.getLeagueProfile(req.params.leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
+  // (removed) Matchups page API no longer used
 
-      const leagueCredentials = await storage.getLeagueCredentials(league.id);
-      if (!leagueCredentials || !leagueCredentials.isValid) {
-        return res.status(401).json({ message: "Valid ESPN credentials required for this league" });
-      }
-      
-      // Convert LeagueCredentials to EspnCredentials format for API service
-      const credentials = {
-        id: leagueCredentials.id,
-        userId: leagueCredentials.addedByUserId,
-        espnS2: leagueCredentials.espnS2,
-        swid: leagueCredentials.swid,
-        testLeagueId: null,
-        testSeason: null,
-        isValid: leagueCredentials.isValid,
-        createdAt: leagueCredentials.createdAt,
-        lastValidated: leagueCredentials.lastValidated
-      };
-
-      const matchupsData = await espnApiService.getMatchups(
-        credentials,
-        league.sport,
-        league.season,
-        league.espnLeagueId,
-        week && week !== "current" ? parseInt(week as string) : undefined
-      );
-
-      res.json(matchupsData);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // AI Recommendations route
-  app.post("/api/leagues/:leagueId/ai-recommendations", requireAuth, async (req: any, res) => {
-    try {
-      const league = await storage.getLeagueProfile(req.params.leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-
-      // Use league profile credentials
-      const credentials = await getLeagueProfileCredentials(
-        req.user.id,
-        league.espnLeagueId.toString(),
-        league.season
-      );
-
-      // Get comprehensive data for the 4 required AI analysis points
-      const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
-        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster', 'mScoreboard']),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
-      ]);
-      
-      // Try to get settings from multiple sources
-      const settingsFromStandings = standingsData.settings || {};
-      const settingsFromLeague = leagueDetailsData.settings || {};
-      const settingsFromFull = fullLeagueData.settings || {};
-      
-      console.log('Settings from standings:', JSON.stringify(settingsFromStandings, null, 2));
-      console.log('Settings from league details:', JSON.stringify(settingsFromLeague, null, 2));
-      console.log('Settings from full league:', JSON.stringify(settingsFromFull, null, 2));
-      
-      // Merge settings data from all sources
-      const combinedSettings = {
-        ...settingsFromStandings,
-        ...settingsFromLeague, 
-        ...settingsFromFull
-      };
-      console.log('Final combined settings:', JSON.stringify(combinedSettings, null, 2));
-
-      // Get waiver wire players (using existing logic from waiver-wire route)
-      const playersResponse = await espnApiService.getPlayers(credentials, league.sport, league.season, league.espnLeagueId.toString());
-      
-      // Handle different possible API response structures
-      let playersData = [];
-      console.log('Raw playersResponse type:', typeof playersResponse);
-      console.log('Is Array?', Array.isArray(playersResponse));
-      
-      if (Array.isArray(playersResponse)) {
-        playersData = playersResponse;
-        console.log('Using direct array, length:', playersData.length);
-      } else if (playersResponse?.players && Array.isArray(playersResponse.players)) {
-        playersData = playersResponse.players;
-        console.log('Using players property, length:', playersData.length);
-      } else {
-        console.log('Unexpected players API response structure:', typeof playersResponse);
-        console.log('Players response keys:', Object.keys(playersResponse || {}));
-        console.log('Full response:', JSON.stringify(playersResponse, null, 2));
-        playersData = []; // Fallback to empty array
-      }
-      
-      // Double-check playersData is an array before filtering
-      if (!Array.isArray(playersData)) {
-        console.error('ERROR: playersData is not an array!', typeof playersData);
-        playersData = []; // Force it to be an array
-      }
-      
-      console.log('Final playersData type:', typeof playersData, 'isArray:', Array.isArray(playersData), 'length:', playersData.length);
-      
-      // Extract taken player IDs from all rosters
-      const takenPlayerIds = new Set();
-      if (rostersData.teams) {
-        rostersData.teams.forEach((team: any) => {
-          const roster = team.roster || team.rosterForCurrentScoringPeriod || team.rosterForMatchupPeriod;
-          if (roster?.entries) {
-            roster.entries.forEach((entry: any) => {
-              const playerId = entry.playerPoolEntry?.player?.id || entry.player?.id || entry.playerId || entry.id;
-              if (playerId) {
-                takenPlayerIds.add(playerId);
-              }
-            });
-          }
-        });
-      }
-
-      // Filter to get only available waiver wire players (exclude FA players)
-      const waiverWirePlayers = (Array.isArray(playersData) ? playersData : []).filter((playerData: any) => {
-        const player = playerData.player || playerData;
-        // Exclude taken players
-        return player?.id && !takenPlayerIds.has(player.id);
-      }).slice(0, 50); // Top 50 available
-
-      // Find user's team (for now, use the first team as default)
-      // TODO: Add user team identification logic based on team ownership
-      const userTeam = standingsData.teams?.[0];
-      let userRoster = null;
-      
-      if (userTeam && rostersData.teams) {
-        const userTeamData = rostersData.teams.find((t: any) => t.id === userTeam.id);
-        userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
-      }
-
-      // Debug: Log the actual league settings structure to understand ESPN API response
-      console.log('League Details Data Structure:');
-      console.log('- leagueDetailsData.settings keys:', Object.keys(leagueDetailsData.settings || {}));
-      console.log('- settings object:', JSON.stringify(leagueDetailsData.settings, null, 2));
-      
-      // Extract scoring settings from various possible locations in ESPN API
-      let receptionPoints = 0;
-      let scoringType = 'Standard';
-      
-      // Check multiple possible paths for scoring settings
-      // Try all available settings sources
-      const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
-      
-      for (let index = 0; index < settingsSources.length; index++) {
-        const settings = settingsSources[index];
-        console.log(`Checking settings source ${index}:`, Object.keys(settings || {}));
-        
-        // Debug: Show what's actually in scoringSettings if it exists
-        if (settings?.scoringSettings) {
-          console.log(`Source ${index} scoringSettings keys:`, Object.keys(settings.scoringSettings));
-          console.log(`Source ${index} scoringSettings.receptionPoints:`, settings.scoringSettings.receptionPoints);
-        }
-        
-        if (settings?.scoringSettings?.receptionPoints !== undefined) {
-          receptionPoints = settings.scoringSettings.receptionPoints;
-          console.log(`Found reception points in scoringSettings from source ${index}:`, receptionPoints);
-          break;
-        } else if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
-          const scoringItems = settings.scoringSettings.scoringItems;
-          console.log(`Checking ${scoringItems.length} scoring items in source ${index}`);
-          console.log('First 5 scoring items:', JSON.stringify(scoringItems.slice(0, 5), null, 2));
-          // Look for reception scoring in scoringItems (ESPN often puts it here)
-          console.log('Searching through scoring items for reception scoring...');
-          const receptionScoringItem = scoringItems.find((item: any) => {
-            const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
-              item.description?.toLowerCase().includes('reception') ||
-              item.abbr === 'REC';
-            if (isReceptionStat) {
-              console.log('Found reception scoring item:', JSON.stringify(item, null, 2));
-            }
-            return isReceptionStat;
-          });
-          if (receptionScoringItem) {
-            receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
-            console.log(`Found reception points in scoringItems from source ${index}:`, receptionPoints);
-            break;
-          } else {
-            // Debug: Show a few scoring items to understand the structure
-            console.log('Sample scoring items (first 3):', JSON.stringify(scoringItems.slice(0, 3), null, 2));
-          }
-        }
-      }
-      
-      // If still no PPR data found, try a different approach - check for specific scoring patterns
-      if (receptionPoints === 0) {
-        console.log('No PPR data found in standard locations, checking alternative patterns...');
-        for (let index = 0; index < settingsSources.length; index++) {
-          const settings = settingsSources[index];
-          if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
-            const scoringItems = settings.scoringSettings.scoringItems;
-            console.log(`Alternative search in source ${index}: checking ${scoringItems.length} items`);
-            // Look specifically for statId 53 (reception stat)
-            const receptionItems = scoringItems.filter((item: any) => item.statId === 53);
-            console.log(`Found ${receptionItems.length} reception items (statId 53):`, receptionItems);
-            
-            // Also check for any reception-related items
-            const allReceptionItems = scoringItems.filter((item: any) => 
-              item.statId === 53 ||
-              String(item.description || '').toLowerCase().includes('rec') ||
-              String(item.abbr || '').toLowerCase().includes('rec')
-            );
-            console.log(`All reception-related items in source ${index}:`, allReceptionItems);
-            
-            // Use the first one that has points > 0
-            const validReceptionItem = allReceptionItems.find((item: any) => 
-              (item.points > 0) || (item.points === 0.5) || (item.points === 1)
-            );
-            
-            if (validReceptionItem) {
-              receptionPoints = validReceptionItem.points || validReceptionItem.value || 0;
-              console.log(`Found reception points via alternative method from source ${index}:`, receptionPoints);
-              console.log(`Full item details:`, JSON.stringify(validReceptionItem, null, 2));
-              break;
-            }
-          }
-        }
-      }
-      
-      console.log('Final extracted reception points:', receptionPoints);
-      
-      const scoringSettings = {
-        scoringType: leagueDetailsData.settings?.scoringType || scoringType,
-        isHalfPPR: receptionPoints === 0.5,
-        isFullPPR: receptionPoints === 1.0,
-        isStandard: receptionPoints === 0,
-        receptionPoints: receptionPoints,
-        scoringItems: leagueDetailsData.settings?.scoringItems || {},
-        rawSettings: leagueDetailsData.settings // Include raw settings for debugging
-      };
-
-      // Get current week context
-      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || 1;
-      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
-      const weekContext = {
-        currentWeek: currentScoringPeriod,
-        seasonType,
-        season: league.season,
-        totalWeeks: leagueDetailsData.settings?.scheduleSettings?.matchupPeriodCount || 17
-      };
-
-      // Build comprehensive analysis data with the 4 required data points
-      const leagueAnalysisData = {
-        // 1. Your Team's Roster
-        userTeam: {
-          name: userTeam ? `${userTeam.location} ${userTeam.nickname}` : 'Unknown Team',
-          roster: userRoster?.entries?.map((entry: any) => {
-            const player = entry.playerPoolEntry?.player || entry.player;
-            return {
-              name: player?.fullName || 'Unknown Player',
-              position: player?.defaultPositionId,
-              lineupSlot: entry.lineupSlotId, // 0-8 starters, 20+ bench, 21 IR
-              isStarter: entry.lineupSlotId < 20,
-              isBench: entry.lineupSlotId === 20,
-              isIR: entry.lineupSlotId === 21,
-              team: player?.proTeamId
-            };
-          }) || []
-        },
-        
-        // 2. Available Waiver Wire Players
-        waiverWire: {
-          topAvailable: waiverWirePlayers.slice(0, 50).map((playerData: any) => {
-            const player = playerData.player || playerData;
-            return {
-              name: player.fullName || 'Unknown Player',
-              position: player.defaultPositionId,
-              team: player.proTeamId,
-              projectedPoints: player.stats?.find((s: any) => s.statSourceId === 1)?.appliedTotal || 0,
-              ownership: player.ownership?.percentOwned || 0
-            };
-          })
-        },
-        
-        // 3. League's Scoring Settings
-        scoringSettings,
-        
-        // 4. Current Week/Context
-        weekContext,
-        
-        // Additional context data
-        league: {
-          name: league.name,
-          sport: league.sport,
-          season: league.season,
-          settings: standingsData.settings
-        },
-        teams: standingsData.teams,
-        standings: standingsData.teams?.map((team: any) => ({
-          teamName: `${team.location} ${team.nickname}`,
-          wins: team.record?.overall?.wins || 0,
-          losses: team.record?.overall?.losses || 0,
-          pointsFor: team.record?.overall?.pointsFor || 0,
-          pointsAgainst: team.record?.overall?.pointsAgainst || 0
-        })) || []
-      };
-
-      const analysis = await geminiService.analyzeLeague(leagueAnalysisData);
-      res.json(analysis);
-    } catch (error: any) {
-      console.error('AI Analysis Error:', error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // AI Question route
-  app.post("/api/leagues/:leagueId/ai-question", requireAuth, async (req: any, res) => {
-    try {
-      const { question } = req.body;
-      if (!question) {
-        return res.status(400).json({ message: "Question is required" });
-      }
-
-      const league = await storage.getLeagueProfile(req.params.leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-
-      // Use league profile credentials
-      const credentials = await getLeagueProfileCredentials(
-        req.user.id,
-        league.espnLeagueId.toString(),
-        league.season
-      );
-
-      // Get comprehensive data for enhanced context (same as recommendations)
-      const [standingsData, rostersData, leagueDetailsData, fullLeagueData] = await Promise.all([
-        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings', 'mTeam', 'mRoster']),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
-      ]);
-      
-      // Get settings from multiple sources (same as recommendations)
-      const settingsFromStandings = standingsData.settings || {};
-      const settingsFromLeague = leagueDetailsData.settings || {};
-      const settingsFromFull = fullLeagueData.settings || {};
-      
-      // Merge settings data from all sources
-      const combinedSettings = {
-        ...settingsFromStandings,
-        ...settingsFromLeague, 
-        ...settingsFromFull
-      };
-
-      // Find user's team and get roster data
-      const userTeam = standingsData.teams?.[0];
-      let userRoster = null;
-      
-      if (userTeam && rostersData.teams) {
-        const userTeamData = rostersData.teams.find((t: any) => t.id === userTeam.id);
-        userRoster = userTeamData?.roster || userTeamData?.rosterForCurrentScoringPeriod;
-      }
-
-      // Extract scoring settings from various possible locations in ESPN API
-      let receptionPoints = 0;
-      let scoringType = 'Standard';
-      
-      // Check multiple possible paths for scoring settings
-      // Try all available settings sources
-      const settingsSources = [combinedSettings, settingsFromFull, settingsFromLeague, settingsFromStandings];
-      
-      for (let index = 0; index < settingsSources.length; index++) {
-        const settings = settingsSources[index];
-        console.log(`AI Question - Checking settings source ${index}:`, Object.keys(settings || {}));
-        
-        // Debug: Show what's actually in scoringSettings if it exists
-        if (settings?.scoringSettings) {
-          console.log(`AI Question - Source ${index} scoringSettings keys:`, Object.keys(settings.scoringSettings));
-          console.log(`AI Question - Source ${index} scoringSettings.receptionPoints:`, settings.scoringSettings.receptionPoints);
-        }
-        
-        if (settings?.scoringSettings?.receptionPoints !== undefined) {
-          receptionPoints = settings.scoringSettings.receptionPoints;
-          console.log(`AI Question - Found reception points in scoringSettings from source ${index}:`, receptionPoints);
-          break;
-        } else if (settings?.scoringSettings?.scoringItems && Array.isArray(settings.scoringSettings.scoringItems)) {
-          const scoringItems = settings.scoringSettings.scoringItems;
-          console.log(`AI Question - Checking ${scoringItems.length} scoring items in source ${index}`);
-          console.log('AI Question - First 5 scoring items:', JSON.stringify(scoringItems.slice(0, 5), null, 2));
-          // Look for reception scoring in scoringItems (ESPN often puts it here)
-          console.log('AI Question - Searching through scoring items for reception scoring...');
-          const receptionScoringItem = scoringItems.find((item: any) => {
-            const isReceptionStat = item.statId === 53 || // Reception stat ID in ESPN
-              item.description?.toLowerCase().includes('reception') ||
-              item.abbr === 'REC';
-            if (isReceptionStat) {
-              console.log('AI Question - Found reception scoring item:', JSON.stringify(item, null, 2));
-            }
-            return isReceptionStat;
-          });
-          if (receptionScoringItem) {
-            receptionPoints = receptionScoringItem.points || receptionScoringItem.value || 0;
-            console.log(`AI Question - Found reception points in scoringItems from source ${index}:`, receptionPoints);
-            break;
-          } else {
-            // Debug: Show a few scoring items to understand the structure
-            console.log('AI Question - Sample scoring items (first 3):', JSON.stringify(scoringItems.slice(0, 3), null, 2));
-          }
-        }
-      }
-      
-      // If still no PPR data found, try a different approach - check for specific scoring patterns
-      if (receptionPoints === 0) {
-        console.log('AI Question - No PPR data found in standard locations, checking alternative patterns...');
-        for (let index = 0; index < settingsSources.length; index++) {
-          const settings = settingsSources[index];
-          if (settings?.scoringItems && Array.isArray(settings.scoringItems)) {
-            console.log(`AI Question - Alternative search in source ${index}: checking ${settings.scoringItems.length} items`);
-            // Look specifically for statId 53 (reception stat)
-            const receptionItems = settings.scoringItems.filter((item: any) => item.statId === 53);
-            console.log(`AI Question - Found ${receptionItems.length} reception items (statId 53):`, receptionItems);
-            
-            // Also check for any reception-related items
-            const allReceptionItems = settings.scoringItems.filter((item: any) => 
-              item.statId === 53 ||
-              String(item.description || '').toLowerCase().includes('rec') ||
-              String(item.abbr || '').toLowerCase().includes('rec')
-            );
-            console.log(`AI Question - All reception-related items in source ${index}:`, allReceptionItems);
-            
-            // Use the first one that has points > 0
-            const validReceptionItem = allReceptionItems.find((item: any) => 
-              (item.points > 0) || (item.points === 0.5) || (item.points === 1)
-            );
-            
-            if (validReceptionItem) {
-              receptionPoints = validReceptionItem.points || validReceptionItem.value || 0;
-              console.log(`AI Question - Found reception points via alternative method from source ${index}:`, receptionPoints);
-              console.log(`AI Question - Full item details:`, JSON.stringify(validReceptionItem, null, 2));
-              break;
-            }
-          }
-        }
-      }
-      
-      console.log('AI Question - Final extracted reception points:', receptionPoints);
-      
-      const scoringSettings = {
-        scoringType: leagueDetailsData.settings?.scoringType || scoringType,
-        isHalfPPR: receptionPoints === 0.5,
-        isFullPPR: receptionPoints === 1.0,
-        isStandard: receptionPoints === 0,
-        receptionPoints: receptionPoints
-      };
-
-      // Get current week context
-      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || 1;
-      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
-      const weekContext = {
-        currentWeek: currentScoringPeriod,
-        seasonType,
-        season: league.season
-      };
-      
-      const contextData = {
-        userTeam: {
-          name: userTeam ? `${userTeam.location} ${userTeam.nickname}` : 'Unknown Team',
-          roster: userRoster?.entries?.map((entry: any) => {
-            const player = entry.playerPoolEntry?.player || entry.player;
-            return {
-              name: player?.fullName || 'Unknown Player',
-              position: player?.defaultPositionId,
-              isStarter: entry.lineupSlotId < 20,
-              isBench: entry.lineupSlotId === 20,
-              isIR: entry.lineupSlotId === 21
-            };
-          }) || []
-        },
-        scoringSettings,
-        weekContext,
-        league: {
-          name: league.name,
-          sport: league.sport,
-          season: league.season
-        },
-        teams: standingsData.teams
-      };
-
-      const answer = await geminiService.askQuestion(question, contextData);
-      res.json({ answer });
-    } catch (error: any) {
-      console.error('AI Question Error:', error);
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // (removed) AI Recommendations page API no longer used
 
   // AI Recommendations Prompt-Only route (returns prompt instead of calling AI)
   app.post("/api/leagues/:leagueId/ai-recommendations-prompt", requireAuth, async (req: any, res) => {
@@ -2599,319 +2196,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return slots[slotId] || `Slot_${slotId}`;
       };
 
-      console.log(`Generating question prompt for team ${teamId} in league ${league.espnLeagueId}`);
+      // (removed) extraneous AI Recommendations code
 
-      // Get comprehensive live data (same as analysis prompt)
-      const [rostersData, leagueDetailsData, playersResponse] = await Promise.all([
-        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings']),
-        espnApiService.getPlayers(credentials, league.sport, league.season, league.espnLeagueId.toString())
-      ]);
-
-      console.log('Rosters data teams:', rostersData.teams?.length || 0);
-      console.log('Looking for team ID:', teamId);
-
-      // Extract scoring settings
-      const settings = leagueDetailsData.settings || rostersData.settings || {};
-      let receptionPoints = 0;
-      if (settings?.scoringSettings?.scoringItems) {
-        const receptionItem = settings.scoringSettings.scoringItems.find((item: any) => item.statId === 53);
-        if (receptionItem?.points !== undefined) {
-          receptionPoints = receptionItem.points;
-        }
-      }
-
-      const scoringSettings = {
-        scoringType: settings.scoringType || 'Head-to-Head Points',
-        isHalfPPR: receptionPoints === 0.5,
-        isFullPPR: receptionPoints === 1.0,
-        isStandard: receptionPoints === 0,
-        receptionPoints: receptionPoints
-      };
-
-      // Get current week context
-      const currentScoringPeriod = leagueDetailsData.scoringPeriodId || leagueDetailsData.currentScoringPeriod || league.currentWeek || 1;
-      const seasonType = league.season >= new Date().getFullYear() ? 'Regular Season' : 'Past Season';
-      const weekContext = {
-        currentWeek: currentScoringPeriod,
-        seasonType,
-        season: league.season
-      };
-
-      // Find user's team from rosters
-      const userTeam = rostersData.teams?.find((t: any) => t.id === teamId);
-      if (!userTeam) {
-        console.error(`Team with ID ${teamId} not found. Available teams:`, rostersData.teams?.map((t: any) => ({ id: t.id, location: t.location, nickname: t.nickname })));
-        return res.status(404).json({ message: `Team with ID ${teamId} not found in league` });
-      }
-
-      console.log('Found user team:', { id: userTeam.id, location: userTeam.location, nickname: userTeam.nickname });
-
-      // Helper function to get team name safely
-      const getTeamName = (team: any): string => {
-        if (team.location && team.nickname) {
-          return `${team.location} ${team.nickname}`;
-        }
-        if (team.name) {
-          return team.name;
-        }
-        if (team.location) {
-          return team.location;
-        }
-        if (team.nickname) {
-          return team.nickname;
-        }
-        return `Team ${team.id}`;
-      };
-
-      // Format user roster with proper categorization
-      const userRoster = userTeam.roster?.entries?.map((entry: any) => {
-        const player = entry.playerPoolEntry?.player || entry.player;
-        const lineupSlot = entry.lineupSlotId;
-        const isBench = lineupSlot === 20;
-        const isIR = lineupSlot === 21;
-        const isStarter = !isBench && !isIR;
-        return {
-          name: player?.fullName || 'Unknown Player',
-          position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
-          nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
-          lineupSlot: getLineupSlotName(lineupSlot),
-          isStarter: isStarter,
-          isBench: isBench,
-          isIR: isIR,
-          projectedPoints: getProjectedPoints(entry),
-          injuryStatus: getInjuryStatus(entry)
-        };
-      }) || [];
-
-      console.log('User roster length:', userRoster.length);
-      console.log('Sample roster players:', userRoster.slice(0, 3).map((p: any) => ({ name: p.name, position: p.position, isStarter: p.isStarter })));
-
-      // Get waiver wire data
-      let playersData = [];
-      if (Array.isArray(playersResponse)) {
-        playersData = playersResponse;
-      } else if (playersResponse?.players && Array.isArray(playersResponse.players)) {
-        playersData = playersResponse.players;
-      }
-
-      // Get taken player IDs
-      const takenPlayerIds = new Set();
-      rostersData.teams?.forEach((team: any) => {
-        team.roster?.entries?.forEach((entry: any) => {
-          const playerId = entry.playerPoolEntry?.player?.id || entry.playerId;
-          if (playerId) takenPlayerIds.add(playerId);
-        });
-      });
-
-      // Get top available players (exclude FA players)
-      const availablePlayers = playersData
-        .filter((playerData: any) => {
-          const player = playerData.player || playerData;
-          const playerId = player?.id;
-          return playerId && !takenPlayerIds.has(playerId);
-        })
-        .slice(0, 50)
-        .map((playerData: any) => {
-          const player = playerData.player || playerData;
-          return {
-            name: player?.fullName || 'Unknown Player',
-            position: getPositionNameLocal(player?.defaultPositionId) || 'FLEX',
-            nflTeam: player?.proTeamId ? getNFLTeamName(player.proTeamId) : 'FA',
-            projectedPoints: getProjectedPoints(playerData),
-            injuryStatus: getInjuryStatus(playerData),
-            percentOwned: player?.ownership?.percentOwned?.toFixed(1) || '0.0'
-          };
-        });
-
-      // Build comprehensive context data
-      const contextData = {
-        userTeam: {
-          name: getTeamName(userTeam),
-          record: userTeam.record ? `${userTeam.record.overall.wins}-${userTeam.record.overall.losses}` : 'Unknown',
-          roster: userRoster,
-          starters: userRoster.filter((p: any) => p.isStarter),
-          bench: userRoster.filter((p: any) => p.isBench),
-          ir: userRoster.filter((p: any) => p.isIR)
-        },
-        scoringSettings,
-        weekContext,
-        teams: rostersData.teams?.map((team: any) => ({
-          name: getTeamName(team),
-          record: team.record ? `${team.record.overall.wins}-${team.record.overall.losses}` : 'Unknown',
-          points: team.record?.overall?.pointsFor || 0
-        })) || [],
-        availablePlayers,
-        leagueSize: rostersData.teams?.length || 12
-      };
-
-      console.log('Context data summary:', {
-        userTeamName: contextData.userTeam.name,
-        rosterCount: contextData.userTeam.roster.length,
-        startersCount: contextData.userTeam.starters.length,
-        benchCount: contextData.userTeam.bench.length,
-        teamsCount: contextData.teams.length,
-        scoringType: contextData.scoringSettings.isFullPPR ? 'Full PPR' : contextData.scoringSettings.isHalfPPR ? 'Half PPR' : 'Standard'
-      });
-
-      // Fetch Fantasy Pros data if requested
-      let fantasyProsData: any = null;
-      if (fpOptions.news || fpOptions.projections || fpOptions.rankings) {
-        fantasyProsData = {};
-        
-        if (fpOptions.news) {
-          const newsResult = await db
-            .select()
-            .from(schema.fantasyProsNews)
-            .where(sql`${schema.fantasyProsNews.sport} = 'NFL'`)
-            .orderBy(sql`${schema.fantasyProsNews.newsDate} DESC`)
-            .limit(50);
-          fantasyProsData.news = newsResult;
-          console.log(`Fetched ${newsResult.length} Fantasy Pros news items for question prompt`);
-        }
-        
-        if (fpOptions.projections) {
-          const projectionsResult = await db
-            .select()
-            .from(schema.fantasyProsProjections)
-            .where(sql`${schema.fantasyProsProjections.sport} = 'NFL' AND ${schema.fantasyProsProjections.season} = ${league.season}`)
-            .orderBy(sql`${schema.fantasyProsProjections.projectedPoints} DESC NULLS LAST`)
-            .limit(100);
-          fantasyProsData.projections = projectionsResult;
-          console.log(`Fetched ${projectionsResult.length} Fantasy Pros projections for question prompt`);
-        }
-        
-        if (fpOptions.rankings) {
-          const rankingsResult = await db
-            .select()
-            .from(schema.fantasyProsRankings)
-            .where(sql`${schema.fantasyProsRankings.sport} = 'NFL' AND ${schema.fantasyProsRankings.season} = ${league.season}`)
-            .orderBy(sql`${schema.fantasyProsRankings.rank} ASC`)
-            .limit(100);
-          fantasyProsData.rankings = rankingsResult;
-          console.log(`Fetched ${rankingsResult.length} Fantasy Pros rankings for question prompt`);
-        }
-      }
-
-      // Get the prompt with comprehensive live data
-      const prompt = geminiService.getQuestionPrompt(question, contextData, fantasyProsData);
-      res.json({ prompt });
-    } catch (error: any) {
-      console.error('Question Prompt Generation Error:', error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Helper function for position mapping
-  const getPositionName = (positionId: number): string => {
-    const positions: { [key: number]: string } = {
-      1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'
-    };
-    return positions[positionId] || `POS_${positionId}`;
-  };
-
-  // Trade analysis route
-  app.post("/api/leagues/:leagueId/trade-analysis", requireAuth, async (req: any, res) => {
-    try {
-      const { selectedPlayer } = req.body;
-      if (!selectedPlayer) {
-        return res.status(400).json({ message: "Selected player is required" });
-      }
-
-      const league = await storage.getLeagueProfile(req.params.leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-
-      // Use league profile credentials
-      const credentials = await getLeagueProfileCredentials(
-        req.user.id,
-        league.espnLeagueId.toString(),
-        league.season
-      );
-
-      // Get comprehensive roster data for all teams
-      const [standingsData, rostersData, leagueDetailsData] = await Promise.all([
-        espnApiService.getStandings(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getRosters(credentials, league.sport, league.season, league.espnLeagueId),
-        espnApiService.getLeagueData(credentials, league.sport, league.season, league.espnLeagueId, ['mSettings'])
-      ]);
-
-      // Extract scoring settings
-      const combinedSettings = {
-        ...standingsData.settings,
-        ...leagueDetailsData.settings,
-        season: league.season
-      };
-
-      let receptionPoints = 0;
-      const settingsSources = [combinedSettings, leagueDetailsData.settings, standingsData.settings];
-      
-      for (const settings of settingsSources) {
-        if (settings?.scoringSettings?.scoringItems) {
-          const receptionItem = settings.scoringSettings.scoringItems.find((item: any) => item.statId === 53);
-          if (receptionItem?.points !== undefined) {
-            receptionPoints = receptionItem.points;
-            break;
-          }
-        }
-      }
-
-      const leagueSettings = {
-        receptionPoints,
-        season: league.season,
-        scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
-      };
-
-      // Find user's team from standings
-      const userTeam = standingsData.teams?.[0];
-      if (!userTeam) {
-        return res.status(404).json({ message: "User team not found" });
-      }
-
-      // Get roster data for all teams
-      const allTeams = rostersData.teams?.map((team: any) => {
-        const standingsTeam = standingsData.teams?.find((t: any) => t.id === team.id);
-        return {
-          id: team.id,
-          name: team.location && team.nickname ? `${team.location} ${team.nickname}` : `Team ${team.id}`,
-          roster: team.roster?.entries?.map((entry: any) => ({
-            name: entry.playerPoolEntry?.player?.fullName || 'Unknown Player',
-            position: getPositionName(entry.playerPoolEntry?.player?.defaultPositionId) || 'FLEX',
-            isStarter: entry.lineupSlotId !== 20, // 20 is typically bench
-            playerId: entry.playerPoolEntry?.player?.id
-          })) || [],
-          record: {
-            wins: standingsTeam?.record?.overall?.wins || 0,
-            losses: standingsTeam?.record?.overall?.losses || 0,
-            pointsFor: standingsTeam?.record?.overall?.pointsFor || 0,
-            pointsAgainst: standingsTeam?.record?.overall?.pointsAgainst || 0
-          }
-        };
-      }) || [];
-
-      // Find the complete user team data with roster
-      const userTeamWithRoster = allTeams.find((team: any) => team.id === userTeam.id) || {
-        id: userTeam.id,
-        name: userTeam.location && userTeam.nickname ? `${userTeam.location} ${userTeam.nickname}` : 'Your Team',
-        roster: [],
-        record: {
-          wins: userTeam.record?.overall?.wins || 0,
-          losses: userTeam.record?.overall?.losses || 0,
-          pointsFor: userTeam.record?.overall?.pointsFor || 0,
-          pointsAgainst: userTeam.record?.overall?.pointsAgainst || 0
-        }
-      };
-
-      // Call Gemini trade analysis
-      const tradeAnalysis = await geminiService.analyzeTrade(
-        selectedPlayer,
-        userTeamWithRoster,
-        allTeams,
-        leagueSettings
-      );
-
-      res.json(tradeAnalysis);
     } catch (error: any) {
       console.error('Trade Analysis Error:', error);
       res.status(500).json({ message: error.message });
@@ -2974,6 +2260,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receptionPoints,
         season: league.season,
         scoringType: combinedSettings.scoringType || 'Head-to-Head Points'
+      };
+
+      const getPositionName = (positionId: number): string => {
+        const positions: Record<number, string> = {
+          0: 'QB', 2: 'RB', 4: 'WR', 6: 'TE', 16: 'DEF', 17: 'K', 23: 'FLEX'
+        };
+        return positions[positionId] || `POS_${positionId}`;
       };
 
       // Find user's team using the provided teamId (normalize types for comparison)
