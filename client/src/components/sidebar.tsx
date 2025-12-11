@@ -256,7 +256,8 @@ export default function Sidebar() {
       <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
           {filterNavigationForUser(user)
-            .map((item) => {
+            .filter((item) => item.name !== "Help" && item.name !== "Account Settings")
+            .map((item, idx) => {
               const Icon = item.icon;
               const isActive = location === item.href;
               
@@ -270,7 +271,7 @@ export default function Sidebar() {
                         ? "bg-primary text-primary-foreground" 
                         : "text-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
-                    data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`nav-item-${idx + 1}`}
                     onClick={() => setIsOpen(false)}
                   >
                     <Icon className="w-5 h-5" />
