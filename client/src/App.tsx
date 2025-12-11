@@ -13,6 +13,7 @@ import AIRecommendations from "@/pages/ai-recommendations";
 import AuthPage from "@/pages/auth-page";
 import TradeAnalyzer from "@/pages/trade-analyzer";
 import AiAnswers from "@/pages/ai-answers";
+import Help from "@/pages/help";
 import Jobs from "@/pages/jobs";
 import Streaming from "@/pages/streaming";
 import ApiPlayground from "@/pages/api-playground";
@@ -28,7 +29,7 @@ import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { AdminRoute } from "@/lib/admin-route";
-import Leagues from "@/pages/leagues";
+// Leagues page removed
 
 function App() {
   return (
@@ -72,17 +73,7 @@ function App() {
                 </div>
               )} />
               
-              <ProtectedRoute path="/leagues" component={() => (
-                <div className="flex min-h-screen">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col lg:ml-0">
-                    <LeagueHeader />
-                    <main className="flex-1 overflow-y-auto">
-                      <Leagues />
-                    </main>
-                  </div>
-                </div>
-              )} />
+              {/* /leagues route removed */}
               
               <ProtectedRoute path="/standings" component={() => (
                 <div className="flex min-h-screen">
@@ -187,6 +178,18 @@ function App() {
                     <LeagueHeader />
                     <main className="flex-1 overflow-y-auto">
                       <AiAnswers />
+                    </main>
+                  </div>
+                </div>
+              )} />
+
+              <ProtectedRoute path="/help" component={() => (
+                <div className="flex min-h-screen">
+                  <Sidebar />
+                  <div className="flex-1 flex flex-col lg:ml-0">
+                    <LeagueHeader />
+                    <main className="flex-1 overflow-y-auto">
+                      <Help />
                     </main>
                   </div>
                 </div>

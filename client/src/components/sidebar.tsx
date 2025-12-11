@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube } from "lucide-react";
+import { Trophy, Key, BarChart3, Users, Calendar, UsersRound, Volleyball, Brain, TrendingUp, Menu, X, FileText, Sun, Moon, LogOut, PlayCircle, FlaskConical, UserCog, TestTube, LifeBuoy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -64,6 +64,7 @@ export const navigation = [
   { name: "Streaming", href: "/streaming", icon: PlayCircle },
   { name: "OPRK Sandbox", href: "/oprk-sandbox", icon: TestTube, adminOnly: true },
   { name: "Manage Members", href: "/manage-members", icon: UserCog },
+  { name: "Help", href: "/help", icon: LifeBuoy },
 ];
 
 export function filterNavigationForUser(user?: { role?: number } | null) {
@@ -87,6 +88,11 @@ export function filterNavigationForUser(user?: { role?: number } | null) {
 
     if (item.name === "Manage Members") {
       return user?.role === 9;
+    }
+
+    // Restrict AI Answers to paid or elevated roles
+    if (item.name === "AI Answers") {
+      return user?.role === 1 || user?.role === 2 || user?.role === 9;
     }
 
     return true;
