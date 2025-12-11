@@ -15,7 +15,7 @@ import { formatGameTime } from "@/lib/timezone-utils";
 
 export default function Players() {
   const { user } = useAuth();
-  const [selectedSport, setSelectedSport] = useState<string>("ffl");
+  const SPORT = "ffl" as const; // Always Football (NFL)
   const [selectedSeason, setSelectedSeason] = useState<string>("2025");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>("");
@@ -48,17 +48,17 @@ export default function Players() {
 
   // Query players data
   const { data: playersData, isLoading: playersLoading } = useQuery({
-    queryKey: ["/api/players", selectedSport, selectedSeason, selectedLeagueId],
+    queryKey: ["/api/players", SPORT, selectedSeason, selectedLeagueId],
     queryFn: async () => {
       const leagueParam = selectedLeagueId ? `&leagueId=${selectedLeagueId}` : '';
-      const response = await fetch(`/api/players/${selectedSport}/${selectedSeason}?${leagueParam}`);
+      const response = await fetch(`/api/players/${SPORT}/${selectedSeason}?${leagueParam}`);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to fetch players: ${response.status} ${errorText}`);
       }
       return response.json();
     },
-    enabled: !!user && !!selectedSport && !!selectedSeason && viewMode === "all",
+    enabled: !!user && !!selectedSeason && viewMode === "all",
   });
 
   // Query waiver wire data
@@ -412,18 +412,7 @@ export default function Players() {
                 </Select>
               </>
             )}
-            
-            <Select value={selectedSport} onValueChange={setSelectedSport}>
-              <SelectTrigger className="w-40" data-testid="select-sport">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ffl">Football (NFL)</SelectItem>
-                <SelectItem value="fba">Basketball (NBA)</SelectItem>
-                <SelectItem value="fhk">Hockey (NHL)</SelectItem>
-                <SelectItem value="flb">Baseball (MLB)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="text-sm text-muted-foreground">Football (NFL)</div>
             
             <Select value={selectedSeason} onValueChange={setSelectedSeason}>
               <SelectTrigger className="w-24" data-testid="select-season">
@@ -475,7 +464,7 @@ export default function Players() {
                   });
                 } else {
                   queryClient.invalidateQueries({ 
-                    queryKey: ["/api/players", selectedSport, selectedSeason] 
+                    queryKey: ["/api/players", SPORT, selectedSeason] 
                   });
                 }
               }}
