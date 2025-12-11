@@ -50,7 +50,7 @@ const useThemeSafe = () => {
   return { theme, toggleTheme };
 };
 
-const navigation = [
+export const navigation = [
   { name: "League Setup", href: "/authentication", icon: Key },
   { name: "Standings", href: "/standings", icon: BarChart3 },
   { name: "Team Rosters", href: "/rosters", icon: Users },
@@ -65,6 +65,33 @@ const navigation = [
   { name: "OPRK Sandbox", href: "/oprk-sandbox", icon: TestTube, adminOnly: true },
   { name: "Manage Members", href: "/manage-members", icon: UserCog },
 ];
+
+export function filterNavigationForUser(user?: { role?: number } | null) {
+  return navigation.filter((item) => {
+    const adminOnlyPages = [
+      "API Playground",
+      "Jobs",
+      "Matchups",
+      "AI Recommendations",
+      "Trade Analyzer",
+      "Streaming",
+    ];
+
+    if (adminOnlyPages.includes(item.name)) {
+      return user?.role === 9 || user?.role === 2;
+    }
+
+    if ((item as any).adminOnly) {
+      return user?.role === 9 || user?.role === 2;
+    }
+
+    if (item.name === "Manage Members") {
+      return user?.role === 9;
+    }
+
+    return true;
+  });
+}
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -176,27 +203,7 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 p-4 overflow-y-auto" data-testid="navigation">
         <ul className="space-y-2">
-          {navigation
-            .filter((item) => {
-              // Hide admin-only pages for non-admin/developer users
-              const adminOnlyPages = ['API Playground', 'Jobs', 'Matchups', 'AI Recommendations', 'Trade Analyzer', 'Streaming'];
-              if (adminOnlyPages.includes(item.name)) {
-                // Allow access for Admin (role 9) or Developer (role 2)
-                return user?.role === 9 || user?.role === 2;
-              }
-              
-              // Hide OPRK Sandbox for non-admin/developer users
-              if (item.adminOnly) {
-                return user?.role === 9 || user?.role === 2;
-              }
-              
-              // Hide Manage Members for non-admin users (admin only - role 9)
-              if (item.name === 'Manage Members') {
-                return user?.role === 9;
-              }
-              
-              return true;
-            })
+          {filterNavigationForUser(user)
             .map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;

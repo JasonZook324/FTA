@@ -23,6 +23,7 @@ import OPRKSandbox from "@/pages/oprk-sandbox";
 import Sidebar from "@/components/sidebar";
 import LeagueHeader from "@/components/league-header";
 import DebugPanel from "@/components/debug-panel";
+import Footer from "@/components/footer";
 import { TeamProvider } from "@/contexts/TeamContext";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -229,6 +230,7 @@ function App() {
               
               <Route component={NotFound} />
             </Switch>
+            <Footer />
             <DebugPanel />
           </TooltipProvider>
         </TeamProvider>
