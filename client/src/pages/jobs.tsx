@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, TrendingUp, Activity, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { Loader2, Database, TrendingUp, Activity, CheckCircle2, Circle, AlertCircle, Newspaper } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 type JobStep = {
@@ -340,6 +340,48 @@ export default function Jobs() {
 
     setUnifiedRunning(false);
     setStatus("✓ All unified player data refreshed successfully!");
+  }
+
+  // News-only refresh - lightweight update for ESPN outlooks and FP news
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsSteps, setNewsSteps] = useState<JobStep[]>([]);
+
+  async function runNewsRefresh() {
+    setNewsRefreshing(true);
+    setStatus("");
+    
+    const jobs: JobStep[] = [
+      { name: "Refresh FP News", status: 'pending' },
+      { name: "Enrich Player Data", status: 'pending' },
+      { name: "Refresh ESPN Outlooks", status: 'pending' },
+      { name: "Refresh Players Master", status: 'pending' },
+    ];
+    setNewsSteps(jobs);
+
+    // Mark first step as running
+    setNewsSteps(prev => prev.map((step, idx) => 
+      idx === 0 ? { ...step, status: 'running' } : step
+    ));
+
+    // Call the single news refresh endpoint
+    const result = await runJob("/api/jobs/unified-refresh-news", {
+      sport: "NFL",
+      season: parseInt(unifiedSeason)
+    });
+
+    if (result.success) {
+      // Mark all steps as completed
+      setNewsSteps(prev => prev.map(step => ({ ...step, status: 'completed' })));
+      setStatus("✓ News data refreshed successfully!");
+    } else {
+      // Mark as error
+      setNewsSteps(prev => prev.map((step, idx) => 
+        idx === 0 ? { ...step, status: 'error', message: result.message } : step
+      ));
+      setStatus(`Failed: ${result.message}`);
+    }
+
+    setNewsRefreshing(false);
   }
 
   async function fetchPlayersMaster() {
@@ -853,7 +895,7 @@ export default function Jobs() {
           <div className="flex gap-3">
             <Button
               data-testid="button-refresh-unified-players"
-              disabled={unifiedRunning}
+              disabled={unifiedRunning || newsRefreshing}
               onClick={runUnifiedPlayerJobs}
               className="flex-1"
               size="lg"
@@ -864,7 +906,7 @@ export default function Jobs() {
             <Button
               data-testid="button-clear-unified-data"
               variant="outline"
-              disabled={unifiedRunning}
+              disabled={unifiedRunning || newsRefreshing}
               onClick={async () => {
                 setStatus("Clearing unified player data...");
                 const result = await runJob("/api/jobs/unified-clear-data");
@@ -875,6 +917,43 @@ export default function Jobs() {
             >
               Clear Data
             </Button>
+          </div>
+
+          {/* News Refresh Section */}
+          <div className="border-t pt-4 mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Newspaper className="h-4 w-4" />
+              <span className="font-medium">Quick News Refresh</span>
+              <span className="text-xs text-muted-foreground">(Faster - updates news/outlooks only)</span>
+            </div>
+            
+            {/* News Progress Steps */}
+            {newsSteps.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <Progress value={getStepProgress(newsSteps)} className="h-2" />
+                <div className="space-y-1">
+                  {newsSteps.map((step, idx) => (
+                    <StepIndicator key={idx} step={step} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              data-testid="button-refresh-news-only"
+              disabled={unifiedRunning || newsRefreshing}
+              onClick={runNewsRefresh}
+              variant="secondary"
+              size="lg"
+              className="w-full"
+            >
+              {newsRefreshing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh News & Outlooks Only
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Updates ESPN outlooks and FantasyPros news headlines without refreshing all player data. 
+              Use this for quick updates before game time.
+            </p>
           </div>
         </CardContent>
       </Card>

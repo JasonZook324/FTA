@@ -1140,3 +1140,84 @@ export async function runAllUnifiedPlayerJobs(
     return { success: false, results, error: error.message };
   }
 }
+
+// Refresh only news/headlines/outlooks without full player data refresh
+// This is a lightweight operation for more frequent news updates
+export async function refreshNewsOnly(
+  sport: string = 'NFL',
+  season: number = 2025
+): Promise<{ success: boolean; results: Record<string, any>; error?: string }> {
+  const results: Record<string, any> = {};
+  
+  try {
+    console.log(`\n${'='.repeat(50)}`);
+    console.log(`REFRESHING NEWS ONLY: ${sport} ${season}`);
+    console.log(`${'='.repeat(50)}\n`);
+
+    // Step 1: Refresh FP News (from fantasy_pros_news table)
+    console.log('[1/3] Refreshing FantasyPros News...');
+    try {
+      const { refreshNews } = await import('./fantasyProsService');
+      const newsResult = await refreshNews(sport, 100); // Fetch up to 100 latest news items
+      results.fpNews = newsResult;
+      if (newsResult.success) {
+        console.log(`✓ Fetched ${newsResult.recordCount} news items`);
+      } else {
+        console.warn('FP News refresh warning:', newsResult.error);
+      }
+    } catch (e: any) {
+      console.warn('FP News refresh warning:', e.message);
+      results.fpNews = { success: false, recordCount: 0, error: e.message };
+    }
+
+    // Step 2: Enrich FP player data with latest news
+    console.log('\n[2/3] Enriching player data with news...');
+    try {
+      const enrichedCount = await enrichFpPlayersWithNews(sport, season);
+      results.enrichedPlayers = { success: true, recordCount: enrichedCount };
+      console.log(`✓ Updated ${enrichedCount} players with latest news`);
+    } catch (e: any) {
+      console.warn('News enrichment warning:', e.message);
+      results.enrichedPlayers = { success: false, recordCount: 0, error: e.message };
+    }
+
+    // Step 3: Update ESPN outlooks by refreshing ESPN player data
+    // This fetches the latest outlooks from ESPN without deleting existing player records
+    console.log('\n[3/3] Refreshing ESPN outlooks...');
+    try {
+      // Re-fetch ESPN players to get latest outlooks
+      const espnResult = await refreshEspnPlayers(sport, season);
+      results.espnOutlooks = { 
+        success: espnResult.success, 
+        recordCount: espnResult.recordCount,
+        error: espnResult.error 
+      };
+      if (espnResult.success) {
+        console.log(`✓ Updated ${espnResult.recordCount} players with ESPN outlooks`);
+      } else {
+        console.warn('ESPN outlooks refresh warning:', espnResult.error);
+      }
+    } catch (e: any) {
+      console.warn('ESPN outlooks refresh warning:', e.message);
+      results.espnOutlooks = { success: false, recordCount: 0, error: e.message };
+    }
+
+    // Step 4: Refresh the players_master view to reflect new data
+    console.log('\n[4/4] Refreshing Players Master View...');
+    results.playersMaster = await refreshPlayersMaster();
+    if (!results.playersMaster.success) {
+      console.warn('Players master refresh warning:', results.playersMaster.error);
+    } else {
+      console.log(`✓ Refreshed players_master view with ${results.playersMaster.rowCount} rows`);
+    }
+
+    console.log(`\n${'='.repeat(50)}`);
+    console.log('News refresh completed');
+    console.log(`${'='.repeat(50)}\n`);
+
+    return { success: true, results };
+  } catch (error: any) {
+    console.error('Error refreshing news:', error);
+    return { success: false, results, error: error.message };
+  }
+}

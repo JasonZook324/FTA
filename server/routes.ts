@@ -4910,6 +4910,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Refresh news only (ESPN outlooks + FP news) - lightweight update
+  app.post("/api/jobs/unified-refresh-news", requireAuth, async (req, res) => {
+    try {
+      const { sport = 'NFL', season = 2025 } = req.body;
+      const { refreshNewsOnly } = await import("./unifiedPlayerService");
+      const result = await refreshNewsOnly(sport, season);
+      
+      if (result.success) {
+        res.json({ 
+          message: `Successfully refreshed news data for ${sport} ${season}`,
+          results: result.results
+        });
+      } else {
+        res.status(500).json({ 
+          message: result.error || 'Failed to refresh news data',
+          results: result.results
+        });
+      }
+    } catch (error: any) {
+      console.error('News refresh error:', error);
+      res.status(500).json({ message: error.message || 'Failed to refresh news data' });
+    }
+  });
+
   // Clear unified player data tables
   app.post("/api/jobs/unified-clear-data", requireAuth, async (req, res) => {
     try {
