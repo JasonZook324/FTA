@@ -168,36 +168,66 @@ export default function LeagueHeader() {
   // League loaded - show league info with team selector and disconnect option
   return (
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-b border-green-200 dark:border-green-800 px-4 sm:px-6 py-3">
-      <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:justify-between">
-        {/* Centered API status overlay on wide screens */}
-        <div className="pointer-events-none absolute inset-0 hidden lg:flex items-center justify-center">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-2 h-2 bg-chart-2 rounded-full" />
-            <span className="text-green-700 dark:text-green-300" data-testid="connection-status">
-              API Connected — Ready for ESPN API calls
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
-          <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center flex-wrap gap-2">
-              <span className="font-semibold text-green-800 dark:text-green-200 text-sm sm:text-base truncate">{currentLeague.name}</span>
-              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 flex-shrink-0">
-                {currentLeague.sport.toUpperCase()}
-              </Badge>
-            </div>
-            <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-green-600 dark:text-green-400 mt-1">
-              <span className="whitespace-nowrap">Season {currentLeague.season}</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="whitespace-nowrap">{currentLeague.teamCount} teams</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="whitespace-nowrap">Week {currentLeague.currentWeek}</span>
+      <div className="flex flex-col gap-3">
+        {/* Row 1: League info and action buttons */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between">
+          {/* League Info */}
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center flex-wrap gap-2">
+                <span className="font-semibold text-green-800 dark:text-green-200 text-sm sm:text-base truncate max-w-[200px] sm:max-w-none">{currentLeague.name}</span>
+                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 flex-shrink-0">
+                  {currentLeague.sport.toUpperCase()}
+                </Badge>
+              </div>
+              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-green-600 dark:text-green-400 mt-1">
+                <span className="whitespace-nowrap">Season {currentLeague.season}</span>
+                <span>•</span>
+                <span className="whitespace-nowrap">{currentLeague.teamCount} teams</span>
+                <span>•</span>
+                <span className="whitespace-nowrap">Week {currentLeague.currentWeek}</span>
+              </div>
             </div>
           </div>
           
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => reloadLeagueMutation.mutate()}
+              disabled={reloadLeagueMutation.isPending}
+              className="flex-1 sm:flex-initial min-h-[40px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900 text-sm"
+              data-testid="button-refresh-header"
+            >
+              <RefreshCw className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{reloadLeagueMutation.isPending ? "Refreshing..." : "Refresh"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+              className="flex-1 sm:flex-initial min-h-[40px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900 text-sm"
+              data-testid="button-disconnect-header"
+            >
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{disconnectMutation.isPending ? "Leaving..." : "Disconnect"}</span>
+            </Button>
+          </div>
+        </div>
+        
+        {/* Row 2: API Status and Team Selector */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between border-t border-green-200 dark:border-green-800 pt-3">
+          {/* API Status */}
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-chart-2 rounded-full flex-shrink-0" />
+            <span className="text-green-700 dark:text-green-300 whitespace-nowrap" data-testid="connection-status">
+              API Connected
+            </span>
+          </div>
+          
           {/* Team Selector */}
-          <div className="flex items-center gap-2 min-w-[200px]">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Users className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
             <Select
               value={selectedTeam?.teamId?.toString() || ""}
@@ -205,7 +235,7 @@ export default function LeagueHeader() {
               disabled={isLoadingTeams || !teamsData?.teams?.length}
             >
               <SelectTrigger 
-                className="h-9 bg-white dark:bg-gray-900 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                className="h-9 w-full sm:w-[220px] bg-white dark:bg-gray-900 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
                 data-testid="select-team-header"
               >
                 <SelectValue placeholder={
@@ -228,31 +258,6 @@ export default function LeagueHeader() {
               </SelectContent>
             </Select>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-              <Button
-            variant="outline"
-            onClick={() => reloadLeagueMutation.mutate()}
-            disabled={reloadLeagueMutation.isPending}
-            className="flex-1 lg:flex-initial min-h-[44px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
-            data-testid="button-refresh-header"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">{reloadLeagueMutation.isPending ? "Refreshing..." : "Refresh Data"}</span>
-            <span className="sm:hidden">{reloadLeagueMutation.isPending ? "..." : "Refresh"}</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => disconnectMutation.mutate()}
-            disabled={disconnectMutation.isPending}
-            className="flex-1 lg:flex-initial min-h-[44px] border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900"
-            data-testid="button-disconnect-header"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">{disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}</span>
-            <span className="sm:hidden">Exit</span>
-          </Button>
         </div>
       </div>
     </div>
