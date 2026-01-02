@@ -1130,34 +1130,32 @@ async function refreshNflMatchupsFromEspn(
       
       const homeAbbr = homeTeam.team?.abbreviation || '';
       const awayAbbr = awayTeam.team?.abbreviation || '';
-      const gameDate = event.date || '';
+      const gameTimeUtc = event.date ? new Date(event.date) : new Date();
       
-      // Extract venue info for dome detection
-      const venue = competition.venue;
-      const isDome = venue?.indoor === true;
+      // Determine game day from the date
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const gameDay = days[gameTimeUtc.getDay()];
       
       // Insert matchup for home team
       await db.execute(sql`
-        INSERT INTO nfl_matchups (season, week, team, opponent_abbr, is_home, game_date, is_dome, venue)
-        VALUES (${season}, ${week}, ${homeAbbr}, ${awayAbbr}, true, ${gameDate}, ${isDome}, ${venue?.fullName || null})
-        ON CONFLICT (season, week, team) DO UPDATE SET
+        INSERT INTO nfl_matchups (season, week, team_abbr, opponent_abbr, is_home, game_time_utc, game_day)
+        VALUES (${season}, ${week}, ${homeAbbr}, ${awayAbbr}, true, ${gameTimeUtc}, ${gameDay})
+        ON CONFLICT (season, week, team_abbr) DO UPDATE SET
           opponent_abbr = EXCLUDED.opponent_abbr,
           is_home = EXCLUDED.is_home,
-          game_date = EXCLUDED.game_date,
-          is_dome = EXCLUDED.is_dome,
-          venue = EXCLUDED.venue
+          game_time_utc = EXCLUDED.game_time_utc,
+          game_day = EXCLUDED.game_day
       `);
       
       // Insert matchup for away team
       await db.execute(sql`
-        INSERT INTO nfl_matchups (season, week, team, opponent_abbr, is_home, game_date, is_dome, venue)
-        VALUES (${season}, ${week}, ${awayAbbr}, ${homeAbbr}, false, ${gameDate}, ${isDome}, ${venue?.fullName || null})
-        ON CONFLICT (season, week, team) DO UPDATE SET
+        INSERT INTO nfl_matchups (season, week, team_abbr, opponent_abbr, is_home, game_time_utc, game_day)
+        VALUES (${season}, ${week}, ${awayAbbr}, ${homeAbbr}, false, ${gameTimeUtc}, ${gameDay})
+        ON CONFLICT (season, week, team_abbr) DO UPDATE SET
           opponent_abbr = EXCLUDED.opponent_abbr,
           is_home = EXCLUDED.is_home,
-          game_date = EXCLUDED.game_date,
-          is_dome = EXCLUDED.is_dome,
-          venue = EXCLUDED.venue
+          game_time_utc = EXCLUDED.game_time_utc,
+          game_day = EXCLUDED.game_day
       `);
       
       insertedCount += 2;
