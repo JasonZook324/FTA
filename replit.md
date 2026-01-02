@@ -30,10 +30,19 @@ The frontend is a React 18 application with TypeScript, built with a component-b
     - 📝 ESPN weekly outlook
     - 📰 FantasyPros news headline and analysis
 - **OpenAI Integration**: Allows direct submission of generated prompts to OpenAI's API for in-app AI analysis, with model selection (GPT-4 Turbo, GPT-4, GPT-3.5 Turbo), request tracking, and robust error handling.
-- **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system is fully self-contained - running the unified player data job fetches all necessary data including rankings and projections. This includes:
-  - Database tables: `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk`, `player_aliases`, `fantasy_pros_rankings`, `fantasy_pros_projections`
+- **Unified Player Data System**: Consolidates ESPN and FantasyPros player data into a single player object. This system is fully self-contained - running the unified player data job fetches all necessary data including week detection, matchups, rankings and projections without any external dependencies. This includes:
+  - Database tables: `espn_player_data`, `fp_player_data`, `defense_vs_position_stats`, `player_crosswalk`, `player_aliases`, `fantasy_pros_rankings`, `fantasy_pros_projections`, `nfl_matchups`
   - Materialized view: `players_master` combining all player data with rankings, projections, and matchups
-  - **7-step workflow** (`runAllUnifiedPlayerJobs`): ESPN Players → FP Players → FP Rankings → FP Projections → Defense Stats → Crosswalk → Refresh View
+  - **9-step self-contained workflow** (`runAllUnifiedPlayerJobs`):
+    1. **Detect Week** - Automatically detects current NFL week from ESPN scoreboard API (no database dependency)
+    2. **Cleanup** - Removes old week data (rankings, projections, matchups) to prevent stale data
+    3. **Refresh Matchups** - Fetches NFL matchups directly from ESPN API (self-contained, no Vegas odds dependency)
+    4. **ESPN Players** - Fetches player data from ESPN Fantasy API
+    5. **FP Players** - Fetches player data from FantasyPros
+    6. **FP Rankings** - Fetches weekly position rankings from FantasyPros
+    7. **FP Projections** - Fetches player projections from FantasyPros
+    8. **Build Crosswalk** - Links ESPN and FP player IDs
+    9. **Refresh Master View** - Updates the `players_master` materialized view
   - **FP Roster Validation**: Before storing ESPN players, validates against FP's current roster status. Players marked as "FA" (free agent) in FP are excluded from ESPN data since ESPN often has stale roster information. This prevents mismatches from inactive/retired players.
   - **Player Alias System**: The `player_aliases` table stores nickname/alternate name mappings (e.g., "Bam Knight" → "Zonovan Knight", "Hollywood Brown" → "Marquise Brown"). Aliases are applied during crosswalk matching to bridge name differences between ESPN and FP.
   - **Multi-Pass Matching Strategy**: 

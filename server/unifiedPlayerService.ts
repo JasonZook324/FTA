@@ -1033,6 +1033,145 @@ async function cleanupOldWeekData(season: number, currentWeek: number): Promise<
   return { deleted };
 }
 
+// Detect current NFL week from ESPN's schedule API (self-contained, no database dependency)
+async function detectCurrentNflWeek(season: number): Promise<number> {
+  try {
+    // ESPN's scoreboard API shows the current week's games
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`ESPN API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract week from the response
+    if (data.week?.number) {
+      console.log(`Detected current NFL week from ESPN: ${data.week.number}`);
+      return data.week.number;
+    }
+    
+    // Fallback: check season type and week in calendar
+    if (data.leagues?.[0]?.calendar) {
+      const calendar = data.leagues[0].calendar;
+      for (const period of calendar) {
+        if (period.entries) {
+          for (const entry of period.entries) {
+            // Find the current/active week
+            const now = new Date();
+            const start = new Date(entry.startDate);
+            const end = new Date(entry.endDate);
+            if (now >= start && now <= end) {
+              const weekNum = parseInt(entry.value);
+              if (!isNaN(weekNum)) {
+                console.log(`Detected current NFL week from calendar: ${weekNum}`);
+                return weekNum;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    throw new Error('Could not parse week from ESPN response');
+  } catch (error: any) {
+    console.warn('Failed to detect current week from ESPN:', error.message);
+    // Return undefined to skip cleanup and use fallback behavior
+    throw error; // Re-throw to let caller handle gracefully
+  }
+}
+
+// Refresh NFL matchups directly from ESPN API (self-contained, no Vegas odds dependency)
+async function refreshNflMatchupsFromEspn(
+  season: number,
+  week: number
+): Promise<{ success: boolean; recordCount: number; error?: string }> {
+  try {
+    console.log(`Fetching NFL matchups from ESPN for ${season} week ${week}...`);
+    
+    // ESPN scoreboard API for specific week
+    const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week=${week}&seasontype=2`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`ESPN API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const events = data.events || [];
+    
+    if (events.length === 0) {
+      return { success: false, recordCount: 0, error: `No games found for week ${week}` };
+    }
+    
+    const { sql } = await import('drizzle-orm');
+    
+    // Clear existing matchups for this week
+    await db.execute(
+      sql`DELETE FROM nfl_matchups WHERE season = ${season} AND week = ${week}`
+    );
+    
+    let insertedCount = 0;
+    
+    for (const event of events) {
+      const competition = event.competitions?.[0];
+      if (!competition) continue;
+      
+      const competitors = competition.competitors || [];
+      const homeTeam = competitors.find((c: any) => c.homeAway === 'home');
+      const awayTeam = competitors.find((c: any) => c.homeAway === 'away');
+      
+      if (!homeTeam || !awayTeam) continue;
+      
+      const homeAbbr = homeTeam.team?.abbreviation || '';
+      const awayAbbr = awayTeam.team?.abbreviation || '';
+      const gameDate = event.date || '';
+      
+      // Extract venue info for dome detection
+      const venue = competition.venue;
+      const isDome = venue?.indoor === true;
+      
+      // Insert matchup for home team
+      await db.execute(sql`
+        INSERT INTO nfl_matchups (season, week, team, opponent_abbr, is_home, game_date, is_dome, venue)
+        VALUES (${season}, ${week}, ${homeAbbr}, ${awayAbbr}, true, ${gameDate}, ${isDome}, ${venue?.fullName || null})
+        ON CONFLICT (season, week, team) DO UPDATE SET
+          opponent_abbr = EXCLUDED.opponent_abbr,
+          is_home = EXCLUDED.is_home,
+          game_date = EXCLUDED.game_date,
+          is_dome = EXCLUDED.is_dome,
+          venue = EXCLUDED.venue
+      `);
+      
+      // Insert matchup for away team
+      await db.execute(sql`
+        INSERT INTO nfl_matchups (season, week, team, opponent_abbr, is_home, game_date, is_dome, venue)
+        VALUES (${season}, ${week}, ${awayAbbr}, ${homeAbbr}, false, ${gameDate}, ${isDome}, ${venue?.fullName || null})
+        ON CONFLICT (season, week, team) DO UPDATE SET
+          opponent_abbr = EXCLUDED.opponent_abbr,
+          is_home = EXCLUDED.is_home,
+          game_date = EXCLUDED.game_date,
+          is_dome = EXCLUDED.is_dome,
+          venue = EXCLUDED.venue
+      `);
+      
+      insertedCount += 2;
+    }
+    
+    console.log(`✓ Inserted ${insertedCount} matchup records from ESPN`);
+    return { success: true, recordCount: insertedCount };
+    
+  } catch (error: any) {
+    console.error('Error fetching matchups from ESPN:', error);
+    return { success: false, recordCount: 0, error: error.message };
+  }
+}
+
 export async function runAllUnifiedPlayerJobs(
   sport: string = 'NFL',
   season: number = 2025,
@@ -1046,45 +1185,66 @@ export async function runAllUnifiedPlayerJobs(
     console.log(`Running all unified player data jobs for ${sport} ${season}`);
     console.log(`${'='.repeat(50)}\n`);
 
-    // Determine current week if not provided
+    // Step 0: Determine current week from ESPN API (self-contained, no DB dependency)
     let targetWeek = week;
     if (!targetWeek && sport === 'NFL') {
+      console.log('[0/9] Detecting current NFL week from ESPN API...');
       try {
-        const { sql } = await import('drizzle-orm');
-        const weekResult = await db.execute(
-          sql`SELECT MAX(week) as current_week FROM nfl_matchups WHERE season = ${season}`
-        );
-        targetWeek = weekResult.rows[0]?.current_week as number || undefined;
-        console.log(`Detected current week: ${targetWeek || 'unknown'}`);
-      } catch (e) {
-        console.log('Could not detect current week, will fetch season data');
+        targetWeek = await detectCurrentNflWeek(season);
+        console.log(`✓ Target week: ${targetWeek}`);
+      } catch (e: any) {
+        console.warn('Could not detect current week, skipping week-specific operations');
+        results.weekDetection = { success: false, error: e.message };
       }
     }
 
-    // Clean up old week data before refreshing (only if we have a target week)
+    // Step 1: Clean up old week data before refreshing (only if we successfully detected week)
     if (targetWeek) {
-      console.log('\n[0/7] Cleaning up old week data...');
+      console.log('\n[1/9] Cleaning up old week data...');
       try {
         results.cleanup = await cleanupOldWeekData(season, targetWeek);
       } catch (e: any) {
         console.warn('Cleanup warning:', e.message);
         results.cleanup = { error: e.message };
       }
+    } else {
+      console.log('\n[1/9] Skipping cleanup (no target week detected)');
+      results.cleanup = { skipped: true, reason: 'Week detection failed' };
     }
 
-    console.log('\n[1/7] Refreshing ESPN Players...');
+    // Step 2: Refresh NFL matchups for the current week (fetch from ESPN API directly)
+    if (targetWeek) {
+      console.log(`\n[2/9] Refreshing NFL matchups for week ${targetWeek}...`);
+      try {
+        const matchupsResult = await refreshNflMatchupsFromEspn(season, targetWeek);
+        results.matchups = matchupsResult;
+        if (matchupsResult.success) {
+          console.log(`✓ Refreshed ${matchupsResult.recordCount} matchup records`);
+        } else {
+          console.warn('NFL matchups refresh warning:', matchupsResult.error);
+        }
+      } catch (e: any) {
+        console.warn('NFL matchups refresh warning:', e.message);
+        results.matchups = { success: false, recordCount: 0, error: e.message };
+      }
+    } else {
+      console.log('\n[2/9] Skipping matchups refresh (no target week)');
+      results.matchups = { skipped: true, reason: 'Week detection failed' };
+    }
+
+    console.log('\n[3/9] Refreshing ESPN Players...');
     results.espnPlayers = await refreshEspnPlayers(sport, season);
     if (!results.espnPlayers.success) {
       throw new Error(`ESPN Players refresh failed: ${results.espnPlayers.error}`);
     }
 
-    console.log('\n[2/7] Refreshing FP Players...');
+    console.log('\n[4/9] Refreshing FP Players...');
     results.fpPlayers = await refreshFpPlayers(sport, season);
     if (!results.fpPlayers.success) {
       console.warn('FP Players refresh warning:', results.fpPlayers.error);
     }
 
-    console.log('\n[3/7] Refreshing FP Rankings...');
+    console.log('\n[5/9] Refreshing FP Rankings...');
     try {
       const { refreshRankings } = await import('./fantasyProsService');
       results.fpRankings = await refreshRankings(sport, season, targetWeek, undefined, 'weekly', scoringType);
@@ -1098,7 +1258,7 @@ export async function runAllUnifiedPlayerJobs(
       results.fpRankings = { success: false, recordCount: 0, error: e.message };
     }
 
-    console.log('\n[4/7] Refreshing FP Projections...');
+    console.log('\n[6/9] Refreshing FP Projections...');
     try {
       const { refreshProjections } = await import('./fantasyProsService');
       results.fpProjections = await refreshProjections(sport, season, targetWeek, undefined, scoringType);
@@ -1112,19 +1272,19 @@ export async function runAllUnifiedPlayerJobs(
       results.fpProjections = { success: false, recordCount: 0, error: e.message };
     }
 
-    console.log('\n[5/7] Refreshing Defense Stats...');
+    console.log('\n[7/9] Refreshing Defense Stats...');
     results.defenseStats = await refreshDefenseStats(sport, season, scoringType);
     if (!results.defenseStats.success) {
       console.warn('Defense stats refresh warning:', results.defenseStats.error);
     }
 
-    console.log('\n[6/7] Building Crosswalk...');
+    console.log('\n[8/9] Building Crosswalk...');
     results.crosswalk = await buildCrosswalk(sport, season);
     if (!results.crosswalk.success) {
       console.warn('Crosswalk build warning:', results.crosswalk.error);
     }
 
-    console.log('\n[7/7] Refreshing Players Master View...');
+    console.log('\n[9/9] Refreshing Players Master View...');
     results.playersMaster = await refreshPlayersMaster();
     if (!results.playersMaster.success) {
       console.warn('Players master refresh warning:', results.playersMaster.error);
