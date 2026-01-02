@@ -71,7 +71,7 @@ export default function Jobs() {
   // Get scoring type from the user's league settings
   const leagueScoringType = currentLeague?.scoringType || "PPR";
 
-  // Set default week to current week when league data loads
+  // Set default week and season from league data when it loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
       setFpWeek(currentLeague.currentWeek.toString());
@@ -86,6 +86,20 @@ export default function Jobs() {
       setDefRankWeek(currentLeague.currentWeek.toString());
     }
   }, [currentLeague?.currentWeek, fpWeek, nflWeek, matchupsWeek, defRankWeek]);
+
+  // Set default season from league when it loads
+  useEffect(() => {
+    if (currentLeague?.season) {
+      const leagueSeason = currentLeague.season.toString();
+      setFpSeason(leagueSeason);
+      setNflSeason(leagueSeason);
+      setMatchupsSeason(leagueSeason);
+      setDefRankSeason(leagueSeason);
+      setUnifiedSeason(leagueSeason);
+      setViewerSeason(leagueSeason);
+      setParitySeason(leagueSeason);
+    }
+  }, [currentLeague?.season]);
 
   async function runJob(endpoint: string, body?: any): Promise<{ success: boolean; message: string }> {
     try {
