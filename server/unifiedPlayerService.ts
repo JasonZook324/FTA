@@ -1301,6 +1301,188 @@ export async function runAllUnifiedPlayerJobs(
   }
 }
 
+// Progress callback type for streaming updates
+type ProgressCallback = (stepKey: string, status: 'running' | 'completed' | 'error' | 'skipped', message?: string) => void;
+
+// Version with real-time progress updates for SSE streaming
+export async function runAllUnifiedPlayerJobsWithProgress(
+  sport: string = 'NFL',
+  season: number = 2025,
+  scoringType: string = 'PPR',
+  week?: number,
+  onProgress?: ProgressCallback
+): Promise<void> {
+  const notify = onProgress || (() => {});
+  
+  console.log(`\n${'='.repeat(50)}`);
+  console.log(`Running all unified player data jobs for ${sport} ${season}`);
+  console.log(`${'='.repeat(50)}\n`);
+
+  // Step 0: Detect Week
+  notify('weekDetection', 'running');
+  let targetWeek = week;
+  if (!targetWeek && sport === 'NFL') {
+    console.log('[0/9] Detecting current NFL week from ESPN API...');
+    try {
+      targetWeek = await detectCurrentNflWeek(season);
+      console.log(`✓ Target week: ${targetWeek}`);
+      notify('weekDetection', 'completed', `Week ${targetWeek}`);
+    } catch (e: any) {
+      console.warn('Could not detect current week, skipping week-specific operations');
+      notify('weekDetection', 'error', e.message);
+    }
+  } else if (targetWeek) {
+    notify('weekDetection', 'completed', `Week ${targetWeek} (provided)`);
+  } else {
+    notify('weekDetection', 'skipped', 'Not NFL');
+  }
+
+  // Step 1: Cleanup
+  notify('cleanup', 'running');
+  if (targetWeek) {
+    console.log('\n[1/9] Cleaning up old week data...');
+    try {
+      await cleanupOldWeekData(season, targetWeek);
+      notify('cleanup', 'completed', 'Old data cleaned');
+    } catch (e: any) {
+      console.warn('Cleanup warning:', e.message);
+      notify('cleanup', 'error', e.message);
+    }
+  } else {
+    console.log('\n[1/9] Skipping cleanup (no target week detected)');
+    notify('cleanup', 'skipped', 'Week detection failed');
+  }
+
+  // Step 2: Matchups
+  notify('matchups', 'running');
+  if (targetWeek) {
+    console.log(`\n[2/9] Refreshing NFL matchups for week ${targetWeek}...`);
+    try {
+      const matchupsResult = await refreshNflMatchupsFromEspn(season, targetWeek);
+      if (matchupsResult.success) {
+        console.log(`✓ Refreshed ${matchupsResult.recordCount} matchup records`);
+        notify('matchups', 'completed', `${matchupsResult.recordCount} matchups`);
+      } else {
+        notify('matchups', 'error', matchupsResult.error);
+      }
+    } catch (e: any) {
+      console.warn('NFL matchups refresh warning:', e.message);
+      notify('matchups', 'error', e.message);
+    }
+  } else {
+    console.log('\n[2/9] Skipping matchups refresh (no target week)');
+    notify('matchups', 'skipped', 'Week detection failed');
+  }
+
+  // Step 3: ESPN Players
+  notify('espnPlayers', 'running');
+  console.log('\n[3/9] Refreshing ESPN Players...');
+  try {
+    const espnResult = await refreshEspnPlayers(sport, season);
+    if (espnResult.success) {
+      notify('espnPlayers', 'completed', `${espnResult.recordCount} players`);
+    } else {
+      notify('espnPlayers', 'error', espnResult.error);
+    }
+  } catch (e: any) {
+    notify('espnPlayers', 'error', e.message);
+  }
+
+  // Step 4: FP Players
+  notify('fpPlayers', 'running');
+  console.log('\n[4/9] Refreshing FP Players...');
+  try {
+    const fpResult = await refreshFpPlayers(sport, season);
+    if (fpResult.success) {
+      notify('fpPlayers', 'completed', `${fpResult.recordCount} players`);
+    } else {
+      notify('fpPlayers', 'error', fpResult.error);
+    }
+  } catch (e: any) {
+    notify('fpPlayers', 'error', e.message);
+  }
+
+  // Step 5: FP Rankings
+  notify('fpRankings', 'running');
+  console.log('\n[5/9] Refreshing FP Rankings...');
+  try {
+    const { refreshRankings } = await import('./fantasyProsService');
+    const rankingsResult = await refreshRankings(sport, season, targetWeek, undefined, 'weekly', scoringType);
+    if (rankingsResult.success) {
+      console.log(`✓ Fetched ${rankingsResult.recordCount} rankings`);
+      notify('fpRankings', 'completed', `${rankingsResult.recordCount} rankings`);
+    } else {
+      notify('fpRankings', 'error', rankingsResult.error);
+    }
+  } catch (e: any) {
+    console.warn('FP Rankings refresh warning:', e.message);
+    notify('fpRankings', 'error', e.message);
+  }
+
+  // Step 6: FP Projections
+  notify('fpProjections', 'running');
+  console.log('\n[6/9] Refreshing FP Projections...');
+  try {
+    const { refreshProjections } = await import('./fantasyProsService');
+    const projectionsResult = await refreshProjections(sport, season, targetWeek, undefined, scoringType);
+    if (projectionsResult.success) {
+      console.log(`✓ Fetched ${projectionsResult.recordCount} projections`);
+      notify('fpProjections', 'completed', `${projectionsResult.recordCount} projections`);
+    } else {
+      notify('fpProjections', 'error', projectionsResult.error);
+    }
+  } catch (e: any) {
+    console.warn('FP Projections refresh warning:', e.message);
+    notify('fpProjections', 'error', e.message);
+  }
+
+  // Step 7: Defense Stats
+  notify('defenseStats', 'running');
+  console.log('\n[7/9] Refreshing Defense Stats...');
+  try {
+    const defenseResult = await refreshDefenseStats(sport, season, scoringType);
+    if (defenseResult.success) {
+      notify('defenseStats', 'completed', `${defenseResult.recordCount} stats`);
+    } else {
+      notify('defenseStats', 'error', defenseResult.error);
+    }
+  } catch (e: any) {
+    notify('defenseStats', 'error', e.message);
+  }
+
+  // Step 8: Crosswalk
+  notify('crosswalk', 'running');
+  console.log('\n[8/9] Building Crosswalk...');
+  try {
+    const crosswalkResult = await buildCrosswalk(sport, season);
+    if (crosswalkResult.success) {
+      notify('crosswalk', 'completed', `${crosswalkResult.recordCount} records`);
+    } else {
+      notify('crosswalk', 'error', crosswalkResult.error);
+    }
+  } catch (e: any) {
+    notify('crosswalk', 'error', e.message);
+  }
+
+  // Step 9: Players Master
+  notify('playersMaster', 'running');
+  console.log('\n[9/9] Refreshing Players Master View...');
+  try {
+    const masterResult = await refreshPlayersMaster();
+    if (masterResult.success) {
+      notify('playersMaster', 'completed', `${masterResult.rowCount} rows`);
+    } else {
+      notify('playersMaster', 'error', masterResult.error);
+    }
+  } catch (e: any) {
+    notify('playersMaster', 'error', e.message);
+  }
+
+  console.log(`\n${'='.repeat(50)}`);
+  console.log('All unified player data jobs completed');
+  console.log(`${'='.repeat(50)}\n`);
+}
+
 // Refresh only news/headlines/outlooks without full player data refresh
 // This is a lightweight operation for more frequent news updates
 export async function refreshNewsOnly(

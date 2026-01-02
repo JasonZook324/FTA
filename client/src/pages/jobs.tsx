@@ -291,85 +291,76 @@ export default function Jobs() {
     setUnifiedRunning(true);
     setStatus("");
     
-    // Full 9-step workflow that includes week detection, cleanup, and matchups
-    const jobs: JobStep[] = [
-      { name: "Detect Week", status: 'pending' },
-      { name: "Cleanup Old Data", status: 'pending' },
-      { name: "Refresh Matchups", status: 'pending' },
-      { name: "Refresh ESPN Players", status: 'pending' },
-      { name: "Refresh FP Players", status: 'pending' },
-      { name: "Refresh FP Rankings", status: 'pending' },
-      { name: "Refresh FP Projections", status: 'pending' },
-      { name: "Refresh Defense Stats", status: 'pending' },
-      { name: "Build Crosswalk", status: 'pending' },
-      { name: "Refresh Players Master", status: 'pending' },
-    ];
+    // Step key to display name mapping
+    const stepMapping: Record<string, string> = {
+      weekDetection: "Detect Week",
+      cleanup: "Cleanup Old Data",
+      matchups: "Refresh Matchups",
+      espnPlayers: "Refresh ESPN Players",
+      fpPlayers: "Refresh FP Players",
+      fpRankings: "Refresh FP Rankings",
+      fpProjections: "Refresh FP Projections",
+      defenseStats: "Refresh Defense Stats",
+      crosswalk: "Build Crosswalk",
+      playersMaster: "Refresh Players Master",
+    };
+    
+    // Initialize all steps as pending
+    const jobs: JobStep[] = Object.values(stepMapping).map(name => ({ 
+      name, 
+      status: 'pending' 
+    }));
     setUnifiedSteps(jobs);
 
-    // Mark all as running since backend handles all in one call
-    setUnifiedSteps(prev => prev.map(step => ({ ...step, status: 'running' })));
+    // Use Server-Sent Events for real-time progress
+    const params = new URLSearchParams({
+      sport: "NFL",
+      season: unifiedSeason,
+      scoringType: leagueScoringType
+    });
+    
+    const eventSource = new EventSource(`/api/jobs/unified-run-all-stream?${params}`, {
+      withCredentials: true
+    });
 
-    try {
-      const response = await fetch("/api/jobs/unified-run-all", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          sport: "NFL",
-          season: parseInt(unifiedSeason),
-          scoringType: leagueScoringType
-        })
-      });
+    eventSource.addEventListener('step', (event) => {
+      const data = JSON.parse(event.data);
+      const { stepKey, status, message } = data;
+      const displayName = stepMapping[stepKey];
       
-      const data = await response.json();
-      
-      if (response.ok && data.results) {
-        // Map backend results to UI steps
-        const stepResults = [
-          { key: 'weekDetection', name: 'Detect Week' },
-          { key: 'cleanup', name: 'Cleanup Old Data' },
-          { key: 'matchups', name: 'Refresh Matchups' },
-          { key: 'espnPlayers', name: 'Refresh ESPN Players' },
-          { key: 'fpPlayers', name: 'Refresh FP Players' },
-          { key: 'fpRankings', name: 'Refresh FP Rankings' },
-          { key: 'fpProjections', name: 'Refresh FP Projections' },
-          { key: 'defenseStats', name: 'Refresh Defense Stats' },
-          { key: 'crosswalk', name: 'Build Crosswalk' },
-          { key: 'playersMaster', name: 'Refresh Players Master' },
-        ];
-        
-        setUnifiedSteps(stepResults.map(sr => {
-          const result = data.results[sr.key];
-          const isSuccess = result?.success !== false && !result?.error;
-          const isSkipped = result?.skipped === true;
-          return {
-            name: sr.name,
-            status: isSkipped ? 'completed' : (isSuccess ? 'completed' : 'error'),
-            message: isSkipped 
-              ? `Skipped: ${result?.reason || 'N/A'}`
-              : (result?.error || result?.message || (isSuccess ? 'Success' : 'Failed'))
-          };
-        }));
-        
-        setStatus("✓ All unified player data refreshed successfully!");
-      } else {
-        setUnifiedSteps(prev => prev.map(step => ({ 
-          ...step, 
-          status: 'error',
-          message: data.message || 'Unknown error'
-        })));
-        setStatus(`Failed: ${data.message || 'Unknown error'}`);
+      if (displayName) {
+        setUnifiedSteps(prev => prev.map(step => 
+          step.name === displayName 
+            ? { ...step, status: status === 'skipped' ? 'completed' : status, message }
+            : step
+        ));
       }
-    } catch (err: any) {
-      setUnifiedSteps(prev => prev.map(step => ({ 
-        ...step, 
-        status: 'error',
-        message: err.message || 'Network error'
-      })));
-      setStatus(`Error: ${err.message || 'Network error'}`);
-    }
+    });
 
-    setUnifiedRunning(false);
+    eventSource.addEventListener('done', () => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      setStatus("✓ All unified player data refreshed successfully!");
+    });
+
+    eventSource.addEventListener('error', (event) => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      
+      // Try to parse error data if available
+      try {
+        const data = JSON.parse((event as any).data || '{}');
+        setStatus(`Failed: ${data.message || 'Unknown error'}`);
+      } catch {
+        setStatus("Failed: Connection error");
+      }
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      setStatus("Failed: Connection lost");
+    };
   }
 
   // News-only refresh - lightweight update for ESPN outlooks and FP news

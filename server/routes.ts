@@ -4910,6 +4910,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SSE streaming endpoint for real-time progress updates
+  app.get("/api/jobs/unified-run-all-stream", requireAuth, async (req, res) => {
+    const sport = (req.query.sport as string) || 'NFL';
+    const season = parseInt(req.query.season as string) || 2025;
+    const scoringType = (req.query.scoringType as string) || 'PPR';
+    const week = req.query.week ? parseInt(req.query.week as string) : undefined;
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendEvent = (event: string, data: any) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      const { runAllUnifiedPlayerJobsWithProgress } = await import("./unifiedPlayerService");
+      
+      await runAllUnifiedPlayerJobsWithProgress(
+        sport,
+        season,
+        scoringType,
+        week,
+        (stepKey: string, status: 'running' | 'completed' | 'error' | 'skipped', message?: string) => {
+          sendEvent('step', { stepKey, status, message });
+        }
+      );
+
+      sendEvent('done', { success: true });
+    } catch (error: any) {
+      console.error('Unified player jobs stream error:', error);
+      sendEvent('error', { message: error.message || 'Failed to run unified player jobs' });
+    } finally {
+      res.end();
+    }
+  });
+
   // Refresh news only (ESPN outlooks + FP news) - lightweight update
   app.post("/api/jobs/unified-refresh-news", requireAuth, async (req, res) => {
     try {
