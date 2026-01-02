@@ -1132,9 +1132,11 @@ async function refreshNflMatchupsFromEspn(
       const awayAbbr = awayTeam.team?.abbreviation || '';
       const gameTimeUtc = event.date ? new Date(event.date) : new Date();
       
-      // Determine game day from the date
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const gameDay = days[gameTimeUtc.getDay()];
+      // Determine game day using US Eastern timezone (NFL schedules are based on ET)
+      const gameDay = new Intl.DateTimeFormat('en-US', { 
+        weekday: 'long', 
+        timeZone: 'America/New_York' 
+      }).format(gameTimeUtc);
       
       // Insert matchup for home team
       await db.execute(sql`
