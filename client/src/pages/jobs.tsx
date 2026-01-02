@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Database, TrendingUp, Activity, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { Loader2, Database, TrendingUp, Activity, CheckCircle2, Circle, AlertCircle, Newspaper } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 type JobStep = {
@@ -71,7 +71,7 @@ export default function Jobs() {
   // Get scoring type from the user's league settings
   const leagueScoringType = currentLeague?.scoringType || "PPR";
 
-  // Set default week to current week when league data loads
+  // Set default week and season from league data when it loads
   useEffect(() => {
     if (currentLeague?.currentWeek && !fpWeek) {
       setFpWeek(currentLeague.currentWeek.toString());
@@ -86,6 +86,20 @@ export default function Jobs() {
       setDefRankWeek(currentLeague.currentWeek.toString());
     }
   }, [currentLeague?.currentWeek, fpWeek, nflWeek, matchupsWeek, defRankWeek]);
+
+  // Set default season from league when it loads
+  useEffect(() => {
+    if (currentLeague?.season) {
+      const leagueSeason = currentLeague.season.toString();
+      setFpSeason(leagueSeason);
+      setNflSeason(leagueSeason);
+      setMatchupsSeason(leagueSeason);
+      setDefRankSeason(leagueSeason);
+      setUnifiedSeason(leagueSeason);
+      setViewerSeason(leagueSeason);
+      setParitySeason(leagueSeason);
+    }
+  }, [currentLeague?.season]);
 
   async function runJob(endpoint: string, body?: any): Promise<{ success: boolean; message: string }> {
     try {
@@ -277,69 +291,118 @@ export default function Jobs() {
     setUnifiedRunning(true);
     setStatus("");
     
-    const jobs: JobStep[] = [
-      { name: "Refresh ESPN Players", status: 'pending' },
-      { name: "Refresh FP Players", status: 'pending' },
-      { name: "Refresh Defense Stats", status: 'pending' },
-      { name: "Build Crosswalk", status: 'pending' },
-      { name: "Refresh Players Master", status: 'pending' },
-    ];
+    // Step key to display name mapping
+    const stepMapping: Record<string, string> = {
+      weekDetection: "Detect Week",
+      cleanup: "Cleanup Old Data",
+      matchups: "Refresh Matchups",
+      espnPlayers: "Refresh ESPN Players",
+      fpPlayers: "Refresh FP Players",
+      fpRankings: "Refresh FP Rankings",
+      fpProjections: "Refresh FP Projections",
+      defenseStats: "Refresh Defense Stats",
+      crosswalk: "Build Crosswalk",
+      playersMaster: "Refresh Players Master",
+    };
+    
+    // Initialize all steps as pending
+    const jobs: JobStep[] = Object.values(stepMapping).map(name => ({ 
+      name, 
+      status: 'pending' 
+    }));
     setUnifiedSteps(jobs);
 
-    const jobConfigs = [
-      { 
-        endpoint: "/api/jobs/unified-refresh-espn-players", 
-        name: "Refresh ESPN Players",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-fp-players", 
-        name: "Refresh FP Players",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-defense-stats", 
-        name: "Refresh Defense Stats",
-        body: { sport: "NFL", season: parseInt(unifiedSeason), scoringType: leagueScoringType }
-      },
-      { 
-        endpoint: "/api/jobs/unified-build-crosswalk", 
-        name: "Build Crosswalk",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-players-master", 
-        name: "Refresh Players Master",
-        body: {}
-      },
-    ];
+    // Use Server-Sent Events for real-time progress
+    const params = new URLSearchParams({
+      sport: "NFL",
+      season: unifiedSeason,
+      scoringType: leagueScoringType
+    });
+    
+    const eventSource = new EventSource(`/api/jobs/unified-run-all-stream?${params}`, {
+      withCredentials: true
+    });
 
-    for (let i = 0; i < jobConfigs.length; i++) {
-      const config = jobConfigs[i];
+    eventSource.addEventListener('step', (event) => {
+      const data = JSON.parse(event.data);
+      const { stepKey, status, message } = data;
+      const displayName = stepMapping[stepKey];
       
-      setUnifiedSteps(prev => prev.map((step, idx) => 
-        idx === i ? { ...step, status: 'running' } : step
-      ));
-
-      const result = await runJob(config.endpoint, config.body);
-
-      setUnifiedSteps(prev => prev.map((step, idx) => 
-        idx === i ? { 
-          ...step, 
-          status: result.success ? 'completed' : 'error',
-          message: result.message
-        } : step
-      ));
-
-      if (!result.success) {
-        setStatus(`Failed at: ${config.name} - ${result.message}`);
-        setUnifiedRunning(false);
-        return;
+      if (displayName) {
+        setUnifiedSteps(prev => prev.map(step => 
+          step.name === displayName 
+            ? { ...step, status: status === 'skipped' ? 'completed' : status, message }
+            : step
+        ));
       }
+    });
+
+    eventSource.addEventListener('done', () => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      setStatus("✓ All unified player data refreshed successfully!");
+    });
+
+    eventSource.addEventListener('error', (event) => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      
+      // Try to parse error data if available
+      try {
+        const data = JSON.parse((event as any).data || '{}');
+        setStatus(`Failed: ${data.message || 'Unknown error'}`);
+      } catch {
+        setStatus("Failed: Connection error");
+      }
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      setUnifiedRunning(false);
+      setStatus("Failed: Connection lost");
+    };
+  }
+
+  // News-only refresh - lightweight update for ESPN outlooks and FP news
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsSteps, setNewsSteps] = useState<JobStep[]>([]);
+
+  async function runNewsRefresh() {
+    setNewsRefreshing(true);
+    setStatus("");
+    
+    const jobs: JobStep[] = [
+      { name: "Refresh FP News", status: 'pending' },
+      { name: "Enrich Player Data", status: 'pending' },
+      { name: "Refresh ESPN Outlooks", status: 'pending' },
+      { name: "Refresh Players Master", status: 'pending' },
+    ];
+    setNewsSteps(jobs);
+
+    // Mark first step as running
+    setNewsSteps(prev => prev.map((step, idx) => 
+      idx === 0 ? { ...step, status: 'running' } : step
+    ));
+
+    // Call the single news refresh endpoint
+    const result = await runJob("/api/jobs/unified-refresh-news", {
+      sport: "NFL",
+      season: parseInt(unifiedSeason)
+    });
+
+    if (result.success) {
+      // Mark all steps as completed
+      setNewsSteps(prev => prev.map(step => ({ ...step, status: 'completed' })));
+      setStatus("✓ News data refreshed successfully!");
+    } else {
+      // Mark as error
+      setNewsSteps(prev => prev.map((step, idx) => 
+        idx === 0 ? { ...step, status: 'error', message: result.message } : step
+      ));
+      setStatus(`Failed: ${result.message}`);
     }
 
-    setUnifiedRunning(false);
-    setStatus("✓ All unified player data refreshed successfully!");
+    setNewsRefreshing(false);
   }
 
   async function fetchPlayersMaster() {
@@ -853,7 +916,7 @@ export default function Jobs() {
           <div className="flex gap-3">
             <Button
               data-testid="button-refresh-unified-players"
-              disabled={unifiedRunning}
+              disabled={unifiedRunning || newsRefreshing}
               onClick={runUnifiedPlayerJobs}
               className="flex-1"
               size="lg"
@@ -864,7 +927,7 @@ export default function Jobs() {
             <Button
               data-testid="button-clear-unified-data"
               variant="outline"
-              disabled={unifiedRunning}
+              disabled={unifiedRunning || newsRefreshing}
               onClick={async () => {
                 setStatus("Clearing unified player data...");
                 const result = await runJob("/api/jobs/unified-clear-data");
@@ -875,6 +938,43 @@ export default function Jobs() {
             >
               Clear Data
             </Button>
+          </div>
+
+          {/* News Refresh Section */}
+          <div className="border-t pt-4 mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Newspaper className="h-4 w-4" />
+              <span className="font-medium">Quick News Refresh</span>
+              <span className="text-xs text-muted-foreground">(Faster - updates news/outlooks only)</span>
+            </div>
+            
+            {/* News Progress Steps */}
+            {newsSteps.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <Progress value={getStepProgress(newsSteps)} className="h-2" />
+                <div className="space-y-1">
+                  {newsSteps.map((step, idx) => (
+                    <StepIndicator key={idx} step={step} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              data-testid="button-refresh-news-only"
+              disabled={unifiedRunning || newsRefreshing}
+              onClick={runNewsRefresh}
+              variant="secondary"
+              size="lg"
+              className="w-full"
+            >
+              {newsRefreshing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Refresh News & Outlooks Only
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Updates ESPN outlooks and FantasyPros news headlines without refreshing all player data. 
+              Use this for quick updates before game time.
+            </p>
           </div>
         </CardContent>
       </Card>
