@@ -215,8 +215,31 @@ class EspnApiService {
     // Try multiple ESPN API approaches to get roster data
     console.log('Attempting to get roster data with multiple methods...');
     
-    // Method 1: Current scoring period with specific roster views
-    const currentWeek = new Date().getMonth() < 8 ? 1 : Math.ceil((new Date().getTime() - new Date(season, 8, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+    // Calculate current NFL week properly (season runs Sep-Jan)
+    // NFL 2025 season: Week 1 starts Sep 4, 2025. Each week is ~7 days.
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
+    // Season start is early September of the season year
+    const seasonStart = new Date(season, 8, 4); // September 4th of season year
+    
+    let currentWeek: number;
+    if (currentMonth >= 8 && currentYear === season) {
+      // Sep-Dec of season year
+      currentWeek = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    } else if (currentMonth <= 1 && currentYear === season + 1) {
+      // Jan-Feb of following year (playoffs/end of season)
+      currentWeek = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    } else {
+      // Off-season or mismatched year - default to week 1
+      currentWeek = 1;
+    }
+    // Clamp to valid NFL week range (1-18)
+    currentWeek = Math.max(1, Math.min(18, currentWeek));
+    
+    console.log(`Calculated current NFL week: ${currentWeek} for season ${season}`);
+    
     const mainUrl = `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}?view=mRoster&view=mTeam&view=mMatchup&scoringPeriodId=${currentWeek}&nocache=${Date.now()}`;
     
     console.log('Main roster API URL:', mainUrl);
@@ -275,10 +298,21 @@ class EspnApiService {
       ? `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leagues/${leagueId}`
       : `${this.baseUrl}/${sport}/seasons/${season}/segments/0/leaguedefaults/1`;
     
-    // Add comprehensive ESPN views to get complete player data including opponent rankings
-    // Calculate current NFL week (assuming season starts in September)
-    const currentDate = new Date();
-    const currentWeek = Math.max(1, Math.min(18, Math.floor((currentDate.getTime() - new Date('2025-09-01').getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1));
+    // Calculate current NFL week properly (season runs Sep-Jan)
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const seasonStart = new Date(season, 8, 4); // September 4th of season year
+    
+    let currentWeek: number;
+    if (currentMonth >= 8 && currentYear === season) {
+      currentWeek = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    } else if (currentMonth <= 1 && currentYear === season + 1) {
+      currentWeek = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    } else {
+      currentWeek = 1;
+    }
+    currentWeek = Math.max(1, Math.min(18, currentWeek));
     
     // Include all relevant ESPN views that might contain OPRK data
     const views = [
