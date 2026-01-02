@@ -291,69 +291,85 @@ export default function Jobs() {
     setUnifiedRunning(true);
     setStatus("");
     
+    // Full 9-step workflow that includes week detection, cleanup, and matchups
     const jobs: JobStep[] = [
+      { name: "Detect Week", status: 'pending' },
+      { name: "Cleanup Old Data", status: 'pending' },
+      { name: "Refresh Matchups", status: 'pending' },
       { name: "Refresh ESPN Players", status: 'pending' },
       { name: "Refresh FP Players", status: 'pending' },
+      { name: "Refresh FP Rankings", status: 'pending' },
+      { name: "Refresh FP Projections", status: 'pending' },
       { name: "Refresh Defense Stats", status: 'pending' },
       { name: "Build Crosswalk", status: 'pending' },
       { name: "Refresh Players Master", status: 'pending' },
     ];
     setUnifiedSteps(jobs);
 
-    const jobConfigs = [
-      { 
-        endpoint: "/api/jobs/unified-refresh-espn-players", 
-        name: "Refresh ESPN Players",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-fp-players", 
-        name: "Refresh FP Players",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-defense-stats", 
-        name: "Refresh Defense Stats",
-        body: { sport: "NFL", season: parseInt(unifiedSeason), scoringType: leagueScoringType }
-      },
-      { 
-        endpoint: "/api/jobs/unified-build-crosswalk", 
-        name: "Build Crosswalk",
-        body: { sport: "NFL", season: parseInt(unifiedSeason) }
-      },
-      { 
-        endpoint: "/api/jobs/unified-refresh-players-master", 
-        name: "Refresh Players Master",
-        body: {}
-      },
-    ];
+    // Mark all as running since backend handles all in one call
+    setUnifiedSteps(prev => prev.map(step => ({ ...step, status: 'running' })));
 
-    for (let i = 0; i < jobConfigs.length; i++) {
-      const config = jobConfigs[i];
+    try {
+      const response = await fetch("/api/jobs/unified-run-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          sport: "NFL",
+          season: parseInt(unifiedSeason),
+          scoringType: leagueScoringType
+        })
+      });
       
-      setUnifiedSteps(prev => prev.map((step, idx) => 
-        idx === i ? { ...step, status: 'running' } : step
-      ));
-
-      const result = await runJob(config.endpoint, config.body);
-
-      setUnifiedSteps(prev => prev.map((step, idx) => 
-        idx === i ? { 
+      const data = await response.json();
+      
+      if (response.ok && data.results) {
+        // Map backend results to UI steps
+        const stepResults = [
+          { key: 'weekDetection', name: 'Detect Week' },
+          { key: 'cleanup', name: 'Cleanup Old Data' },
+          { key: 'matchups', name: 'Refresh Matchups' },
+          { key: 'espnPlayers', name: 'Refresh ESPN Players' },
+          { key: 'fpPlayers', name: 'Refresh FP Players' },
+          { key: 'fpRankings', name: 'Refresh FP Rankings' },
+          { key: 'fpProjections', name: 'Refresh FP Projections' },
+          { key: 'defenseStats', name: 'Refresh Defense Stats' },
+          { key: 'crosswalk', name: 'Build Crosswalk' },
+          { key: 'playersMaster', name: 'Refresh Players Master' },
+        ];
+        
+        setUnifiedSteps(stepResults.map(sr => {
+          const result = data.results[sr.key];
+          const isSuccess = result?.success !== false && !result?.error;
+          const isSkipped = result?.skipped === true;
+          return {
+            name: sr.name,
+            status: isSkipped ? 'completed' : (isSuccess ? 'completed' : 'error'),
+            message: isSkipped 
+              ? `Skipped: ${result?.reason || 'N/A'}`
+              : (result?.error || result?.message || (isSuccess ? 'Success' : 'Failed'))
+          };
+        }));
+        
+        setStatus("✓ All unified player data refreshed successfully!");
+      } else {
+        setUnifiedSteps(prev => prev.map(step => ({ 
           ...step, 
-          status: result.success ? 'completed' : 'error',
-          message: result.message
-        } : step
-      ));
-
-      if (!result.success) {
-        setStatus(`Failed at: ${config.name} - ${result.message}`);
-        setUnifiedRunning(false);
-        return;
+          status: 'error',
+          message: data.message || 'Unknown error'
+        })));
+        setStatus(`Failed: ${data.message || 'Unknown error'}`);
       }
+    } catch (err: any) {
+      setUnifiedSteps(prev => prev.map(step => ({ 
+        ...step, 
+        status: 'error',
+        message: err.message || 'Network error'
+      })));
+      setStatus(`Error: ${err.message || 'Network error'}`);
     }
 
     setUnifiedRunning(false);
-    setStatus("✓ All unified player data refreshed successfully!");
   }
 
   // News-only refresh - lightweight update for ESPN outlooks and FP news
