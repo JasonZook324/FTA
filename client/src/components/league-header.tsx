@@ -216,16 +216,8 @@ export default function LeagueHeader() {
           </div>
         </div>
         
-        {/* Row 2: API Status and Team Selector */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between border-t border-green-200 dark:border-green-800 pt-3">
-          {/* API Status */}
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-2 h-2 bg-chart-2 rounded-full flex-shrink-0" />
-            <span className="text-green-700 dark:text-green-300 whitespace-nowrap" data-testid="connection-status">
-              API Connected
-            </span>
-          </div>
-          
+        {/* Row 2: Team Selector */}
+        <div className="flex items-center gap-3 border-t border-green-200 dark:border-green-800 pt-3">
           {/* Team Selector */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Users className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
